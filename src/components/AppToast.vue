@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref } from "vue";
 import { useToastStore } from "../stores/toast";
 import { Check, X, Info, Download } from "lucide-vue-next";
@@ -9,8 +9,8 @@ const dismissing = ref<number | null>(null);
 const typeStyles: Record<string, string> = {
   success: "border-l-emerald-500 bg-emerald-500/10",
   error: "border-l-red-500 bg-red-500/10",
-  info: "border-l-gray-400 bg-white/5",
-  progress: "border-l-emerald-500 bg-white/5",
+  info: "border-l-gray-400 bg-theme-btn",
+  progress: "border-l-emerald-500 bg-theme-btn",
 };
 
 const typeIcons: Record<string, typeof Check> = {
@@ -23,7 +23,7 @@ const typeIcons: Record<string, typeof Check> = {
 const typeIconColors: Record<string, string> = {
   success: "text-emerald-400",
   error: "text-red-400",
-  info: "text-gray-400",
+  info: "text-theme-secondary",
   progress: "text-accent-emerald",
 };
 
@@ -54,12 +54,12 @@ function onDismiss(id: number) {
             :size="16"
             class="shrink-0 mt-0.5"
             :class="typeIconColors[toast.type]" />
-          <span class="text-gray-200 leading-snug">{{ toast.message }}</span>
+          <span class="text-theme-primary leading-snug">{{ toast.message }}</span>
         </div>
         <!-- Progress bar (only for progress toasts) -->
         <div v-if="toast.type === 'progress' && toast.progress !== undefined" class="w-full">
           <div class="flex items-center justify-between mb-1">
-            <span class="text-[10px] text-gray-400">{{ toast.progress }}%</span>
+            <span class="text-[10px] text-theme-secondary">{{ toast.progress }}%</span>
           </div>
           <div class="w-full bg-gray-700 rounded-full h-1.5">
             <div class="bg-accent-emerald h-1.5 rounded-full transition-all duration-300"

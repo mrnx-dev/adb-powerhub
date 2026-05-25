@@ -23,11 +23,11 @@ function handleConnect() {
       <div class="flex gap-2">
         <div class="flex-1">
           <input v-model="store.ipAddress" type="text" placeholder="IP address (e.g., 192.168.1.5)"
-            class="w-full bg-black/40 border border-white/10 rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:border-accent-emerald/50" />
+            class="w-full bg-theme-input border border-theme-secondary rounded-lg py-1.5 px-3 text-xs text-theme-primary focus:outline-none focus:border-accent-emerald/50 placeholder:text-theme-muted" />
         </div>
         <div class="w-28">
           <input v-model="store.usbDeviceId" type="text" placeholder="USB ID"
-            class="w-full bg-black/40 border border-white/10 rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:border-accent-emerald/50" />
+            class="w-full bg-theme-input border border-theme-secondary rounded-lg py-1.5 px-3 text-xs text-theme-primary focus:outline-none focus:border-accent-emerald/50 placeholder:text-theme-muted" />
         </div>
       </div>
       <div class="flex gap-2">
@@ -36,7 +36,7 @@ function handleConnect() {
           {{ store.connecting ? "Connecting..." : "Auto Connect" }}
         </button>
         <button v-if="store.connected" @click="store.disconnect"
-          class="bg-white/5 border border-white/10 text-gray-300 py-2 px-4 rounded-lg text-xs hover:bg-white/10 transition-colors">
+          class="bg-theme-btn border border-theme-secondary text-theme-secondary py-2 px-4 rounded-lg text-xs hover:bg-theme-hover transition-colors">
           Disconnect
         </button>
       </div>

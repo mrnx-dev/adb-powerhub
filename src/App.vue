@@ -37,7 +37,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="text-token-primary font-sans h-screen overflow-hidden flex flex-col" style="background-color: var(--token-bg-page);">
+  <div class="font-sans h-screen overflow-hidden flex flex-col bg-theme-page text-theme-primary">
     <TitleBar />
     <main class="flex flex-1 overflow-hidden">
       <AppSidebarLeft />
