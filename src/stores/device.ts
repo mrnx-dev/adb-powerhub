@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore } from "./settings";
 import { useToastStore } from "./toast";
 
@@ -45,6 +46,10 @@ export const useDeviceStore = defineStore("device", () => {
   let pollTimeout: ReturnType<typeof setTimeout> | null = null;
   let pollFailCount = 0;
   let isPolling = false;
+  let pollCount = 0;
+
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 2000;
 
   const batteryColor = computed(() => {
     if (batteryLevel.value > 60) return "text-green-400";
@@ -52,10 +57,13 @@ export const useDeviceStore = defineStore("device", () => {
     return "text-red-400";
   });
 
+  const MAX_LOG_LENGTH = 500;
+
   function addLog(message: string, type: "info" | "error" | "success" = "info") {
     const timestamp = new Date().toLocaleTimeString();
     const prefix = type === "error" ? "✗" : type === "success" ? "✓" : "→";
-    logs.value.push(`[${timestamp}] ${prefix} ${message}`);
+    const truncated = message.length > MAX_LOG_LENGTH ? message.slice(0, MAX_LOG_LENGTH) + "..." : message;
+    logs.value.push(`[${timestamp}] ${prefix} ${truncated}`);
     if (logs.value.length > 500) logs.value.shift();
   }
 
@@ -105,6 +113,35 @@ export const useDeviceStore = defineStore("device", () => {
       connected.value = false;
     } finally {
       connecting.value = false;
+    }
+  }
+
+  async function connectWithRetry(maxRetries: number = MAX_RETRIES) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      connecting.value = true;
+      try {
+        const result = await invoke<string>("adb_connect", { ip: ipAddress.value });
+        connected.value = true;
+        deviceId.value = ipAddress.value;
+        pollFailCount = 0;
+        addLog(result, "success");
+        toast.show("Device connected", "success");
+        await pollStats();
+        startPolling();
+        syncToggles();
+        return;
+      } catch (e) {
+        addLog(`Connection attempt ${attempt}/${maxRetries} failed: ${e}`, "error");
+        if (attempt < maxRetries) {
+          toast.show(`Retrying (${attempt}/${maxRetries})...`, "info");
+          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+        } else {
+          toast.show(`Connection failed after ${maxRetries} attempts`, "error");
+          connected.value = false;
+        }
+      } finally {
+        connecting.value = false;
+      }
     }
   }
 
@@ -172,6 +209,10 @@ export const useDeviceStore = defineStore("device", () => {
       androidVersion.value = stats.android_version || "—";
       sdkVersion.value = stats.sdk_version || "—";
       pollFailCount = 0;
+      pollCount++;
+      if (pollCount % 5 === 0) {
+        syncToggles().catch(() => {});
+      }
     } catch {
       pollFailCount++;
       addLog(`Device not responding (attempt ${pollFailCount}/3)`, "error");
@@ -379,6 +420,13 @@ export const useDeviceStore = defineStore("device", () => {
   }
 
   async function rebootRecovery() {
+    const confirmed = await ask("Are you sure you want to reboot into recovery mode?", {
+      title: "Reboot to Recovery",
+      kind: "warning",
+      okLabel: "Reboot",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
     try {
       await invoke("adb_reboot_recovery");
       addLog("Rebooting to recovery...", "info");
@@ -392,6 +440,13 @@ export const useDeviceStore = defineStore("device", () => {
   }
 
   async function rebootBootloader() {
+    const confirmed = await ask("Are you sure you want to reboot into bootloader?", {
+      title: "Reboot to Bootloader",
+      kind: "warning",
+      okLabel: "Reboot",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
     try {
       await invoke("adb_reboot_bootloader");
       addLog("Rebooting to bootloader...", "info");
@@ -422,6 +477,13 @@ export const useDeviceStore = defineStore("device", () => {
   }
 
   async function rebootDevice() {
+    const confirmed = await ask("Are you sure you want to reboot the device?", {
+      title: "Reboot Device",
+      kind: "warning",
+      okLabel: "Reboot",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
     try {
       await invoke("adb_reboot");
       addLog("Rebooting device...", "info");
@@ -489,7 +551,7 @@ export const useDeviceStore = defineStore("device", () => {
     wifiEnabled, dataEnabled, airplaneEnabled, bluetoothEnabled,
     showTapsEnabled, layoutBoundsEnabled, stayAwakeEnabled,
     brightness, textInput, showRebootMenu,
-    addLog, clearLogs, connect, autoConnect, disconnect, pollStats, startPolling, handleDisconnect, executeCommand,
+    addLog, clearLogs, connect, connectWithRetry, autoConnect, disconnect, pollStats, startPolling, handleDisconnect, executeCommand,
     toggleWifi, toggleData, toggleAirplane, toggleBluetooth, toggleShowTaps,
     syncToggles, toggleLayoutBounds, toggleStayAwake,
     pressHome, pressBack, pressRecent, rotateDevice,

@@ -17,6 +17,7 @@ use settings::*;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use tokio::sync::Mutex as AsyncMutex;
 
 pub struct AppState {
     pub adb_path: Mutex<String>,
@@ -24,6 +25,7 @@ pub struct AppState {
     pub scrcpy_path: Mutex<Option<String>>,
     pub scrcpy_process: Mutex<Option<u32>>,
     pub cancel_download: Mutex<Arc<AtomicBool>>,
+    pub command_lock: AsyncMutex<()>,
 }
 
 #[tauri::command]
@@ -43,6 +45,7 @@ pub fn run() {
             scrcpy_path: Mutex::new(None),
             scrcpy_process: Mutex::new(None),
             cancel_download: Mutex::new(Arc::new(AtomicBool::new(false))),
+            command_lock: AsyncMutex::new(()),
         })
         .invoke_handler(tauri::generate_handler![
             open_folder,

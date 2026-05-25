@@ -6,7 +6,7 @@ const store = useDeviceStore();
 
 function handleConnect() {
   if (store.ipAddress.trim()) {
-    store.connect();
+    store.connectWithRetry();
   } else {
     store.autoConnect();
   }

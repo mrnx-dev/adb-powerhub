@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { ref, computed, type Ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
@@ -12,7 +12,7 @@ let storeInstance: Store | null = null;
 
 async function getStore(): Promise<Store> {
   if (!storeInstance) {
-    storeInstance = await load("settings.json", { autoSave: true });
+    storeInstance = await load("settings.json", { autoSave: true, defaults: {} });
   }
   return storeInstance;
 }
@@ -110,16 +110,24 @@ export const useSettingsStore = defineStore("settings", () => {
   async function loadSettings() {
     try {
       const s = await getStore();
-      const keys = [
-        "adbPath", "scrcpyPath", "autoDetectBinaries", "stayOnTop",
-        "autoConnectOnLaunch", "pollingInterval", "videoQuality",
-        "customBitRate", "customMaxSize", "recordingFormat",
-        "screenshotSaveDir", "recordingSaveDir",
+      const keys: [string, Ref<string | number | boolean>][] = [
+        ["adbPath", adbPath],
+        ["scrcpyPath", scrcpyPath],
+        ["autoDetectBinaries", autoDetectBinaries],
+        ["stayOnTop", stayOnTop],
+        ["autoConnectOnLaunch", autoConnectOnLaunch],
+        ["pollingInterval", pollingInterval],
+        ["videoQuality", videoQuality],
+        ["customBitRate", customBitRate],
+        ["customMaxSize", customMaxSize],
+        ["recordingFormat", recordingFormat],
+        ["screenshotSaveDir", screenshotSaveDir],
+        ["recordingSaveDir", recordingSaveDir],
       ];
-      for (const key of keys) {
+      for (const [key, refVar] of keys) {
         const val = await s.get<string | number | boolean>(key);
         if (val !== null && val !== undefined) {
-          (this as any)[key] = val;
+          refVar.value = val as any;
         }
       }
     } catch {

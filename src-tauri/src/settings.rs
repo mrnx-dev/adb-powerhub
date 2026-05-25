@@ -44,6 +44,9 @@ pub fn settings_set_scrcpy_path(path: String, state: State<AppState>) -> Result<
 
 #[tauri::command]
 pub fn settings_validate_adb(path: String) -> Result<ValidationResult, String> {
+    if path.trim().is_empty() {
+        return Err("ADB path is empty".to_string());
+    }
     let output = Command::new(&path)
         .arg("version")
         .stdout(Stdio::piped())
@@ -74,6 +77,9 @@ pub fn settings_validate_adb(path: String) -> Result<ValidationResult, String> {
 
 #[tauri::command]
 pub fn settings_validate_scrcpy(path: String) -> Result<ValidationResult, String> {
+    if path.trim().is_empty() {
+        return Err("scrcpy path is empty".to_string());
+    }
     let output = Command::new(&path)
         .arg("--version")
         .stdout(Stdio::piped())

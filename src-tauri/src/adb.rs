@@ -3,38 +3,75 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 use tauri::State;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 use crate::AppState;
 
+const ADB_TIMEOUT_SECS: u64 = 15;
+
 fn run_adb_cmd(adb_path: &str, args: &[&str]) -> Result<String, String> {
-    let output = Command::new(adb_path)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| format!("Failed to execute adb: {}", e))?;
+    run_adb_cmd_with_timeout(adb_path, args, ADB_TIMEOUT_SECS)
+}
 
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+fn run_adb_cmd_with_timeout(adb_path: &str, args: &[&str], timeout_secs: u64) -> Result<String, String> {
+    use std::sync::mpsc;
+    use std::thread;
 
-    if output.status.success() {
-        Ok(stdout)
-    } else {
-        if stderr.is_empty() {
-            Err(format!("Command failed with status {}", output.status))
-        } else {
-            Err(stderr)
+    let adb = adb_path.to_string();
+    let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+    let timeout_secs_clone = timeout_secs;
+
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        #[cfg(windows)]
+        let result = Command::new(&adb)
+            .args(&args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .creation_flags(0x08000000)
+            .output();
+
+        #[cfg(not(windows))]
+        let result = Command::new(&adb)
+            .args(&args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output();
+
+        let _ = tx.send(result);
+    });
+
+    match rx.recv_timeout(Duration::from_secs(timeout_secs_clone)) {
+        Ok(Ok(output)) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            if output.status.success() {
+                Ok(stdout)
+            } else if stderr.is_empty() {
+                Err(format!("Command failed with status {}", output.status))
+            } else {
+                Err(stderr)
+            }
         }
+        Ok(Err(e)) => Err(format!("Failed to execute adb: {}", e)),
+        Err(_) => Err(format!("ADB command timed out after {} seconds", timeout_secs_clone)),
     }
 }
 
 fn run_adb_cmd_with_device(adb_path: &str, device_serial: Option<&str>, args: &[&str]) -> Result<String, String> {
+    run_adb_cmd_with_device_timed(adb_path, device_serial, args, ADB_TIMEOUT_SECS)
+}
+
+fn run_adb_cmd_with_device_timed(adb_path: &str, device_serial: Option<&str>, args: &[&str], timeout_secs: u64) -> Result<String, String> {
     let mut full_args: Vec<&str> = Vec::new();
     if let Some(serial) = device_serial {
         full_args.push("-s");
         full_args.push(serial);
     }
     full_args.extend_from_slice(args);
-    run_adb_cmd(adb_path, &full_args)
+    run_adb_cmd_with_timeout(adb_path, &full_args, timeout_secs)
 }
 
 fn get_adb_path(state: &State<AppState>) -> String {
@@ -43,6 +80,17 @@ fn get_adb_path(state: &State<AppState>) -> String {
 
 fn get_device_serial(state: &State<AppState>) -> Option<String> {
     state.connected_device.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+struct CommandGuard<'a> {
+    _guard: tokio::sync::MutexGuard<'a, ()>,
+}
+
+impl<'a> CommandGuard<'a> {
+    async fn acquire(state: &'a State<'_, AppState>) -> Result<Self, String> {
+        let guard = state.command_lock.lock().await;
+        Ok(CommandGuard { _guard: guard })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -142,7 +190,11 @@ pub fn adb_shell(state: State<AppState>, command: String) -> Result<String, Stri
 pub fn adb_get_battery(state: State<AppState>) -> Result<BatteryInfo, String> {
     let adb = get_adb_path(&state);
     let serial = get_device_serial(&state);
-    let output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "dumpsys", "battery"])?;
+    battery_internal(&adb, serial.as_deref())
+}
+
+fn battery_internal(adb: &str, serial: Option<&str>) -> Result<BatteryInfo, String> {
+    let output = run_adb_cmd_with_device(adb, serial, &["shell", "dumpsys", "battery"])?;
 
     let mut level = 0;
     let mut status = String::from("Unknown");
@@ -187,11 +239,11 @@ pub fn adb_get_battery(state: State<AppState>) -> Result<BatteryInfo, String> {
 }
 
 #[tauri::command]
-pub fn adb_get_cpu(state: State<AppState>) -> Result<f32, String> {
+pub async fn adb_get_cpu(state: State<'_, AppState>) -> Result<f32, String> {
     let adb = get_adb_path(&state);
     let serial = get_device_serial(&state);
 
-    let output1 = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "cat", "/proc/stat"])?;
+    let output1 = run_adb_cmd_with_device_timed(&adb, serial.as_deref(), &["shell", "cat", "/proc/stat"], 5)?;
     let first_line1 = output1.lines().next().unwrap_or("cpu 0 0 0 0 0 0 0");
     let vals1: Vec<u64> = first_line1
         .split_whitespace()
@@ -199,9 +251,9 @@ pub fn adb_get_cpu(state: State<AppState>) -> Result<f32, String> {
         .filter_map(|v| v.parse().ok())
         .collect();
 
-    std::thread::sleep(Duration::from_millis(500));
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let output2 = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "cat", "/proc/stat"])?;
+    let output2 = run_adb_cmd_with_device_timed(&adb, serial.as_deref(), &["shell", "cat", "/proc/stat"], 5)?;
     let first_line2 = output2.lines().next().unwrap_or("cpu 0 0 0 0 0 0 0");
     let vals2: Vec<u64> = first_line2
         .split_whitespace()
@@ -231,9 +283,9 @@ pub fn adb_get_cpu(state: State<AppState>) -> Result<f32, String> {
 
 #[tauri::command]
 pub fn adb_get_device_info(state: State<AppState>) -> Result<DeviceStats, String> {
-    let battery = adb_get_battery(state.clone())?;
     let adb = get_adb_path(&state);
     let serial = get_device_serial(&state);
+    let battery = battery_internal(&adb, serial.as_deref())?;
 
     let model = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "getprop", "ro.product.model"])
         .unwrap_or_default()
@@ -283,9 +335,11 @@ pub fn adb_set_airplane(state: State<AppState>, enable: bool) -> Result<String, 
     let _ = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "settings", "put", "global", "airplane_mode_on", mode]);
     let broadcast = "android.intent.action.AIRPLANE_MODE";
 
-    let extra = if enable { "--ez state true" } else { "--ez state false" };
-
-    run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "am", "broadcast", "-a", broadcast, extra])
+    if enable {
+        run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "am", "broadcast", "-a", broadcast, "--ez", "state", "true"])
+    } else {
+        run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "am", "broadcast", "-a", broadcast, "--ez", "state", "false"])
+    }
 }
 
 #[tauri::command]
@@ -391,11 +445,29 @@ pub fn adb_key_next(state: State<AppState>) -> Result<String, String> {
     run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "input", "keyevent", "87"])
 }
 
+fn encode_adb_text(text: &str) -> String {
+    let mut result = String::with_capacity(text.len() * 3);
+    for c in text.chars() {
+        match c {
+            ' ' => result.push_str("%s"),
+            c if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' => result.push(c),
+            _ => {
+                let mut buf = [0u8; 4];
+                let s = c.encode_utf8(&mut buf);
+                for byte in s.bytes() {
+                    result.push_str(&format!("%{:02X}", byte));
+                }
+            }
+        }
+    }
+    result
+}
+
 #[tauri::command]
 pub fn adb_input_text(state: State<AppState>, text: String) -> Result<String, String> {
     let adb = get_adb_path(&state);
     let serial = get_device_serial(&state);
-    let encoded = text.replace(' ', "%s");
+    let encoded = encode_adb_text(&text);
     run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "input", "text", &encoded])
 }
 
@@ -489,9 +561,10 @@ pub fn adb_set_device(state: State<AppState>, device_id: String) -> Result<(), S
 }
 
 #[tauri::command]
-pub fn adb_poll_device_stats(state: State<AppState>) -> Result<DeviceStats, String> {
+pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceStats, String> {
+    let _guard = CommandGuard::acquire(&state).await?;
     let battery = adb_get_battery(state.clone())?;
-    let cpu = adb_get_cpu(state.clone())?;
+    let cpu = adb_get_cpu(state.clone()).await?;
     let adb = get_adb_path(&state);
     let serial = get_device_serial(&state);
 

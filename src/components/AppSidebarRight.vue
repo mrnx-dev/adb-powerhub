@@ -174,7 +174,7 @@ onUnmounted(() => {
           <Sun :size="14" class="opacity-70 shrink-0" />
           <input type="range" min="0" max="255" v-model.number="store.brightness"
             @change="store.setBrightness(store.brightness)"
-            class="flex-1 h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer accent-emerald-500" />
+            class="flex-1 h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer accent-emerald-500 min-w-0" />
           <span class="text-[10px] text-gray-500 w-6 text-right">{{ store.brightness }}</span>
         </div>
       </div>

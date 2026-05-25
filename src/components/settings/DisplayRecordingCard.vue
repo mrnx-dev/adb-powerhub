@@ -43,12 +43,12 @@ const formatOptions: { key: "mp4" | "mkv"; label: string }[] = [
       <div v-if="store.videoQuality === 'custom'" class="mt-4 bg-black/30 border border-white/5 rounded-xl p-4 space-y-4">
         <div>
           <label class="text-xs font-medium text-gray-400 mb-2 block">Bit Rate (Mbps)</label>
-          <input v-model.number="store.customBitRate" @input="store.setCustomBitRate(store.customBitRate)" type="number" min="1" max="100"
+          <input v-model.number="store.customBitRate" @change="store.setCustomBitRate(store.customBitRate)" type="number" min="1" max="100"
             class="w-full bg-black/40 border border-white/10 rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50" />
         </div>
         <div>
           <label class="text-xs font-medium text-gray-400 mb-2 block">Max Resolution (px)</label>
-          <input v-model.number="store.customMaxSize" @input="store.setCustomMaxSize(store.customMaxSize)" type="number" min="0" max="7680"
+          <input v-model.number="store.customMaxSize" @change="store.setCustomMaxSize(store.customMaxSize)" type="number" min="0" max="7680"
             class="w-full bg-black/40 border border-white/10 rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50" />
           <p class="text-[10px] text-gray-500 mt-1">0 = unlimited (native resolution)</p>
         </div>
