@@ -200,7 +200,7 @@ export const useDeviceStore = defineStore("device", () => {
         model: string;
         android_version: string;
         sdk_version: string;
-      }}>("adb_poll_device_stats");
+      }>("adb_poll_device_stats");
 
       batteryLevel.value = stats.battery.level;
       batteryStatus.value = stats.battery.status;
@@ -226,17 +226,6 @@ export const useDeviceStore = defineStore("device", () => {
     } finally {
       isPolling = false;
       isLoadingStats.value = false;
-    }
-  }
-    } catch {
-      pollFailCount++;
-      addLog(`Device not responding (attempt ${pollFailCount}/3)`, "error");
-      if (pollFailCount >= 3) {
-        await handleDisconnect("Device disconnected unexpectedly");
-        toast.show("Device disconnected unexpectedly", "error");
-      }
-    } finally {
-      isPolling = false;
     }
   }
 

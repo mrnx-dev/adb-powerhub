@@ -1,42 +1,97 @@
 @import "tailwindcss";
 @import "@mdi/font/css/materialdesignicons.min.css";
 
-@theme {
+/* ——— Tailwind dark variant override ——————————————————— */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* ——— Theme Tokens ———————————————————————————————————— */
+
+:root {
+  /* Dark is the default */
   --color-app-dark: #06100d;
   --color-sidebar-dark: rgba(13, 26, 22, 0.95);
   --color-accent-emerald: #10b981;
   --color-accent-emerald-hover: #059669;
   --color-card-border: rgba(16, 185, 129, 0.3);
   --font-sans: "Inter", sans-serif;
+
+  /* Token surface */
+  --token-bg-page: #06100d;
+  --token-bg-sidebar: #0d1a16;
+  --token-bg-card: rgba(255, 255, 255, 0.03);
+  --token-bg-terminal: rgba(0, 0, 0, 0.6);
+  --token-text-primary: #e5e7eb;
+  --token-text-secondary: #9ca3af;
+  --token-text-muted: #4b5563;
+  --token-border-primary: rgba(16, 185, 129, 0.4);
+  --token-border-secondary: rgba(255, 255, 255, 0.1);
+
+  /* Scrollbar */
+  --token-scrollbar-track: #06100d;
+  --token-scrollbar-thumb: #15261f;
+  --token-scrollbar-thumb-hover: #1e382e;
+
+  /* Glow gradient */
+  --token-glow-center: rgba(16, 185, 129, 0.15);
+  --token-glow-edge: rgba(6, 16, 13, 1);
 }
 
+:root[data-theme="light"] {
+  --color-app-dark: #f8faf9;
+  --color-sidebar-dark: rgba(240, 244, 242, 0.95);
+  --color-card-border: rgba(16, 185, 129, 0.2);
+
+  --token-bg-page: #f8faf9;
+  --token-bg-sidebar: #f2f5f3;
+  --token-bg-card: rgba(0, 0, 0, 0.04);
+  --token-bg-terminal: rgba(0, 0, 0, 0.04);
+  --token-text-primary: #1f2937;
+  --token-text-secondary: #4b5563;
+  --token-text-muted: #9ca3af;
+  --token-border-primary: rgba(16, 185, 129, 0.3);
+  --token-border-secondary: rgba(0, 0, 0, 0.1);
+
+  --token-scrollbar-track: #e5e7eb;
+  --token-scrollbar-thumb: #9ca3af;
+  --token-scrollbar-thumb-hover: #6b7280;
+
+  --token-glow-center: rgba(16, 185, 129, 0.05);
+  --token-glow-edge: rgba(248, 250, 249, 1);
+}
+
+/* ——— Scrollbar —————————————————————————————————————— */
 ::-webkit-scrollbar {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #06100d;
+  background: var(--token-scrollbar-track);
 }
 ::-webkit-scrollbar-thumb {
-  background: #15261f;
+  background: var(--token-scrollbar-thumb);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #1e382e;
+  background: var(--token-scrollbar-thumb-hover);
 }
 
+/* ——— Custom classes ————————————————————————————————— */
 .bg-glow {
-  background: radial-gradient(circle at 70% 30%, rgba(16, 185, 129, 0.15) 0%, rgba(6, 16, 13, 1) 70%);
+  background: radial-gradient(
+    circle at 70% 30%,
+    var(--token-glow-center) 0%,
+    var(--token-glow-edge) 70%
+  );
 }
 
 .sidebar-blur {
   backdrop-filter: blur(10px);
-  background-color: #0d1a16;
+  background-color: var(--token-bg-sidebar);
 }
 
 .card-glass {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--token-bg-card);
   backdrop-filter: blur(4px);
-  border: 2px solid rgba(16, 185, 129, 0.4) !important;
+  border: 2px solid var(--token-border-primary) !important;
   box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
 }
 

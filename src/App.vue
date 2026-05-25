@@ -12,13 +12,17 @@ import DashboardView from "./views/DashboardView.vue";
 import SettingsView from "./views/SettingsView.vue";
 import AppToast from "./components/AppToast.vue";
 
+import { useThemeStore } from "./stores/theme";
+
 const deviceStore = useDeviceStore();
 const settingsStore = useSettingsStore();
 const navStore = useNavigationStore();
+const themeStore = useThemeStore();
 
 useKeyboardShortcuts();
 
 onMounted(async () => {
+  themeStore.init();
   await settingsStore.init();
 
   if (settingsStore.autoConnectOnLaunch && settingsStore.adbValid) {
@@ -33,7 +37,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="bg-app-dark text-gray-200 font-sans h-screen overflow-hidden flex flex-col">
+  <div class="text-token-primary font-sans h-screen overflow-hidden flex flex-col" style="background-color: var(--token-bg-page);">
     <TitleBar />
     <main class="flex flex-1 overflow-hidden">
       <AppSidebarLeft />

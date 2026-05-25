@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useSettingsStore } from "../../stores/settings";
+import { useThemeStore } from "../../stores/theme";
 import { Settings } from "lucide-vue-next";
 
 const store = useSettingsStore();
+const themeStore = useThemeStore();
 
 const pollingOptions = [1, 2, 3, 5, 10, 15, 30];
 </script>
@@ -15,6 +17,17 @@ const pollingOptions = [1, 2, 3, 5, 10, 15, 30];
     </div>
 
     <div class="space-y-5">
+      <!-- Theme -->
+      <div>
+        <label class="text-sm block mb-2">Theme</label>
+        <select v-model="themeStore.theme" @change="themeStore.setTheme(themeStore.theme)"
+          class="w-full bg-black/40 border border-white/10 rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50 cursor-pointer">
+          <option value="dark" class="bg-gray-900">Dark</option>
+          <option value="light" class="bg-gray-900">Light</option>
+          <option value="system" class="bg-gray-900">System</option>
+        </select>
+      </div>
+
       <!-- Stay on Top -->
       <div class="flex items-center justify-between">
         <div>
