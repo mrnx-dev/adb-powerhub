@@ -43,4 +43,5 @@
 body {
   margin: 0;
   user-select: none;
+  scrollbar-gutter: stable;
 }

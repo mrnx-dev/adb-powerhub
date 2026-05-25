@@ -48,6 +48,8 @@ export const useDeviceStore = defineStore("device", () => {
   let isPolling = false;
   let pollCount = 0;
 
+  const isLoadingStats = ref(false);
+
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 2000;
 
@@ -189,6 +191,7 @@ export const useDeviceStore = defineStore("device", () => {
 
   async function pollStats() {
     if (!connected.value || isPolling) return;
+    isLoadingStats.value = true;
     isPolling = true;
     try {
       const stats = await invoke<{
@@ -197,7 +200,7 @@ export const useDeviceStore = defineStore("device", () => {
         model: string;
         android_version: string;
         sdk_version: string;
-      }>("adb_poll_device_stats");
+      }}>("adb_poll_device_stats");
 
       batteryLevel.value = stats.battery.level;
       batteryStatus.value = stats.battery.status;
@@ -213,6 +216,18 @@ export const useDeviceStore = defineStore("device", () => {
       if (pollCount % 5 === 0) {
         syncToggles().catch(() => {});
       }
+    } catch {
+      pollFailCount++;
+      addLog(`Device not responding (attempt ${pollFailCount}/3)`, "error");
+      if (pollFailCount >= 3) {
+        await handleDisconnect("Device disconnected unexpectedly");
+        toast.show("Device disconnected unexpectedly", "error");
+      }
+    } finally {
+      isPolling = false;
+      isLoadingStats.value = false;
+    }
+  }
     } catch {
       pollFailCount++;
       addLog(`Device not responding (attempt ${pollFailCount}/3)`, "error");
@@ -544,6 +559,7 @@ export const useDeviceStore = defineStore("device", () => {
 
   return {
     connected, connecting, ipAddress, usbDeviceId, deviceId,
+    isLoadingStats,
     batteryLevel, batteryStatus, batteryHealth, batteryTemp, batteryPlugged, batteryColor,
     cpuUsage, model, androidVersion, sdkVersion,
     logs, commandInput,

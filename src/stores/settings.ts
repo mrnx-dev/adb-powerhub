@@ -7,6 +7,7 @@ import { open as shellOpen } from "@tauri-apps/plugin-shell";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { load, Store } from "@tauri-apps/plugin-store";
 import { useDeviceStore } from "./device";
+import { useToastStore } from "./toast";
 
 let storeInstance: Store | null = null;
 
@@ -39,6 +40,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const downloadProgress = ref({ read: 0, total: 0, percent: 0 });
   const downloadError = ref<string | null>(null);
   const downloadCancelled = ref(false);
+  let downloadToastId: number | null = null;
   const downloadInfo = ref<{
     os: string;
     adb_download_url: string;
@@ -243,6 +245,8 @@ export const useSettingsStore = defineStore("settings", () => {
   }
 
   async function downloadAdb() {
+    const toastStore = useToastStore();
+    downloadToastId = toastStore.show("Downloading ADB...", "progress");
     downloading.value = "adb";
     downloadError.value = null;
     downloadCancelled.value = false;
@@ -253,13 +257,23 @@ export const useSettingsStore = defineStore("settings", () => {
       adbPath.value = path;
       await saveSetting("adbPath", adbPath.value);
       await validateAdb();
+      if (downloadToastId !== null) {
+        toastStore.remove(downloadToastId);
+        downloadToastId = null;
+      }
+      toastStore.show("ADB downloaded successfully", "success");
       downloading.value = null;
     } catch (e) {
       const msg = String(e);
+      if (downloadToastId !== null) {
+        toastStore.remove(downloadToastId);
+        downloadToastId = null;
+      }
       if (msg.includes("cancelled")) {
         downloadCancelled.value = true;
       } else {
         downloadError.value = msg;
+        toastStore.show("ADB download failed", "error");
       }
       downloading.value = null;
     }
@@ -362,15 +376,21 @@ export const useSettingsStore = defineStore("settings", () => {
   }
 
   async function listenListeners() {
+    const toastStore = useToastStore();
+
     await listen<{ type: string; read: number; total: number }>("download-progress", (event) => {
       if (event.payload.type === "adb") {
+        const pct = event.payload.total > 0
+          ? Math.round((event.payload.read / event.payload.total) * 100)
+          : 0;
         downloadProgress.value = {
           read: event.payload.read,
           total: event.payload.total,
-          percent: event.payload.total > 0
-            ? Math.round((event.payload.read / event.payload.total) * 100)
-            : 0,
+          percent: pct,
         };
+        if (downloadToastId !== null) {
+          toastStore.updateProgress(downloadToastId, pct);
+        }
       }
     });
 
@@ -378,6 +398,11 @@ export const useSettingsStore = defineStore("settings", () => {
       if (event.payload.type === "adb") {
         adbPath.value = event.payload.path;
         downloading.value = null;
+        if (downloadToastId !== null) {
+          toastStore.remove(downloadToastId);
+          downloadToastId = null;
+        }
+        toastStore.show("ADB downloaded successfully", "success", 3000);
         validateAdb();
       }
     });
@@ -385,6 +410,11 @@ export const useSettingsStore = defineStore("settings", () => {
     await listen<{ type: string }>("download-cancelled", () => {
       downloading.value = null;
       downloadCancelled.value = true;
+      if (downloadToastId !== null) {
+        toastStore.remove(downloadToastId);
+        downloadToastId = null;
+      }
+      toastStore.show("Download cancelled", "info", 3000);
     });
   }
 

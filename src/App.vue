@@ -37,10 +37,23 @@ onMounted(async () => {
     <TitleBar />
     <main class="flex flex-1 overflow-hidden">
       <AppSidebarLeft />
-      <DashboardView v-if="navStore.currentPage === 'dashboard'" />
-      <SettingsView v-else-if="navStore.currentPage === 'settings'" />
+      <Transition name="page-fade" mode="out-in">
+        <DashboardView v-if="navStore.currentPage === 'dashboard'" />
+        <SettingsView v-else-if="navStore.currentPage === 'settings'" />
+      </Transition>
       <AppSidebarRight />
     </main>
     <AppToast />
   </div>
 </template>
+
+<style scoped>
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+}
+</style>

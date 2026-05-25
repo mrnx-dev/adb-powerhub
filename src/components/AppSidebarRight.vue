@@ -10,7 +10,7 @@ import {
   Send, Image,
   PanelRightClose, PanelRightOpen,
   ChevronDown, RotateCcw, MonitorUp,
-  Smartphone,
+  Smartphone, Unlink,
 } from "lucide-vue-next";
 
 const store = useDeviceStore();
@@ -260,6 +260,11 @@ onUnmounted(() => {
       <div ref="systemRef" class="mb-4">
         <h3 class="text-[10px] font-bold text-gray-500 tracking-widest mb-4 uppercase">System</h3>
         <div class="space-y-1.5">
+          <button v-if="store.connected" @click="store.disconnect"
+            class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-red-500/10 hover:border-red-500/30 text-gray-300 hover:text-red-400 transition-all">
+            <Unlink :size="16" class="opacity-70" />
+            <span class="text-xs font-medium">Disconnect</span>
+          </button>
           <button @click="store.takeScreenshot"
             class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all">
             <Image :size="16" class="opacity-70" />
