@@ -83,7 +83,7 @@ async function copyLogs() {
     </div>
 
     <!-- Log Area -->
-    <div ref="logContainerRef" class="flex-1 overflow-y-auto mb-3 p-3 font-mono text-xs text-theme-secondary bg-black/60 rounded-t-xl border-x border-t border-theme-tertiary select-text">
+    <div ref="logContainerRef" class="flex-1 overflow-y-auto mb-3 p-3 font-mono text-xs text-theme-secondary bg-theme-terminal rounded-t-xl border-x border-t border-theme-tertiary select-text">
       <p v-if="store.logs.length === 0" class="mb-1">No logs yet. Click "Auto Connect" to start.</p>
       <p v-for="(log, i) in store.logs" :key="i" class="mb-1 whitespace-pre-wrap break-all">{{ log }}</p>
       <div v-if="store.logs.length > 0" class="flex items-center gap-2">

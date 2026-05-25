@@ -41,29 +41,29 @@
 
 /* ——— LIGHT TOKENS ———————————————————————————————————————— */
 :root[data-theme="light"] {
-  --bg-page: #f0f2f0;
-  --bg-sidebar: rgba(255,255,255,0.95);
-  --bg-card: rgba(255,255,255,0.7);
-  --bg-terminal: rgba(240,242,240,0.8);
-  --bg-input: rgba(0,0,0,0.04);
-  --bg-button: rgba(0,0,0,0.04);
-  --bg-hover: rgba(0,0,0,0.07);
+  --bg-page: #e8ecea;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-terminal: #f2f5f3;
+  --bg-input: #eef1ef;
+  --bg-button: #f4f5f4;
+  --bg-hover: #e5e7e6;
 
-  --text-primary: #1f2937;      /* gray-800 */
-  --text-secondary: #4b5563;    /* gray-600 */
-  --text-muted: #9ca3af;        /* gray-400 */
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
   --text-heading: #111827;
 
-  --border-primary: rgba(16,185,129,0.3);
-  --border-secondary: rgba(0,0,0,0.08);
-  --border-tertiary: rgba(0,0,0,0.04);
+  --border-primary: rgba(16,185,129,0.35);
+  --border-secondary: rgba(0,0,0,0.10);
+  --border-tertiary: rgba(0,0,0,0.05);
 
   --scrollbar-track: #e5e7eb;
   --scrollbar-thumb: #9ca3af;
   --scrollbar-thumb-hover: #6b7280;
 
-  --glow-center: rgba(16,185,129,0.06);
-  --glow-edge: rgba(240,242,240,1);
+  --glow-center: rgba(16,185,129,0.07);
+  --glow-edge: rgba(232,236,234,1);
 }
 
 /* ============================================================

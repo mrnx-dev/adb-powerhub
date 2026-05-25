@@ -61,7 +61,7 @@ function onDismiss(id: number) {
           <div class="flex items-center justify-between mb-1">
             <span class="text-[10px] text-theme-secondary">{{ toast.progress }}%</span>
           </div>
-          <div class="w-full bg-gray-700 rounded-full h-1.5">
+          <div class="w-full bg-theme-btn rounded-full h-1.5">
             <div class="bg-accent-emerald h-1.5 rounded-full transition-all duration-300"
               :style="{ width: toast.progress + '%' }"></div>
           </div>
