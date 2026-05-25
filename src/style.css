@@ -1,0 +1,46 @@
+@import "tailwindcss";
+@import "@mdi/font/css/materialdesignicons.min.css";
+
+@theme {
+  --color-app-dark: #06100d;
+  --color-sidebar-dark: rgba(13, 26, 22, 0.95);
+  --color-accent-emerald: #10b981;
+  --color-accent-emerald-hover: #059669;
+  --color-card-border: rgba(16, 185, 129, 0.3);
+  --font-sans: "Inter", sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #06100d;
+}
+::-webkit-scrollbar-thumb {
+  background: #15261f;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #1e382e;
+}
+
+.bg-glow {
+  background: radial-gradient(circle at 70% 30%, rgba(16, 185, 129, 0.15) 0%, rgba(6, 16, 13, 1) 70%);
+}
+
+.sidebar-blur {
+  backdrop-filter: blur(10px);
+  background-color: #0d1a16;
+}
+
+.card-glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(4px);
+  border: 2px solid rgba(16, 185, 129, 0.4) !important;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+}
+
+body {
+  margin: 0;
+  user-select: none;
+}

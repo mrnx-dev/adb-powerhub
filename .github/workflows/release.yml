@@ -1,0 +1,144 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+          - platform: macos-13
+            target: x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "ADB PowerHub ${{ github.ref_name }}"
+          releaseBody: |
+            See the assets below to download and install ADB PowerHub.
+
+            ## What's Changed
+            *See commit history for details.*
+
+            ## Installation
+            - **Windows**: Download the `.exe` (NSIS installer) or `.msi`
+            - **macOS**: Download the `.dmg` (Apple Silicon) or `.dmg` (Intel)
+            - **Linux**: Download the `.deb` or `.AppImage`
+          releaseDraft: true
+          prerelease: false
+
+  generate-update-manifest:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get release info
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${GITHUB_REF_NAME}
+          VERSION=${TAG#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          RELEASE_ID=$(gh api repos/${{ github.repository }}/releases --method GET \
+            --jq ".[] | select(.tag_name==\"$TAG\") | .id")
+          echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
+
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "pub_date=$PUB_DATE" >> $GITHUB_OUTPUT
+
+      - name: Generate latest.json
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          PUB_DATE: ${{ steps.release.outputs.pub_date }}
+          REPO: ${{ github.repository }}
+        run: |
+          cat > latest.json <<EOF
+          {
+            "version": "${VERSION}",
+            "notes": "See release page for details",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "windows-x86_64": {
+                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/ADB-PowerHub_${VERSION}_x64-setup.exe",
+                "signature": ""
+              },
+              "darwin-aarch64": {
+                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/ADB-PowerHub_${VERSION}_aarch64.dmg",
+                "signature": ""
+              },
+              "darwin-x86_64": {
+                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/ADB-PowerHub_${VERSION}_x64.dmg",
+                "signature": ""
+              },
+              "linux-x86_64": {
+                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/ADB-PowerHub_${VERSION}_amd64.AppImage",
+                "signature": ""
+              }
+            }
+          }
+          EOF
+
+      - name: Upload latest.json to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ steps.release.outputs.release_id }}
+        run: |
+          gh api repos/${{ github.repository }}/releases/${RELEASE_ID}/assets \
+            --method POST \
+            -f name="latest.json" \
+            -f file=@latest.json \
+            2>/dev/null || true

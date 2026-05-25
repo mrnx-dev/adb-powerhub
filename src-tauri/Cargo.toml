@@ -1,0 +1,30 @@
+[package]
+name = "adb-powerhub"
+version = "0.1.0"
+description = "ADB PowerHub - Android Device Bridge Controller"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "adb_powerhub_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+which = "7"
+reqwest = { version = "0.12", features = ["json"] }
+zip = "2"
+walkdir = "2"
+opener = "0.7"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
