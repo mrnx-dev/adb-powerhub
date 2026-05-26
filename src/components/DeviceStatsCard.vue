@@ -1,25 +1,12 @@
 <script setup lang="ts">
 import { useDeviceStore } from "../stores/device";
-import { Smartphone, Battery, Cpu, Unlink } from "lucide-vue-next";
+import { Smartphone, Battery, Cpu } from "lucide-vue-next";
 
 const store = useDeviceStore();
 </script>
 
 <template>
-  <section class="card-glass border border-card-border rounded-2xl p-4">
-    <!-- Header with Disconnect -->
-    <div v-if="store.connected" class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <Smartphone :size="14" class="text-accent-emerald" />
-        <h2 class="text-xs font-bold uppercase tracking-widest">Device Stats</h2>
-      </div>
-      <button @click="store.disconnect"
-        class="p-1.5 rounded-lg bg-theme-btn border border-theme-tertiary hover:bg-red-500/10 hover:border-red-500/30 text-theme-secondary hover:text-red-400 transition-all"
-        title="Disconnect">
-        <Unlink :size="14" />
-      </button>
-    </div>
-
+  <section class="card-glass p-4">
     <!-- Skeleton loading state -->
     <template v-if="store.connected && store.isLoadingStats">
       <div class="flex items-center gap-6 flex-wrap">
@@ -56,7 +43,7 @@ const store = useDeviceStore();
         <div class="h-4 w-px bg-theme-secondary"></div>
 
         <div class="flex items-center gap-2">
-          <Battery :size="14" class="shrink-0" :class="store.batteryLevel > 20 ? 'text-green-400' : 'text-red-400'" />
+          <Battery :size="14" class="shrink-0" :class="store.batteryLevel > 20 ? 'text-color-success' : 'text-color-error'" />
           <span class="text-sm font-bold leading-none">{{ store.batteryLevel }}%</span>
           <span class="text-[10px]" :class="store.batteryColor">{{ store.batteryStatus }}</span>
         </div>
@@ -66,8 +53,8 @@ const store = useDeviceStore();
         <div class="flex items-center gap-2 min-w-[140px]">
           <Cpu :size="14" class="text-accent-emerald shrink-0" />
           <span class="text-[10px] text-theme-secondary w-7">CPU</span>
-          <div class="flex-1 bg-theme-btn rounded-full h-[6px]">
-            <div class="bg-accent-emerald h-[6px] rounded-full transition-all duration-500" :style="{ width: store.cpuUsage + '%' }"></div>
+          <div class="flex-1 progress-bar-track">
+            <div class="progress-bar-fill transition-all duration-500" :style="{ width: store.cpuUsage + '%' }"></div>
           </div>
           <span class="text-[10px] text-theme-secondary w-8 text-right">{{ store.cpuUsage.toFixed(0) }}%</span>
         </div>

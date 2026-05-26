@@ -49,14 +49,15 @@ export const useDeviceStore = defineStore("device", () => {
   let pollCount = 0;
 
   const isLoadingStats = ref(false);
+  const isInitialLoad = ref(true);
 
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 2000;
 
   const batteryColor = computed(() => {
-    if (batteryLevel.value > 60) return "text-green-400";
-    if (batteryLevel.value > 20) return "text-yellow-400";
-    return "text-red-400";
+    if (batteryLevel.value > 60) return "text-color-success";
+    if (batteryLevel.value > 20) return "text-color-warning";
+    return "text-color-error";
   });
 
   const MAX_LOG_LENGTH = 500;
@@ -89,6 +90,7 @@ export const useDeviceStore = defineStore("device", () => {
     connected.value = false;
     deviceId.value = "";
     resetStats();
+    isInitialLoad.value = true;
     stopPolling();
     addLog(reason, "error");
     if (mirroring.value) {
@@ -181,6 +183,7 @@ export const useDeviceStore = defineStore("device", () => {
       await invoke("adb_disconnect");
       connected.value = false;
       deviceId.value = "";
+      isInitialLoad.value = true;
       stopPolling();
       addLog("Disconnected", "info");
       toast.show("Disconnected", "info");
@@ -191,7 +194,10 @@ export const useDeviceStore = defineStore("device", () => {
 
   async function pollStats() {
     if (!connected.value || isPolling) return;
-    isLoadingStats.value = true;
+    const shouldShimmer = isInitialLoad.value;
+    if (shouldShimmer) {
+      isLoadingStats.value = true;
+    }
     isPolling = true;
     try {
       const stats = await invoke<{
@@ -224,6 +230,7 @@ export const useDeviceStore = defineStore("device", () => {
         toast.show("Device disconnected unexpectedly", "error");
       }
     } finally {
+      isInitialLoad.value = false;
       isPolling = false;
       isLoadingStats.value = false;
     }
@@ -436,6 +443,7 @@ export const useDeviceStore = defineStore("device", () => {
       addLog("Rebooting to recovery...", "info");
       toast.show("Rebooting to recovery...", "info");
       connected.value = false;
+      isInitialLoad.value = true;
       stopPolling();
     } catch (e) {
       addLog(String(e), "error");
@@ -456,6 +464,7 @@ export const useDeviceStore = defineStore("device", () => {
       addLog("Rebooting to bootloader...", "info");
       toast.show("Rebooting to bootloader...", "info");
       connected.value = false;
+      isInitialLoad.value = true;
       stopPolling();
     } catch (e) {
       addLog(String(e), "error");
@@ -493,6 +502,7 @@ export const useDeviceStore = defineStore("device", () => {
       addLog("Rebooting device...", "info");
       toast.show("Rebooting device...", "info");
       connected.value = false;
+      isInitialLoad.value = true;
       stopPolling();
     } catch (e) {
       addLog(String(e), "error");
