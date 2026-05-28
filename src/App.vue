@@ -5,12 +5,14 @@ import { useDeviceStore } from "./stores/device";
 import { useSettingsStore } from "./stores/settings";
 import { useNavigationStore } from "./stores/navigation";
 import { useKeyboardShortcuts } from "./composables/useKeyboardShortcuts";
+import { useConnectionHistoryStore } from "./stores/connectionHistory";
 import TitleBar from "./components/TitleBar.vue";
 import AppSidebarLeft from "./components/AppSidebarLeft.vue";
 import AppSidebarRight from "./components/AppSidebarRight.vue";
 import DashboardView from "./views/DashboardView.vue";
 import SettingsView from "./views/SettingsView.vue";
 import AppToast from "./components/AppToast.vue";
+import ConnectPanel from "./components/ConnectPanel.vue";
 
 import { useThemeStore } from "./stores/theme";
 
@@ -18,15 +20,17 @@ const deviceStore = useDeviceStore();
 const settingsStore = useSettingsStore();
 const navStore = useNavigationStore();
 const themeStore = useThemeStore();
+const connectionHistoryStore = useConnectionHistoryStore();
 
 useKeyboardShortcuts();
 
 onMounted(async () => {
   themeStore.init();
   await settingsStore.init();
+  await connectionHistoryStore.init();
 
   if (settingsStore.autoConnectOnLaunch && settingsStore.adbValid) {
-    deviceStore.autoConnect();
+    await deviceStore.autoConnect();
   }
 
   await listen("scrcpy-exited", () => {
@@ -48,6 +52,7 @@ onMounted(async () => {
       <AppSidebarRight />
     </main>
     <AppToast />
+    <ConnectPanel />
   </div>
 </template>
 

@@ -8,6 +8,11 @@ export function useKeyboardShortcuts() {
 
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === "Escape") {
+      if (navStore.connectPanelOpen) {
+        navStore.closeConnectPanel();
+        e.preventDefault();
+        return;
+      }
       if (deviceStore.showRebootMenu) {
         deviceStore.showRebootMenu = false;
         e.preventDefault();

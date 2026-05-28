@@ -4,6 +4,7 @@ import { ref } from "vue";
 export const useNavigationStore = defineStore("navigation", () => {
   const currentPage = ref<"dashboard" | "settings">("dashboard");
   const focusTerminalRequested = ref(false);
+  const connectPanelOpen = ref(false);
 
   function navigateTo(page: "dashboard" | "settings") {
     currentPage.value = page;
@@ -17,5 +18,17 @@ export const useNavigationStore = defineStore("navigation", () => {
     focusTerminalRequested.value = false;
   }
 
-  return { currentPage, focusTerminalRequested, navigateTo, requestTerminalFocus, clearTerminalFocusRequest };
+  function openConnectPanel() {
+    connectPanelOpen.value = true;
+  }
+
+  function closeConnectPanel() {
+    connectPanelOpen.value = false;
+  }
+
+  function toggleConnectPanel() {
+    connectPanelOpen.value = !connectPanelOpen.value;
+  }
+
+  return { currentPage, focusTerminalRequested, connectPanelOpen, navigateTo, requestTerminalFocus, clearTerminalFocusRequest, openConnectPanel, closeConnectPanel, toggleConnectPanel };
 });
