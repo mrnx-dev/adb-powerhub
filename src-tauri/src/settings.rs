@@ -298,6 +298,42 @@ pub async fn settings_download_adb(
 }
 
 #[tauri::command]
+pub fn settings_get_adb_version(path: String) -> Result<(u32, u32, u32), String> {
+    let output = Command::new(&path)
+        .arg("version")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| format!("Cannot execute adb: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines() {
+        let trimmed = line.trim();
+        if let Some(ver_str) = trimmed.strip_prefix("Version ") {
+            let parts: Vec<&str> = ver_str.split('.').collect();
+            if parts.len() >= 2 {
+                let major = parts[0].parse().unwrap_or(0);
+                let minor = parts[1].parse().unwrap_or(0);
+                let patch = if parts.len() > 2 { parts[2].parse().unwrap_or(0) } else { 0 };
+                return Ok((major, minor, patch));
+            }
+        }
+        let lower = trimmed.to_lowercase();
+        if lower.starts_with("android debug bridge version ") {
+            let rest = &lower["android debug bridge version ".len()..];
+            let parts: Vec<&str> = rest.split('.').collect();
+            if parts.len() >= 2 {
+                let major = parts[0].parse().unwrap_or(0);
+                let minor = parts[1].parse().unwrap_or(0);
+                let patch = if parts.len() > 2 { parts[2].parse().unwrap_or(0) } else { 0 };
+                return Ok((major, minor, patch));
+            }
+        }
+    }
+    Err("Could not parse ADB version".to_string())
+}
+
+#[tauri::command]
 pub fn settings_cancel_download(state: State<AppState>) -> Result<(), String> {
     let cancel_flag = lock_state!(state.cancel_download).clone();
     cancel_flag.store(true, Ordering::SeqCst);

@@ -22,14 +22,14 @@ const expanded = ref(false);
     </div>
 
     <div class="flex flex-col" :class="expanded ? 'px-3 gap-1' : 'px-2 gap-1'">
-      <h3 v-if="expanded" class="text-[10px] font-bold text-theme-muted tracking-widest mb-1 uppercase px-2">Navigation</h3>
+      <h3 v-if="expanded" class="font-sans text-xs font-semibold tracking-wider mb-1 uppercase px-2 text-theme-muted">Navigation</h3>
 
       <button @click="navStore.navigateTo('dashboard')"
-        class="rounded-xl border transition-all"
+        class="rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'dashboard'
-            ? 'bg-accent-emerald/10 border-accent-emerald/50 text-accent-emerald'
-            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover:bg-theme-hover hover:border-accent-emerald/50',
+            ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
           expanded ? 'flex items-center gap-3 px-2 py-2.5' : 'flex items-center justify-center py-2.5'
         ]"
         :title="!expanded ? 'Dashboard' : undefined">
@@ -38,11 +38,11 @@ const expanded = ref(false);
       </button>
 
       <button @click="navStore.navigateTo('settings')"
-        class="rounded-xl border transition-all"
+        class="rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'settings'
-            ? 'bg-accent-emerald/10 border-accent-emerald/50 text-accent-emerald'
-            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover:bg-theme-hover hover:border-accent-emerald/50',
+            ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
           expanded ? 'flex items-center gap-3 px-2 py-2.5' : 'flex items-center justify-center py-2.5'
         ]"
         :title="!expanded ? 'Settings' : undefined">

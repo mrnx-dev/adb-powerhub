@@ -26,6 +26,8 @@ pub struct AppState {
     pub scrcpy_process: Mutex<Option<u32>>,
     pub cancel_download: Mutex<Arc<AtomicBool>>,
     pub command_lock: AsyncMutex<()>,
+    pub cancel_connect: Arc<AtomicBool>,
+    pub connect_process: Arc<std::sync::Mutex<Option<u32>>>,
 }
 
 #[tauri::command]
@@ -46,6 +48,8 @@ pub fn run() {
             scrcpy_process: Mutex::new(None),
             cancel_download: Mutex::new(Arc::new(AtomicBool::new(false))),
             command_lock: AsyncMutex::new(()),
+            cancel_connect: Arc::new(AtomicBool::new(false)),
+            connect_process: Arc::new(std::sync::Mutex::new(None)),
         })
         .invoke_handler(tauri::generate_handler![
             open_folder,
@@ -88,6 +92,11 @@ pub fn run() {
             adb_auto_connect,
             adb_set_device,
             adb_poll_device_stats,
+            adb_tcpip,
+            adb_get_ip,
+            adb_connect_port,
+            adb_cancel_connect,
+            adb_pair,
             settings_set_adb_path,
             settings_set_scrcpy_path,
             settings_validate_adb,
@@ -96,6 +105,7 @@ pub fn run() {
             settings_get_download_info,
             settings_download_adb,
             settings_cancel_download,
+            settings_get_adb_version,
             settings_get_app_data_dir,
         ])
         .run(tauri::generate_context!())

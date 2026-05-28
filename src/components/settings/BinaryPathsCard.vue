@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { useSettingsStore } from "../../stores/settings";
 import { invoke } from "@tauri-apps/api/core";
 import { Link, ExternalLink, Download, XCircle, RefreshCw } from "lucide-vue-next";
@@ -21,24 +21,24 @@ async function applyAdbPath() {
 </script>
 
 <template>
-  <section class="card-glass border border-card-border rounded-2xl p-4">
+  <section class="card-glass p-4">
     <div class="flex items-center gap-2 mb-4">
       <Link :size="16" class="text-accent-emerald" />
-      <h2 class="text-xs font-bold uppercase tracking-widest">Binary Paths</h2>
+      <h2 class="font-sans text-xs font-semibold tracking-wider uppercase">Binary Paths</h2>
     </div>
 
     <!-- ADB Path -->
     <div class="mb-6">
       <div class="flex items-center justify-between mb-2">
         <label class="text-xs font-medium text-theme-secondary">ADB Path</label>
-        <span v-if="store.adbValid" class="text-xs text-green-400">✅ {{ store.adbVersion.split('\n')[0] }}</span>
-        <span v-else-if="store.downloading !== 'adb' && !store.downloadCancelled" class="text-xs text-red-400">⚠ Not Found</span>
+        <span v-if="store.adbValid" class="text-xs text-color-success">✅ {{ store.adbVersion.split('\n')[0] }}</span>
+        <span v-else-if="store.downloading !== 'adb' && !store.downloadCancelled" class="text-xs text-color-error">⚠ Not Found</span>
       </div>
       <div class="flex items-center gap-3">
         <input v-model="store.adbPath" @blur="applyAdbPath" type="text"
           class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50" />
         <button @click="store.browseAdbPath"
-          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover:bg-theme-hover hover:border-accent-emerald/50 transition-all">
+          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent transition-all">
           Browse
         </button>
       </div>
@@ -46,28 +46,28 @@ async function applyAdbPath() {
       <!-- ADB Download (in-app) -->
       <div v-if="!store.adbValid && store.downloading !== 'adb'" class="mt-3">
         <!-- Download error -->
-        <div v-if="store.downloadError" class="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-2">
-          <p class="text-xs text-red-400 mb-2">✗ Download failed: {{ store.downloadError }}</p>
+        <div v-if="store.downloadError" class="bg-color-error-container border border-color-error rounded-xl p-3 mb-2">
+          <p class="text-xs text-color-error mb-2">✗ Download failed: {{ store.downloadError }}</p>
           <button @click="store.downloadAdb"
-            class="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-emerald hover:bg-accent-emerald-hover text-theme-primary text-xs font-semibold transition-colors">
+            class="flex items-center gap-2 px-4 py-2 rounded-lg btn-primary text-xs font-semibold">
             <RefreshCw :size="14" /> Retry Download
           </button>
         </div>
 
         <!-- Cancelled -->
-        <div v-else-if="store.downloadCancelled" class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 mb-2">
-          <p class="text-xs text-yellow-400 mb-2">Download cancelled</p>
+        <div v-else-if="store.downloadCancelled" class="bg-color-warning-container border border-color-warning rounded-xl p-3 mb-2">
+          <p class="text-xs text-color-warning mb-2">Download cancelled</p>
           <button @click="store.downloadAdb"
-            class="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-emerald hover:bg-accent-emerald-hover text-theme-primary text-xs font-semibold transition-colors">
+            class="flex items-center gap-2 px-4 py-2 rounded-lg btn-primary text-xs font-semibold">
             <RefreshCw :size="14" /> Retry Download
           </button>
         </div>
 
         <!-- Download prompt -->
-        <div v-else class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3">
-          <p class="text-xs text-yellow-400 mb-3">⚠ ADB not found on your system</p>
+        <div v-else class="bg-color-warning-container border border-color-warning rounded-xl p-3">
+          <p class="text-xs text-color-warning mb-3">⚠ ADB not found on your system</p>
           <button @click="store.downloadAdb"
-            class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent-emerald hover:bg-accent-emerald-hover text-theme-primary text-xs font-semibold transition-colors shadow-lg shadow-emerald-500/20">
+            class="flex items-center gap-2 px-4 py-2.5 rounded-lg btn-primary text-xs font-semibold">
             <Download :size="14" />
             Download ADB for {{ store.currentOs.charAt(0).toUpperCase() + store.currentOs.slice(1) }}
           </button>
@@ -85,12 +85,12 @@ async function applyAdbPath() {
             {{ formatBytes(store.downloadProgress.read) }} / {{ formatBytes(store.downloadProgress.total) }}
           </span>
         </div>
-        <div class="w-full bg-gray-700 rounded-full h-2 mb-3">
-          <div class="bg-accent-emerald h-2 rounded-full transition-all duration-300"
+        <div class="progress-bar-track mb-3">
+          <div class="progress-bar-fill transition-all duration-300"
             :style="{ width: store.downloadProgress.percent + '%' }"></div>
         </div>
-        <button @click="store.cancelDownload"
-          class="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/20 transition-colors">
+          <button @click="store.cancelDownload"
+            class="flex items-center gap-2 px-4 py-2 rounded-lg bg-color-error-container border border-color-error text-color-error text-xs font-semibold hover:bg-color-error-container transition-colors">
           <XCircle :size="14" /> Cancel Download
         </button>
       </div>
@@ -98,7 +98,7 @@ async function applyAdbPath() {
       <!-- Update button (when adb found) -->
       <div v-if="store.adbValid && !store.downloading" class="mt-3">
         <button @click="store.downloadAdb"
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-secondary text-xs text-theme-secondary hover:border-accent-emerald/50 hover:bg-theme-hover hover:text-accent-emerald transition-all">
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-secondary text-xs text-theme-secondary hover-accent transition-all">
           <Download :size="12" /> Update ADB
         </button>
       </div>
@@ -108,23 +108,23 @@ async function applyAdbPath() {
     <div>
       <div class="flex items-center justify-between mb-2">
         <label class="text-xs font-medium text-theme-secondary">Scrcpy Path</label>
-        <span v-if="store.scrcpyValid" class="text-xs text-green-400">✅ {{ store.scrcpyVersion }}</span>
-        <span v-else class="text-xs text-red-400">⚠ Not Found</span>
+        <span v-if="store.scrcpyValid" class="text-xs text-color-success">✅ {{ store.scrcpyVersion }}</span>
+        <span v-else class="text-xs text-color-error">⚠ Not Found</span>
       </div>
       <div class="flex items-center gap-3">
         <input v-model="store.scrcpyPath" @blur="store.saveSetting('scrcpyPath', store.scrcpyPath); store.validateScrcpy()" type="text"
           class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50" />
         <button @click="store.browseScrcpyPath"
-          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover:bg-theme-hover hover:border-accent-emerald/50 transition-all">
+          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent transition-all">
           Browse
         </button>
       </div>
 
       <!-- Scrcpy download link (recommendation only) -->
-      <div v-if="!store.scrcpyValid" class="mt-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3">
-        <p class="text-xs text-yellow-400 mb-3">⚠ Scrcpy not found</p>
+      <div v-if="!store.scrcpyValid" class="mt-3 bg-color-warning-container border border-color-warning rounded-xl p-3">
+        <p class="text-xs text-color-warning mb-3">⚠ Scrcpy not found</p>
         <button @click="store.openScrcpyLink"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent-emerald hover:bg-accent-emerald-hover text-theme-primary text-xs font-semibold transition-colors shadow-lg shadow-emerald-500/20">
+          class="flex items-center gap-2 px-4 py-2.5 rounded-lg btn-primary text-xs font-semibold">
           <ExternalLink :size="14" />
           {{ store.downloadInfo?.scrcpy_link_label || "Download Scrcpy" }}
         </button>
@@ -140,7 +140,7 @@ async function applyAdbPath() {
       <!-- Visit link (when scrcpy found) -->
       <div v-if="store.scrcpyValid && store.downloadInfo" class="mt-3">
         <button @click="store.openScrcpyLink"
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-secondary text-xs text-theme-secondary hover:border-accent-emerald/50 hover:bg-theme-hover hover:text-accent-emerald transition-all">
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-secondary text-xs text-theme-secondary hover-accent transition-all">
           <ExternalLink :size="12" /> Visit Scrcpy Page
         </button>
       </div>
@@ -156,7 +156,17 @@ async function applyAdbPath() {
         <label class="relative inline-flex items-center cursor-pointer">
           <input type="checkbox" class="sr-only peer" v-model="store.autoDetectBinaries"
             @change="store.setAutoDetectBinaries(store.autoDetectBinaries)" />
-          <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-emerald"></div>
+          <div class="w-9 h-5 bg-theme-toggle-track rounded-full 
+                      peer peer-focus:outline-none
+                      after:content-[''] after:absolute after:top-[2px] after:start-[2px] 
+                      after:bg-[#06100d] 
+                      after:rounded-full after:h-4 after:w-4 
+                      after:shadow-md after:transition-all after:duration-300 
+                      after:ease-[cubic-bezier(0.34,1.56,0.64,1)]
+                      peer-checked:after:translate-x-[14px] 
+                      rtl:peer-checked:after:-translate-x-[14px] 
+                      peer-checked:after:bg-accent-emerald
+                      peer-active:after:w-[22px]"></div>
         </label>
       </div>
     </div>

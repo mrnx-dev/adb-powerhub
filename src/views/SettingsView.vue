@@ -5,7 +5,7 @@ import DisplayRecordingCard from "../components/settings/DisplayRecordingCard.vu
 </script>
 
 <template>
-  <div class="flex-1 overflow-y-auto bg-glow p-4 space-y-4">
+  <div class="flex-1 overflow-y-auto bg-glow p-6 space-y-6">
     <BinaryPathsCard />
     <GeneralPrefsCard />
     <DisplayRecordingCard />

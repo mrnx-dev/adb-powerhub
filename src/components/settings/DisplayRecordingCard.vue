@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { useSettingsStore } from "../../stores/settings";
 import { MonitorPlay } from "lucide-vue-next";
 
@@ -18,10 +18,10 @@ const formatOptions: { key: "mp4" | "mkv"; label: string }[] = [
 </script>
 
 <template>
-  <section class="card-glass border border-card-border rounded-2xl p-4">
+  <section class="card-glass p-4">
     <div class="flex items-center gap-2 mb-4">
       <MonitorPlay :size="16" class="text-accent-emerald" />
-      <h2 class="text-xs font-bold uppercase tracking-widest">Display & Recording</h2>
+      <h2 class="font-sans text-xs font-semibold tracking-wider uppercase">Display & Recording</h2>
     </div>
 
     <!-- Video Quality -->
@@ -32,8 +32,8 @@ const formatOptions: { key: "mp4" | "mkv"; label: string }[] = [
           @click="store.setVideoQuality(preset.key)"
           class="flex flex-col items-center px-3 py-3 rounded-xl border transition-all"
           :class="store.videoQuality === preset.key
-            ? 'bg-accent-emerald/10 border-accent-emerald/50 text-accent-emerald'
-            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover:border-accent-emerald/50 hover:bg-theme-hover'">
+            ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent'">
           <span class="text-xs font-semibold">{{ preset.label }}</span>
           <span class="text-[10px] opacity-60">{{ preset.desc }}</span>
         </button>
@@ -63,12 +63,12 @@ const formatOptions: { key: "mp4" | "mkv"; label: string }[] = [
           @click="store.setRecordingFormat(fmt.key)"
           class="flex items-center justify-center px-4 py-3 rounded-xl border transition-all text-sm font-semibold"
           :class="store.recordingFormat === fmt.key
-            ? 'bg-accent-emerald/10 border-accent-emerald/50 text-accent-emerald'
-            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover:border-accent-emerald/50 hover:bg-theme-hover'">
+            ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent'">
           {{ fmt.label }}
         </button>
       </div>
-      <p v-if="store.recordingFormat === 'mp4'" class="text-xs text-yellow-500 mt-2">
+      <p v-if="store.recordingFormat === 'mp4'" class="text-xs text-color-warning mt-2">
         MP4 files may become corrupted if recording is interrupted. MKV is recommended for reliability.
       </p>
     </div>
@@ -81,7 +81,7 @@ const formatOptions: { key: "mp4" | "mkv"; label: string }[] = [
           placeholder="Default: ~/Pictures/adb-powerhub"
           class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50" />
         <button @click="store.browseScreenshotDir"
-          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover:bg-theme-hover hover:border-accent-emerald/50 transition-all">
+          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent transition-all">
           Browse
         </button>
       </div>
@@ -95,7 +95,7 @@ const formatOptions: { key: "mp4" | "mkv"; label: string }[] = [
           placeholder="Default: ~/Videos/adb-powerhub"
           class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50" />
         <button @click="store.browseRecordingDir"
-          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover:bg-theme-hover hover:border-accent-emerald/50 transition-all">
+          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent transition-all">
           Browse
         </button>
       </div>

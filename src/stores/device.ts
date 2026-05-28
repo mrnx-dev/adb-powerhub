@@ -4,14 +4,18 @@ import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore } from "./settings";
 import { useToastStore } from "./toast";
+import { useConnectionHistoryStore } from "./connectionHistory";
 
 export const useDeviceStore = defineStore("device", () => {
   const toast = useToastStore();
   const connected = ref(false);
   const connecting = ref(false);
   const ipAddress = ref("");
-  const usbDeviceId = ref("");
+  const port = ref(5555);
   const deviceId = ref("");
+  const connectMethod = ref<"manual" | "wifi" | "pairing">("manual");
+  const transport = ref<"usb" | "wifi">("usb");
+  const autoConnectStatus = ref<"idle" | "detecting_usb" | "enabling_tcp" | "detecting_ip" | "connecting_tcp" | "connected" | "error">("idle");
 
   const batteryLevel = ref(0);
   const batteryStatus = ref("Unknown");
@@ -51,6 +55,8 @@ export const useDeviceStore = defineStore("device", () => {
   const isLoadingStats = ref(false);
   const isInitialLoad = ref(true);
 
+  let cancelCurrentConnect: (() => void) | null = null;
+
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 2000;
 
@@ -86,31 +92,40 @@ export const useDeviceStore = defineStore("device", () => {
     sdkVersion.value = "—";
   }
 
-  async function handleDisconnect(reason: string) {
-    connected.value = false;
-    deviceId.value = "";
-    resetStats();
-    isInitialLoad.value = true;
-    stopPolling();
-    addLog(reason, "error");
-    if (mirroring.value) {
-      mirroring.value = false;
-      try { await invoke("adb_stop_scrcpy"); } catch {}
-    }
+  async function onConnected(deviceIdStr: string, method: "manual" | "wifi" | "pairing") {
+    connected.value = true;
+    deviceId.value = deviceIdStr;
+    connectMethod.value = method;
+    autoConnectStatus.value = "connected";
+    pollFailCount = 0;
+    addLog(`Connected to ${deviceIdStr}`, "success");
+    toast.show("Device connected", "success");
+    await pollStats();
+    startPolling();
+    syncToggles();
+    // save after pollStats so model / version info is populated
+    const history = useConnectionHistoryStore();
+    const deviceIp = ipAddress.value || deviceIdStr.split(":")[0];
+    const devicePort = port.value || parseInt(deviceIdStr.split(":")[1] || "5555");
+    const methodKey = method === "pairing" ? "pairing" as const : "wifi" as const;
+    history.save({
+      id: history.deviceId(deviceIp, devicePort),
+      ip: deviceIp,
+      port: devicePort,
+      label: model.value || deviceIp,
+      model: model.value,
+      lastConnected: new Date().toISOString(),
+      method: methodKey,
+    });
   }
 
-  async function connect() {
+  async function connectWithPort(targetIp: string, targetPort: number) {
     connecting.value = true;
     try {
-      const result = await invoke<string>("adb_connect", { ip: ipAddress.value });
-      connected.value = true;
-      deviceId.value = ipAddress.value;
-      pollFailCount = 0;
-      addLog(result, "success");
-      toast.show("Device connected", "success");
-      await pollStats();
-      startPolling();
-      syncToggles();
+      await invoke<string>("adb_connect_port", { ip: targetIp, port: targetPort });
+      try { await onConnected(`${targetIp}:${targetPort}`, "manual"); } catch (e) {
+        addLog(`Post-connect setup failed: ${e}`, "error");
+      }
     } catch (e) {
       addLog(String(e), "error");
       toast.show("Connection failed", "error");
@@ -121,58 +136,200 @@ export const useDeviceStore = defineStore("device", () => {
   }
 
   async function connectWithRetry(maxRetries: number = MAX_RETRIES) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      connecting.value = true;
-      try {
-        const result = await invoke<string>("adb_connect", { ip: ipAddress.value });
-        connected.value = true;
-        deviceId.value = ipAddress.value;
-        pollFailCount = 0;
-        addLog(result, "success");
-        toast.show("Device connected", "success");
-        await pollStats();
-        startPolling();
-        syncToggles();
-        return;
-      } catch (e) {
-        addLog(`Connection attempt ${attempt}/${maxRetries} failed: ${e}`, "error");
-        if (attempt < maxRetries) {
-          toast.show(`Retrying (${attempt}/${maxRetries})...`, "info");
-          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
-        } else {
-          toast.show(`Connection failed after ${maxRetries} attempts`, "error");
-          connected.value = false;
+    if (connecting.value) return;
+    connecting.value = true;
+    let cancelled = false;
+    const cancelPromise = new Promise<void>((_, reject) => {
+      cancelCurrentConnect = () => {
+        cancelled = true;
+        reject(new Error("cancelled"));
+      };
+    });
+    try {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        if (cancelled) break;
+        try {
+          await Promise.race([
+            invoke("adb_connect_port", { ip: ipAddress.value, port: port.value }),
+            cancelPromise,
+          ]);
+        } catch (connectError) {
+          const msg = String(connectError);
+          if (cancelled || msg.includes("cancelled")) {
+            addLog("Connection cancelled", "info");
+            toast.show("Connection cancelled", "info");
+            try { await invoke("adb_disconnect"); } catch {}
+            break;
+          }
+          addLog(`Connection attempt ${attempt}/${maxRetries} failed: ${msg}`, "error");
+          if (attempt < maxRetries) {
+            toast.show(`Retrying (${attempt}/${maxRetries})...`, "info");
+            await Promise.race([
+              new Promise(r => setTimeout(r, RETRY_DELAY_MS)),
+              cancelPromise,
+            ]);
+            if (cancelled) {
+              addLog("Connection cancelled", "info");
+              toast.show("Connection cancelled", "info");
+              try { await invoke("adb_disconnect"); } catch {}
+              break;
+            }
+          } else {
+            toast.show(`Connection failed after ${maxRetries} attempts`, "error");
+            connected.value = false;
+          }
+          continue;
         }
-      } finally {
-        connecting.value = false;
+        try {
+          await onConnected(`${ipAddress.value}:${port.value}`, "manual");
+        } catch (e) {
+          addLog(`Post-connect setup failed: ${e}`, "error");
+        }
+        return;
       }
+    } finally {
+      connecting.value = false;
+      cancelCurrentConnect = null;
     }
   }
 
-  async function autoConnect() {
+  async function cancelConnect() {
+    if (cancelCurrentConnect) {
+      cancelCurrentConnect();
+      cancelCurrentConnect = null;
+    }
+    connecting.value = false;
+    try {
+      await invoke("adb_cancel_connect");
+    } catch (e) {
+      addLog(`Cancel error: ${e}`, "error");
+    }
+  }
+
+  async function autoConnect(): Promise<boolean> {
+    autoConnectStatus.value = "detecting_usb";
     connecting.value = true;
     try {
-      const devices = await invoke<{ id: string; state: string }[]>("adb_devices");
-      const connectedDevice = devices.find((d) => d.state === "device");
-      if (connectedDevice) {
+      const devices = await invoke<{ id: string; state: string; transport: string; model: string }[]>("adb_devices");
+      const usbDevices = devices.filter((d) => d.transport === "usb" && d.state === "device");
+      const wifiDevices = devices.filter((d) => d.transport === "wifi" && d.state === "device");
+
+      // Phase 1: USB device detected — enable TCP mode for seamless WiFi switch
+      if (usbDevices.length > 0) {
+        const usbDevice = usbDevices[0];
+        transport.value = "usb";
+        addLog(`USB device detected: ${usbDevice.model || usbDevice.id}`, "info");
+
+        // Try to enable TCP mode
+        autoConnectStatus.value = "enabling_tcp";
+        try {
+          await invoke("adb_tcpip", { serial: usbDevice.id, port: 5555 });
+          addLog(`Wireless mode enabled on ${usbDevice.id} port 5555`, "success");
+        } catch (e) {
+          addLog(`Could not enable wireless mode: ${e}`, "error");
+          // Fallback: connect via USB only
+          connected.value = true;
+          deviceId.value = usbDevice.id;
+          try { await invoke("adb_set_device", { deviceId: usbDevice.id }); } catch {}
+          pollFailCount = 0;
+          addLog(`Connected to ${usbDevice.model || usbDevice.id} via USB`, "success");
+          toast.show("Connected via USB", "success");
+          addLog("Unplugging USB will disconnect the device", "info");
+          try { await pollStats(); } catch {}
+          startPolling();
+          syncToggles();
+          autoConnectStatus.value = "connected";
+          return true;
+        }
+
+        // Detect IP address while USB is still connected
+        autoConnectStatus.value = "detecting_ip";
+        let deviceIp = "";
+        try {
+          deviceIp = await invoke<string>("adb_get_ip", { serial: usbDevice.id });
+          addLog(`Detected IP: ${deviceIp}`, "success");
+        } catch {
+          addLog("Could not auto-detect IP address", "error");
+        }
+
+        // Connect via WiFi if IP is available
+        if (deviceIp) {
+          autoConnectStatus.value = "connecting_tcp";
+          ipAddress.value = deviceIp;
+          port.value = 5555;
+          try {
+            await invoke("adb_connect_port", { ip: deviceIp, port: 5555 });
+            try { await onConnected(`${deviceIp}:5555`, "wifi"); } catch (e) {
+              addLog(`Post-connect setup failed: ${e}`, "error");
+            }
+            addLog("You may unplug USB safely — device is connected via Wi-Fi", "info");
+            return true;
+          } catch (e) {
+            addLog(`Wi-Fi connection failed: ${e}`, "error");
+          }
+        }
+
+        // Fallback: connect via USB only
         connected.value = true;
-        deviceId.value = connectedDevice.id;
-        try { await invoke("adb_set_device", { deviceId: connectedDevice.id }); } catch {}
+        deviceId.value = usbDevice.id;
+        try { await invoke("adb_set_device", { deviceId: usbDevice.id }); } catch {}
         pollFailCount = 0;
-        addLog(`Connected to ${connectedDevice.id}`, "success");
-        toast.show(`Connected to ${connectedDevice.id}`, "success");
-        await pollStats();
+        addLog(`Connected to ${usbDevice.model || usbDevice.id} via USB`, "success");
+        toast.show("Connected via USB", "success");
+        addLog("Unplugging USB will disconnect the device", "info");
+        try { await pollStats(); } catch {}
         startPolling();
         syncToggles();
-      } else if (devices.length > 0) {
+        autoConnectStatus.value = "connected";
+        return true;
+      }
+
+      // Phase 2: No USB — try existing WiFi device
+      if (wifiDevices.length > 0) {
+        const wifiDevice = wifiDevices[0];
+        connected.value = true;
+        deviceId.value = wifiDevice.id;
+        transport.value = "wifi";
+        try { await invoke("adb_set_device", { deviceId: wifiDevice.id }); } catch {}
+        pollFailCount = 0;
+        addLog(`Connected to ${wifiDevice.model || wifiDevice.id}`, "success");
+        toast.show("Device connected", "success");
+        try { await pollStats(); } catch {}
+        startPolling();
+        syncToggles();
+        autoConnectStatus.value = "connected";
+        return true;
+      }
+
+      // Phase 3: No devices found at all — try saved device
+      const history = useConnectionHistoryStore();
+      const last = history.getLastConnected();
+      if (last) {
+        addLog(`Trying saved device ${last.ip}:${last.port}...`, "info");
+        try {
+          await invoke("adb_connect_port", { ip: last.ip, port: last.port });
+          try { await onConnected(`${last.ip}:${last.port}`, last.method); } catch (e) {
+            addLog(`Post-connect setup failed: ${e}`, "error");
+          }
+          return true;
+        } catch (e) {
+          addLog(`Saved device unreachable: ${e}`, "error");
+        }
+      }
+
+      if (devices.length > 0) {
         addLog(`${devices.length} device(s) found but none ready`, "error");
         toast.show("Device not ready", "error");
       } else {
-        addLog("No devices found", "error");
+        addLog("No devices found. Connect a USB device or enter an IP address.", "error");
         toast.show("No devices found", "error");
       }
+      autoConnectStatus.value = "error";
+      return false;
     } catch (e) {
       addLog(String(e), "error");
+      autoConnectStatus.value = "error";
+      return false;
     } finally {
       connecting.value = false;
     }
@@ -187,8 +344,44 @@ export const useDeviceStore = defineStore("device", () => {
       stopPolling();
       addLog("Disconnected", "info");
       toast.show("Disconnected", "info");
+      autoConnectStatus.value = "idle";
     } catch (e) {
       addLog(String(e), "error");
+    }
+  }
+
+  async function connectSaved(saved: { ip: string; port: number; method: "wifi" | "pairing" }) {
+    ipAddress.value = saved.ip;
+    port.value = saved.port;
+    await connectWithPort(saved.ip, saved.port);
+  }
+
+  async function pairDevice(pairIp: string, pairPortVal: number, code: string) {
+    connecting.value = true;
+    try {
+      await invoke("adb_pair", { ip: pairIp, pairPort: pairPortVal, code });
+      addLog(`Paired with ${pairIp}:${pairPortVal}`, "success");
+      toast.show("Pairing successful. Now connecting...", "success");
+      port.value = 5555;
+      await connectWithPort(pairIp, 5555);
+    } catch (e) {
+      addLog(String(e), "error");
+      toast.show("Pairing failed", "error");
+    } finally {
+      connecting.value = false;
+    }
+  }
+
+  async function handleDisconnect(reason: string) {
+    connected.value = false;
+    deviceId.value = "";
+    resetStats();
+    isInitialLoad.value = true;
+    stopPolling();
+    addLog(reason, "error");
+    if (mirroring.value) {
+      mirroring.value = false;
+      try { await invoke("adb_stop_scrcpy"); } catch {}
     }
   }
 
@@ -557,8 +750,8 @@ export const useDeviceStore = defineStore("device", () => {
   }
 
   return {
-    connected, connecting, ipAddress, usbDeviceId, deviceId,
-    isLoadingStats,
+    connected, connecting, ipAddress, port, deviceId, connectMethod, transport, autoConnectStatus,
+    isLoadingStats, isInitialLoad,
     batteryLevel, batteryStatus, batteryHealth, batteryTemp, batteryPlugged, batteryColor,
     cpuUsage, model, androidVersion, sdkVersion,
     logs, commandInput,
@@ -566,7 +759,9 @@ export const useDeviceStore = defineStore("device", () => {
     wifiEnabled, dataEnabled, airplaneEnabled, bluetoothEnabled,
     showTapsEnabled, layoutBoundsEnabled, stayAwakeEnabled,
     brightness, textInput, showRebootMenu,
-    addLog, clearLogs, connect, connectWithRetry, autoConnect, disconnect, pollStats, startPolling, handleDisconnect, executeCommand,
+    addLog, clearLogs, connectWithPort, connectWithRetry, cancelConnect, autoConnect, disconnect,
+    onConnected, handleDisconnect, pollStats, startPolling, executeCommand,
+    connectSaved, pairDevice,
     toggleWifi, toggleData, toggleAirplane, toggleBluetooth, toggleShowTaps,
     syncToggles, toggleLayoutBounds, toggleStayAwake,
     pressHome, pressBack, pressRecent, rotateDevice,

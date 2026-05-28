@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tauri::State;
 
@@ -60,6 +62,119 @@ fn run_adb_cmd_with_timeout(adb_path: &str, args: &[&str], timeout_secs: u64) ->
     }
 }
 
+fn kill_process_tree(pid: u32) {
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/F", "/T", "/PID", &pid.to_string()])
+            .output();
+    }
+    #[cfg(unix)]
+    {
+        unsafe {
+            libc::kill(-(pid as i32), 9);
+        }
+    }
+}
+
+fn run_adb_cmd_cancellable(
+    cancel_flag: &AtomicBool,
+    process_slot: &Arc<std::sync::Mutex<Option<u32>>>,
+    adb_path: &str,
+    args: &[&str],
+    timeout_secs: u64,
+) -> Result<String, String> {
+    use std::sync::mpsc;
+
+    let (tx, rx) = mpsc::channel();
+
+    let adb = adb_path.to_string();
+    let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+    #[cfg(windows)]
+    let child = Command::new(&adb)
+        .args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .creation_flags(0x08000000)
+        .spawn()
+        .map_err(|e| format!("Failed to spawn adb: {}", e))?;
+
+    #[cfg(not(windows))]
+    let child = Command::new(&adb)
+        .args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn adb: {}", e))?;
+
+    let pid = child.id();
+    {
+        let mut slot = process_slot.lock().unwrap();
+        *slot = Some(pid);
+    }
+
+    let tx_child = tx.clone();
+    std::thread::spawn(move || {
+        let output = child.wait_with_output();
+        let _ = tx_child.send(output);
+    });
+
+    let start = std::time::Instant::now();
+    loop {
+        if cancel_flag.load(Ordering::SeqCst) {
+            kill_process_tree(pid);
+            {
+                let mut slot = process_slot.lock().unwrap();
+                *slot = None;
+            }
+            return Err("cancelled".to_string());
+        }
+
+        match rx.recv_timeout(Duration::from_millis(200)) {
+            Ok(Ok(output)) => {
+                {
+                    let mut slot = process_slot.lock().unwrap();
+                    *slot = None;
+                }
+                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                return if output.status.success() {
+                    Ok(stdout)
+                } else if stderr.is_empty() {
+                    Err(format!("Command failed with status {}", output.status))
+                } else {
+                    Err(stderr)
+                };
+            }
+            Ok(Err(e)) => {
+                {
+                    let mut slot = process_slot.lock().unwrap();
+                    *slot = None;
+                }
+                return Err(format!("Failed to execute adb: {}", e));
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                if start.elapsed() > Duration::from_secs(timeout_secs) {
+                    kill_process_tree(pid);
+                    {
+                        let mut slot = process_slot.lock().unwrap();
+                        *slot = None;
+                    }
+                    return Err(format!("ADB command timed out after {} seconds", timeout_secs));
+                }
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                {
+                    let mut slot = process_slot.lock().unwrap();
+                    *slot = None;
+                }
+                return Err("ADB monitor thread disconnected".to_string());
+            }
+        }
+    }
+}
+
 fn run_adb_cmd_with_device(adb_path: &str, device_serial: Option<&str>, args: &[&str]) -> Result<String, String> {
     run_adb_cmd_with_device_timed(adb_path, device_serial, args, ADB_TIMEOUT_SECS)
 }
@@ -100,6 +215,11 @@ pub struct DeviceInfo {
     pub model: String,
     pub product: String,
     pub device: String,
+    pub transport: String,
+}
+
+fn detect_transport(id: &str) -> String {
+    if id.contains(':') { "wifi".to_string() } else { "usb".to_string() }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -166,12 +286,15 @@ pub fn adb_devices(state: State<AppState>) -> Result<Vec<DeviceInfo>, String> {
                 .map(|p| p.strip_prefix("device:").unwrap_or("").to_string())
                 .unwrap_or_default();
 
+            let transport = detect_transport(&id);
+
             devices.push(DeviceInfo {
                 id,
                 state: device_state,
                 model,
                 product,
                 device,
+                transport,
             });
         }
     }
@@ -558,6 +681,138 @@ pub fn adb_set_device(state: State<AppState>, device_id: String) -> Result<(), S
     let mut device = lock_state!(state.connected_device);
     *device = Some(device_id);
     Ok(())
+}
+
+#[tauri::command]
+pub fn adb_tcpip(state: State<AppState>, serial: String, port: u16) -> Result<String, String> {
+    let adb = get_adb_path(&state);
+    let port_str = port.to_string();
+    run_adb_cmd(&adb, &["-s", &serial, "tcpip", &port_str])
+}
+
+#[tauri::command]
+pub fn adb_get_ip(state: State<AppState>, serial: String) -> Result<String, String> {
+    let adb = get_adb_path(&state);
+    let adb_ref = &adb;
+    let s = Some(serial.as_str());
+
+    let methods: &[&[&str]] = &[
+        &["shell", "ip", "route"],
+        &["shell", "getprop", "dhcp.wlan0.ipaddress"],
+        &["shell", "ifconfig", "wlan0"],
+        &["shell", "dumpsys", "connectivity"],
+    ];
+
+    for args in methods {
+        let output = run_adb_cmd_with_device(adb_ref, s, args).unwrap_or_default();
+        if let Some(ip) = extract_ip_from_output(&output) {
+            if !ip.is_empty() {
+                return Ok(ip);
+            }
+        }
+    }
+    Err("Could not determine device IP".to_string())
+}
+
+fn extract_ip_from_output(output: &str) -> Option<String> {
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if let Some(src) = trimmed.find("src ") {
+            let ip_candidate = trimmed[src + 4..].split_whitespace().next().unwrap_or("");
+            if is_valid_ip(ip_candidate) {
+                return Some(ip_candidate.to_string());
+            }
+        }
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        for part in &parts {
+            if is_valid_ip(part) {
+                return Some(part.to_string());
+            }
+        }
+        if let Some(addr) = trimmed.find("inet addr:") {
+            let ip_candidate = trimmed[addr + 10..].split_whitespace().next().unwrap_or("");
+            if is_valid_ip(ip_candidate) {
+                return Some(ip_candidate.to_string());
+            }
+        }
+        if let Some(addr) = trimmed.find("LinkAddresses: [") {
+            let rest = &trimmed[addr + 15..];
+            if let Some(end) = rest.find(']') {
+                let ip_candidate = &rest[..end];
+                if is_valid_ip(ip_candidate) {
+                    return Some(ip_candidate.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn is_valid_ip(s: &str) -> bool {
+    let parts: Vec<&str> = s.split('.').collect();
+    if parts.len() != 4 { return false; }
+    parts.iter().all(|p| p.parse::<u16>().map_or(false, |n| n <= 255))
+}
+
+#[tauri::command]
+pub async fn adb_connect_port(state: State<'_, AppState>, ip: String, port: u16) -> Result<String, String> {
+    state.cancel_connect.store(false, Ordering::SeqCst);
+
+    let cancel = state.cancel_connect.clone();
+    let process_slot = state.connect_process.clone();
+    let adb = get_adb_path(&state);
+    let target = format!("{}:{}", ip, port);
+    let target_for_state = target.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        run_adb_cmd_cancellable(
+            &cancel,
+            &process_slot,
+            &adb,
+            &["connect", &target],
+            10,
+        )
+    })
+    .await
+    .map_err(|e| format!("Task error: {}", e))??;
+
+    if state.cancel_connect.load(Ordering::SeqCst) {
+        return Err("cancelled".to_string());
+    }
+
+    if result.contains("connected") || result.contains("already connected") {
+        let mut device = lock_state!(state.connected_device);
+        *device = Some(target_for_state);
+        Ok(result)
+    } else {
+        Err(result)
+    }
+}
+
+#[tauri::command]
+pub async fn adb_cancel_connect(state: State<'_, AppState>) -> Result<(), String> {
+    state.cancel_connect.store(true, Ordering::SeqCst);
+
+    let pid = state.connect_process.lock().unwrap().take();
+    if let Some(pid) = pid {
+        kill_process_tree(pid);
+    }
+
+    *lock_state!(state.connected_device) = None;
+
+    let adb = get_adb_path(&state);
+    tokio::task::spawn_blocking(move || {
+        let _ = run_adb_cmd(&adb, &["disconnect"]);
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn adb_pair(state: State<AppState>, ip: String, pair_port: u16, code: String) -> Result<String, String> {
+    let adb = get_adb_path(&state);
+    let target = format!("{}:{}", ip, pair_port);
+    run_adb_cmd_with_timeout(&adb, &["pair", &target, &code], 15)
 }
 
 #[tauri::command]
