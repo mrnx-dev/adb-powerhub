@@ -35,6 +35,10 @@ export const useDeviceStore = defineStore("device", () => {
   const scrcpyPath = ref<string | null>(null);
   const mirroring = ref(false);
   const recordingScreen = ref(false);
+  const showTouches = ref(false);
+  const turnScreenOff = ref(false);
+  const alwaysOnTop = ref(false);
+  const noControl = ref(false);
 
   const wifiEnabled = ref(false);
   const dataEnabled = ref(false);
@@ -712,6 +716,15 @@ export const useDeviceStore = defineStore("device", () => {
     }
   }
 
+  function toggleMirrorFlag(flag: 'showTouches' | 'turnScreenOff' | 'alwaysOnTop' | 'noControl') {
+    switch (flag) {
+      case 'showTouches': showTouches.value = !showTouches.value; break;
+      case 'turnScreenOff': turnScreenOff.value = !turnScreenOff.value; break;
+      case 'alwaysOnTop': alwaysOnTop.value = !alwaysOnTop.value; break;
+      case 'noControl': noControl.value = !noControl.value; break;
+    }
+  }
+
   async function launchMirror() {
     try {
       const settingsStore = useSettingsStore();
@@ -730,6 +743,10 @@ export const useDeviceStore = defineStore("device", () => {
         videoBitrate: bitrate,
         maxSize,
         recordingFormat,
+        showTouches: showTouches.value,
+        turnScreenOff: turnScreenOff.value,
+        alwaysOnTop: alwaysOnTop.value,
+        noControl: noControl.value,
       });
       mirroring.value = true;
       addLog("scrcpy launched", "success");
@@ -756,6 +773,7 @@ export const useDeviceStore = defineStore("device", () => {
     cpuUsage, model, androidVersion, sdkVersion,
     logs, commandInput,
     scrcpyAvailable, scrcpyPath, mirroring, recordingScreen,
+    showTouches, turnScreenOff, alwaysOnTop, noControl, toggleMirrorFlag,
     wifiEnabled, dataEnabled, airplaneEnabled, bluetoothEnabled,
     showTapsEnabled, layoutBoundsEnabled, stayAwakeEnabled,
     brightness, textInput, showRebootMenu,

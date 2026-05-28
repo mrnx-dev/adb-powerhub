@@ -48,6 +48,10 @@ pub fn adb_launch_scrcpy(
     video_bitrate: Option<String>,
     max_size: Option<String>,
     recording_format: Option<String>,
+    show_touches: Option<bool>,
+    turn_screen_off: Option<bool>,
+    always_on_top: Option<bool>,
+    no_control: Option<bool>,
 ) -> Result<String, String> {
     let scrcpy_status = adb_find_scrcpy(state.clone())?;
 
@@ -58,7 +62,24 @@ pub fn adb_launch_scrcpy(
     let scrcpy_path = scrcpy_status.path.ok_or("scrcpy path is missing despite being available".to_string())?;
 
     let mut cmd = Command::new(&scrcpy_path);
-    cmd.arg("--stay-awake");
+
+    // --stay-awake memerlukan kontrol; kalau no-control aktif, skip
+    if !no_control.unwrap_or(false) {
+        cmd.arg("--stay-awake");
+    }
+
+    if show_touches.unwrap_or(false) {
+        cmd.arg("--show-touches");
+    }
+    if turn_screen_off.unwrap_or(false) {
+        cmd.arg("--turn-screen-off");
+    }
+    if always_on_top.unwrap_or(false) {
+        cmd.arg("--always-on-top");
+    }
+    if no_control.unwrap_or(false) {
+        cmd.arg("--no-control");
+    }
 
     let device_serial = state.connected_device.lock().unwrap_or_else(|e| e.into_inner()).clone();
     if let Some(serial) = device_serial {
