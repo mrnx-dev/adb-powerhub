@@ -10,12 +10,14 @@ A cross-platform desktop application for controlling Android devices via ADB (An
 ## Features
 
 ### Device Connection
+
 - Connect via IP address (wireless ADB)
 - USB auto-connect with device detection
 - Auto-connect on launch (configurable)
 - Device switching and disconnection
 
 ### Device Monitoring
+
 - Real-time battery level, status, and health
 - CPU usage monitoring
 - Device model, Android version, and SDK info
@@ -23,17 +25,20 @@ A cross-platform desktop application for controlling Android devices via ADB (An
 - Auto-disconnect after 3 consecutive poll failures
 
 ### Connectivity Toggles
+
 - Wi-Fi enable/disable
 - Mobile data enable/disable
 - Airplane mode toggle
 - Bluetooth enable/disable
 
 ### Developer Tools
+
 - Show touches toggle
 - Layout bounds toggle
 - Stay awake (keep screen on while charging)
 
 ### Remote Controls
+
 - Navigation: Home, Back, Recent
 - Volume: Up, Down, Mute
 - Media: Previous, Play/Pause, Next
@@ -43,21 +48,25 @@ A cross-platform desktop application for controlling Android devices via ADB (An
 - Screen rotation toggle
 
 ### Screen Mirroring (scrcpy)
+
 - Launch scrcpy with configurable quality presets (Low/Medium/High/Custom)
 - Screen recording (MKV or MP4 format)
 - Stay awake during mirroring
 - In-app scrcpy path configuration
 
 ### Terminal
+
 - Interactive ADB command execution
 - Timestamped log viewer with copy/export
 - Real-time command output
 
 ### System Actions
+
 - Screenshot capture and auto-open folder
 - Reboot (normal, recovery, bootloader)
 
 ### Settings
+
 - ADB binary path (auto-detect, manual, or in-app download from Google)
 - Scrcpy binary path (with install guidance)
 - Stay on top (always-on-top window)
@@ -68,6 +77,7 @@ A cross-platform desktop application for controlling Android devices via ADB (An
 - Persistent settings via Tauri store
 
 ### UI/UX
+
 - Dark glass-morphism theme with emerald accent
 - Collapsible sidebars (left: navigation, right: controls)
 - Toast notifications for key actions
@@ -76,18 +86,18 @@ A cross-platform desktop application for controlling Android devices via ADB (An
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Vue 3 (Composition API + `<script setup>`) |
-| State Management | Pinia |
-| Styling | Tailwind CSS v4 |
-| Icons | Lucide Vue Next, Material Design Icons |
-| Build | Vite |
-| Desktop | Tauri v2 |
-| Backend | Rust (2021 edition) |
-| Async | Tokio |
-| HTTP | Reqwest |
-| CI/CD | GitHub Actions (build 4 platforms) |
+| Layer            | Technology                                 |
+| ---------------- | ------------------------------------------ |
+| Frontend         | Vue 3 (Composition API + `<script setup>`) |
+| State Management | Pinia                                      |
+| Styling          | Tailwind CSS v4                            |
+| Icons            | Lucide Vue Next, Material Design Icons     |
+| Build            | Vite                                       |
+| Desktop          | Tauri v2                                   |
+| Backend          | Rust (2021 edition)                        |
+| Async            | Tokio                                      |
+| HTTP             | Reqwest                                    |
+| CI/CD            | GitHub Actions (build 4 platforms)         |
 
 ## Project Structure
 
@@ -165,9 +175,9 @@ Produced installers will be in `src-tauri/target/release/bundle/`.
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+K` | Focus terminal input |
+| Shortcut | Action                        |
+| -------- | ----------------------------- |
+| `Ctrl+K` | Focus terminal input          |
 | `Escape` | Close reboot menu / dropdowns |
 
 ## License
