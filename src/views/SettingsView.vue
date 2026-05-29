@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import BinaryPathsCard from "../components/settings/BinaryPathsCard.vue";
-import GeneralPrefsCard from "../components/settings/GeneralPrefsCard.vue";
-import DisplayRecordingCard from "../components/settings/DisplayRecordingCard.vue";
+import BinaryPathsCard from '../components/settings/BinaryPathsCard.vue';
+import GeneralPrefsCard from '../components/settings/GeneralPrefsCard.vue';
+import DisplayRecordingCard from '../components/settings/DisplayRecordingCard.vue';
 </script>
 
 <template>

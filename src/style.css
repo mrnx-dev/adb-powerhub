@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "@mdi/font/css/materialdesignicons.min.css";
+@import 'tailwindcss';
+@import '@mdi/font/css/materialdesignicons.min.css';
 
 /* ============================================================
    ADB PowerHub — Theme System (Emerald Token Strategy)
@@ -9,7 +9,7 @@
 @theme {
   --color-accent-emerald: #10b981;
   --color-accent-emerald-hover: #059669;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
 
   --radius-sm: 0.25rem;
   --radius-DEFAULT: 0.5rem;
@@ -72,7 +72,7 @@
 }
 
 /* ——— LIGHT TOKENS ———————————————————————————————————————— */
-:root[data-theme="light"] {
+:root[data-theme='light'] {
   --bg-page: #e8ecea;
   --bg-sidebar: #f9fafb;
   --bg-card: #ffffff;
@@ -89,30 +89,30 @@
   --text-heading: #111827;
   --text-inverse: #ffffff;
 
-  --border-primary: rgba(16, 185, 129, 0.40);
+  --border-primary: rgba(16, 185, 129, 0.4);
   --border-secondary: rgba(0, 0, 0, 0.12);
   --border-tertiary: rgba(0, 0, 0, 0.06);
 
   --color-primary: #10b981;
-  --color-primary-container: rgba(16, 185, 129, 0.10);
+  --color-primary-container: rgba(16, 185, 129, 0.1);
   --color-on-primary: #ffffff;
   --color-secondary: #374151;
-  --color-secondary-container: rgba(55, 65, 81, 0.10);
+  --color-secondary-container: rgba(55, 65, 81, 0.1);
   --color-on-secondary-container: #374151;
   --color-tertiary: #10b981;
   --color-tertiary-container: rgba(16, 185, 129, 0.06);
   --color-success: #059669;
-  --color-success-container: rgba(5, 150, 105, 0.10);
+  --color-success-container: rgba(5, 150, 105, 0.1);
   --color-error: #dc2626;
-  --color-error-container: rgba(220, 38, 38, 0.10);
+  --color-error-container: rgba(220, 38, 38, 0.1);
   --color-warning: #d97706;
-  --color-warning-container: rgba(217, 119, 6, 0.10);
+  --color-warning-container: rgba(217, 119, 6, 0.1);
   --color-info: #374151;
-  --color-info-container: rgba(55, 65, 81, 0.10);
+  --color-info-container: rgba(55, 65, 81, 0.1);
 
   --shadow-card: 0px 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-modal: 0px 4px 16px rgba(0, 0, 0, 0.15);
-  --shadow-hover: 0px 2px 6px rgba(0, 0, 0, 0.10);
+  --shadow-hover: 0px 2px 6px rgba(0, 0, 0, 0.1);
   --shadow-focus-ring: 0 0 0 3px rgba(16, 185, 129, 0.2);
 
   --scrollbar-track: #e5e7eb;
@@ -139,63 +139,138 @@ body {
   background-color: var(--bg-page);
 }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--scrollbar-track); }
-::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
 
 /* ============================================================
    THEME-AWARE UTILITY CLASSES
    ============================================================ */
 
 /* Backgrounds */
-.bg-theme-page      { background-color: var(--bg-page); }
-.bg-theme-sidebar   { background-color: var(--bg-sidebar); }
-.bg-theme-card      { background-color: var(--bg-card); }
-.bg-theme-terminal  { background-color: var(--bg-terminal); }
-.bg-theme-input     { background-color: var(--bg-input); }
-.bg-theme-btn       { background-color: var(--bg-button); }
-.bg-theme-hover     { background-color: var(--bg-hover); }
-.bg-sidebar-dark    { background-color: var(--bg-sidebar); }
+.bg-theme-page {
+  background-color: var(--bg-page);
+}
+.bg-theme-sidebar {
+  background-color: var(--bg-sidebar);
+}
+.bg-theme-card {
+  background-color: var(--bg-card);
+}
+.bg-theme-terminal {
+  background-color: var(--bg-terminal);
+}
+.bg-theme-input {
+  background-color: var(--bg-input);
+}
+.bg-theme-btn {
+  background-color: var(--bg-button);
+}
+.bg-theme-hover {
+  background-color: var(--bg-hover);
+}
+.bg-sidebar-dark {
+  background-color: var(--bg-sidebar);
+}
 
 /* Toggle switch tokens */
-.bg-theme-toggle-track { background-color: var(--bg-toggle-track); }
-.bg-theme-toggle-knob  { background-color: var(--bg-toggle-knob); }
+.bg-theme-toggle-track {
+  background-color: var(--bg-toggle-track);
+}
+.bg-theme-toggle-knob {
+  background-color: var(--bg-toggle-knob);
+}
 
 /* Text */
-.text-theme-primary     { color: var(--text-primary); }
-.text-theme-secondary   { color: var(--text-secondary); }
-.text-theme-muted       { color: var(--text-muted); }
-.text-theme-inverse     { color: var(--text-inverse); }
+.text-theme-primary {
+  color: var(--text-primary);
+}
+.text-theme-secondary {
+  color: var(--text-secondary);
+}
+.text-theme-muted {
+  color: var(--text-muted);
+}
+.text-theme-inverse {
+  color: var(--text-inverse);
+}
 
 /* Borders */
-.border-theme-primary   { border-color: var(--border-primary); }
-.border-theme-secondary { border-color: var(--border-secondary); }
-.border-theme-tertiary  { border-color: var(--border-tertiary); }
-.border-card-border     { border-color: var(--border-secondary); }
+.border-theme-primary {
+  border-color: var(--border-primary);
+}
+.border-theme-secondary {
+  border-color: var(--border-secondary);
+}
+.border-theme-tertiary {
+  border-color: var(--border-tertiary);
+}
+.border-card-border {
+  border-color: var(--border-secondary);
+}
 
 /* Semantic text colors */
-.text-color-primary     { color: var(--color-primary); }
-.text-color-success     { color: var(--color-success); }
-.text-color-error       { color: var(--color-error); }
-.text-color-warning     { color: var(--color-warning); }
-.text-color-info        { color: var(--color-info); }
+.text-color-primary {
+  color: var(--color-primary);
+}
+.text-color-success {
+  color: var(--color-success);
+}
+.text-color-error {
+  color: var(--color-error);
+}
+.text-color-warning {
+  color: var(--color-warning);
+}
+.text-color-info {
+  color: var(--color-info);
+}
 
 /* Semantic background colors */
-.bg-color-success-container   { background-color: var(--color-success-container); }
-.bg-color-error-container     { background-color: var(--color-error-container); }
-.bg-color-warning-container   { background-color: var(--color-warning-container); }
-.bg-color-info-container      { background-color: var(--color-info-container); }
+.bg-color-success-container {
+  background-color: var(--color-success-container);
+}
+.bg-color-error-container {
+  background-color: var(--color-error-container);
+}
+.bg-color-warning-container {
+  background-color: var(--color-warning-container);
+}
+.bg-color-info-container {
+  background-color: var(--color-info-container);
+}
 
 /* Semantic border colors */
-.border-color-success   { border-color: var(--color-success); }
-.border-color-error     { border-color: var(--color-error); }
-.border-color-warning   { border-color: var(--color-warning); }
+.border-color-success {
+  border-color: var(--color-success);
+}
+.border-color-error {
+  border-color: var(--color-error);
+}
+.border-color-warning {
+  border-color: var(--color-warning);
+}
 
 /* Shadows */
-.shadow-theme-card   { box-shadow: var(--shadow-card); }
-.shadow-theme-modal  { box-shadow: var(--shadow-modal); }
-.shadow-theme-hover  { box-shadow: var(--shadow-hover); }
+.shadow-theme-card {
+  box-shadow: var(--shadow-card);
+}
+.shadow-theme-modal {
+  box-shadow: var(--shadow-modal);
+}
+.shadow-theme-hover {
+  box-shadow: var(--shadow-hover);
+}
 
 /* ============================================================
    ELEVATION & CARD SYSTEM
@@ -217,7 +292,9 @@ body {
   border: 2px solid var(--border-primary) !important;
   border-radius: 0.5rem;
   box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .card-glass:hover {
@@ -265,18 +342,18 @@ body {
    FORM ELEMENT TOKENS
    ============================================================ */
 
-input[type="text"],
-input[type="number"],
+input[type='text'],
+input[type='number'],
 select,
 textarea {
   caret-color: var(--color-primary);
 }
 
-input[type="range"] {
+input[type='range'] {
   accent-color: var(--color-primary);
 }
 
-input[type="checkbox"] {
+input[type='checkbox'] {
   accent-color: var(--color-primary);
 }
 
@@ -306,7 +383,7 @@ select::-ms-expand {
 }
 
 /* --- Range Slider --- */
-input[type="range"] {
+input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
@@ -315,13 +392,13 @@ input[type="range"] {
   height: auto;
 }
 
-input[type="range"]::-webkit-slider-runnable-track {
+input[type='range']::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 9999px;
   background: var(--bg-toggle-track);
 }
 
-input[type="range"]::-webkit-slider-thumb {
+input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 16px;
@@ -334,21 +411,21 @@ input[type="range"]::-webkit-slider-thumb {
   transition: transform 0.1s ease;
 }
 
-input[type="range"]:hover::-webkit-slider-thumb {
+input[type='range']:hover::-webkit-slider-thumb {
   transform: scale(1.1);
 }
 
-input[type="range"]:active::-webkit-slider-thumb {
+input[type='range']:active::-webkit-slider-thumb {
   transform: scale(1.15);
 }
 
-input[type="range"]::-moz-range-track {
+input[type='range']::-moz-range-track {
   height: 6px;
   border-radius: 9999px;
   background: var(--bg-toggle-track);
 }
 
-input[type="range"]::-moz-range-thumb {
+input[type='range']::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
@@ -389,7 +466,7 @@ input[type="range"]::-moz-range-thumb {
    ============================================================ */
 
 .terminal-log-line::before {
-  content: "> ";
+  content: '> ';
   color: var(--color-primary);
   font-weight: 700;
 }
@@ -477,13 +554,25 @@ input[type="range"]::-moz-range-thumb {
 }
 
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.3); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.3);
+  }
 }
 
 @keyframes blink-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 
 /* ============================================================

@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
-import { listen } from "@tauri-apps/api/event";
-import { useDeviceStore } from "./stores/device";
-import { useSettingsStore } from "./stores/settings";
-import { useNavigationStore } from "./stores/navigation";
-import { useKeyboardShortcuts } from "./composables/useKeyboardShortcuts";
-import { useConnectionHistoryStore } from "./stores/connectionHistory";
-import TitleBar from "./components/TitleBar.vue";
-import AppSidebarLeft from "./components/AppSidebarLeft.vue";
-import AppSidebarRight from "./components/AppSidebarRight.vue";
-import DashboardView from "./views/DashboardView.vue";
-import SettingsView from "./views/SettingsView.vue";
-import AppToast from "./components/AppToast.vue";
-import ConnectPanel from "./components/ConnectPanel.vue";
+import { onMounted } from 'vue';
+import { listen } from '@tauri-apps/api/event';
+import { useDeviceStore } from './stores/device';
+import { useSettingsStore } from './stores/settings';
+import { useNavigationStore } from './stores/navigation';
+import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts';
+import { useConnectionHistoryStore } from './stores/connectionHistory';
+import TitleBar from './components/TitleBar.vue';
+import AppSidebarLeft from './components/AppSidebarLeft.vue';
+import AppSidebarRight from './components/AppSidebarRight.vue';
+import DashboardView from './views/DashboardView.vue';
+import SettingsView from './views/SettingsView.vue';
+import AppToast from './components/AppToast.vue';
+import ConnectPanel from './components/ConnectPanel.vue';
 
-import { useThemeStore } from "./stores/theme";
+import { useThemeStore } from './stores/theme';
 
 const deviceStore = useDeviceStore();
 const settingsStore = useSettingsStore();
@@ -33,9 +33,9 @@ onMounted(async () => {
     await deviceStore.autoConnect();
   }
 
-  await listen("scrcpy-exited", () => {
+  await listen('scrcpy-exited', () => {
     deviceStore.mirroring = false;
-    deviceStore.addLog("scrcpy window closed", "info");
+    deviceStore.addLog('scrcpy window closed', 'info');
   });
 });
 </script>

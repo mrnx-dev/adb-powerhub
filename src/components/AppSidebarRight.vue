@@ -1,17 +1,32 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from "vue";
-import { useDeviceStore } from "../stores/device";
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { useDeviceStore } from '../stores/device';
 import {
-  Wifi, Plane, Bluetooth,
-  Pointer, LayoutGrid, Sun,
-  Home, ArrowLeft, History,
-  Volume1, Volume2, VolumeX,
-  Power, SkipBack, Play, SkipForward,
-  Send, Image,
-  PanelRightClose, PanelRightOpen,
-  ChevronDown, RotateCcw, MonitorUp,
+  Wifi,
+  Plane,
+  Bluetooth,
+  Pointer,
+  LayoutGrid,
+  Sun,
+  Home,
+  ArrowLeft,
+  History,
+  Volume1,
+  Volume2,
+  VolumeX,
+  Power,
+  SkipBack,
+  Play,
+  SkipForward,
+  Send,
+  Image,
+  PanelRightClose,
+  PanelRightOpen,
+  ChevronDown,
+  RotateCcw,
+  MonitorUp,
   Smartphone,
-} from "lucide-vue-next";
+} from '@lucide/vue';
 
 const store = useDeviceStore();
 const collapsed = ref(false);
@@ -25,37 +40,42 @@ const systemRef = ref<HTMLElement | null>(null);
 function expandAndScroll(refVal: HTMLElement | null) {
   collapsed.value = false;
   nextTick(() => {
-    refVal?.scrollIntoView({ behavior: "smooth", block: "start" });
+    refVal?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 }
 
 function handleClickOutside(e: MouseEvent) {
   if (store.showRebootMenu) {
     const target = e.target as HTMLElement;
-    if (!target.closest(".reboot-menu-container")) {
+    if (!target.closest('.reboot-menu-container')) {
       store.showRebootMenu = false;
     }
   }
 }
 
 onMounted(() => {
-  document.addEventListener("click", handleClickOutside);
+  document.addEventListener('click', handleClickOutside);
 });
 
 onUnmounted(() => {
-  document.removeEventListener("click", handleClickOutside);
+  document.removeEventListener('click', handleClickOutside);
 });
 </script>
 
 <template>
   <aside
     class="bg-sidebar-dark sidebar-blur border-l border-theme-tertiary flex flex-col shrink-0 overflow-hidden transition-all duration-200 z-20"
-    :class="collapsed ? 'w-12' : 'w-48'">
-
-    <div class="flex items-center shrink-0" :class="collapsed ? 'justify-center p-3' : 'justify-end p-2'">
-      <button @click="collapsed = !collapsed"
+    :class="collapsed ? 'w-12' : 'w-48'"
+  >
+    <div
+      class="flex items-center shrink-0"
+      :class="collapsed ? 'justify-center p-3' : 'justify-end p-2'"
+    >
+      <button
         class="p-1.5 rounded-lg hover:bg-theme-hover transition-all"
-        :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+        :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        @click="collapsed = !collapsed"
+      >
         <PanelRightOpen v-if="collapsed" :size="16" class="opacity-70" />
         <PanelRightClose v-else :size="16" class="opacity-70" />
       </button>
@@ -63,29 +83,50 @@ onUnmounted(() => {
 
     <!-- Collapsed: section icons -->
     <div v-if="collapsed" class="flex flex-col items-center gap-1 px-2 mt-1">
-      <button @click="expandAndScroll(connectivityRef)" class="p-2.5 rounded-xl hover:bg-accent-emerald transition-all" title="Connectivity">
+      <button
+        class="p-2.5 rounded-xl hover:bg-accent-emerald transition-all"
+        title="Connectivity"
+        @click="expandAndScroll(connectivityRef)"
+      >
         <Wifi :size="16" class="opacity-70" />
       </button>
-      <button @click="expandAndScroll(devToolsRef)" class="p-2.5 rounded-xl hover:bg-accent-emerald transition-all" title="Dev Tools">
+      <button
+        class="p-2.5 rounded-xl hover:bg-accent-emerald transition-all"
+        title="Dev Tools"
+        @click="expandAndScroll(devToolsRef)"
+      >
         <Pointer :size="16" class="opacity-70" />
       </button>
-      <button @click="expandAndScroll(displayRef)" class="p-2.5 rounded-xl hover:bg-accent-emerald transition-all" title="Display">
+      <button
+        class="p-2.5 rounded-xl hover:bg-accent-emerald transition-all"
+        title="Display"
+        @click="expandAndScroll(displayRef)"
+      >
         <Sun :size="16" class="opacity-70" />
       </button>
-      <button @click="expandAndScroll(remoteRef)" class="p-2.5 rounded-xl hover:bg-accent-emerald transition-all" title="Remote Controls">
+      <button
+        class="p-2.5 rounded-xl hover:bg-accent-emerald transition-all"
+        title="Remote Controls"
+        @click="expandAndScroll(remoteRef)"
+      >
         <Smartphone :size="16" class="opacity-70" />
       </button>
-      <button @click="expandAndScroll(systemRef)" class="p-2.5 rounded-xl hover:bg-accent-emerald transition-all" title="System">
+      <button
+        class="p-2.5 rounded-xl hover:bg-accent-emerald transition-all"
+        title="System"
+        @click="expandAndScroll(systemRef)"
+      >
         <Image :size="16" class="opacity-70" />
       </button>
     </div>
 
     <!-- Expanded: full content -->
     <div v-if="!collapsed" class="flex flex-col p-3 overflow-y-auto">
-
       <!-- Connectivity -->
       <div ref="connectivityRef" class="mb-6">
-        <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">Connectivity</h3>
+        <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">
+          Connectivity
+        </h3>
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -93,21 +134,15 @@ onUnmounted(() => {
               <span class="text-xs text-theme-primary">Wi-Fi</span>
             </div>
             <label class="relative inline-flex items-center cursor-pointer select-none">
-              <input type="checkbox" class="sr-only peer" v-model="store.wifiEnabled"
-                @change="store.toggleWifi(store.wifiEnabled)" />
-              <div class="w-8 h-[18px] bg-theme-toggle-track rounded-full 
-peer peer-focus:outline-none
-
-                          after:content-[''] after:absolute after:top-[2px] after:start-[2px] 
-                          after:bg-[#06100d] 
-                          after:rounded-full after:h-3.5 after:w-3.5 
-                          after:shadow-md after:transition-all after:duration-300 
-                          after:ease-[cubic-bezier(0.34,1.56,0.64,1)]
-                          peer-checked:after:translate-x-[12px] 
-                          rtl:peer-checked:after:-translate-x-[12px] 
-                          peer-checked:after:bg-accent-emerald 
-                          peer-checked:after:bg-accent-emerald
-                          peer-active:after:w-[18px]"></div>
+              <input
+                v-model="store.wifiEnabled"
+                type="checkbox"
+                class="sr-only peer"
+                @change="store.toggleWifi(store.wifiEnabled)"
+              />
+              <div
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+              ></div>
             </label>
           </div>
 
@@ -117,21 +152,15 @@ peer peer-focus:outline-none
               <span class="text-xs text-theme-primary">Airplane</span>
             </div>
             <label class="relative inline-flex items-center cursor-pointer select-none">
-              <input type="checkbox" class="sr-only peer" v-model="store.airplaneEnabled"
-                @change="store.toggleAirplane(store.airplaneEnabled)" />
-              <div class="w-8 h-[18px] bg-theme-toggle-track rounded-full 
-                          peer peer-focus:outline-none
-                          peer-checked:bg-accent-emerald 
-                          after:content-[''] after:absolute after:top-[2px] after:start-[2px] 
-                          after:bg-[#06100d] 
-                          after:rounded-full after:h-3.5 after:w-3.5 
-                          after:shadow-md after:transition-all after:duration-300 
-                          after:ease-[cubic-bezier(0.34,1.56,0.64,1)]
-                          peer-checked:after:translate-x-[12px] 
-                          rtl:peer-checked:after:-translate-x-[12px] 
-                          peer-checked:after:bg-accent-emerald 
-                          peer-checked:after:bg-accent-emerald
-                          peer-active:after:w-[18px]"></div>
+              <input
+                v-model="store.airplaneEnabled"
+                type="checkbox"
+                class="sr-only peer"
+                @change="store.toggleAirplane(store.airplaneEnabled)"
+              />
+              <div
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+              ></div>
             </label>
           </div>
 
@@ -141,21 +170,15 @@ peer peer-focus:outline-none
               <span class="text-xs text-theme-primary">Bluetooth</span>
             </div>
             <label class="relative inline-flex items-center cursor-pointer select-none">
-              <input type="checkbox" class="sr-only peer" v-model="store.bluetoothEnabled"
-                @change="store.toggleBluetooth(store.bluetoothEnabled)" />
-              <div class="w-8 h-[18px] bg-theme-toggle-track rounded-full 
-                          peer peer-focus:outline-none
-                          peer-checked:bg-accent-emerald 
-                          after:content-[''] after:absolute after:top-[2px] after:start-[2px] 
-                          after:bg-[#06100d] 
-                          after:rounded-full after:h-3.5 after:w-3.5 
-                          after:shadow-md after:transition-all after:duration-300 
-                          after:ease-[cubic-bezier(0.34,1.56,0.64,1)]
-                          peer-checked:after:translate-x-[12px] 
-                          rtl:peer-checked:after:-translate-x-[12px] 
-                          peer-checked:after:bg-accent-emerald 
-                          peer-checked:after:bg-accent-emerald
-                          peer-active:after:w-[18px]"></div>
+              <input
+                v-model="store.bluetoothEnabled"
+                type="checkbox"
+                class="sr-only peer"
+                @change="store.toggleBluetooth(store.bluetoothEnabled)"
+              />
+              <div
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+              ></div>
             </label>
           </div>
         </div>
@@ -163,7 +186,9 @@ peer peer-focus:outline-none
 
       <!-- Dev Tools -->
       <div ref="devToolsRef" class="mb-6">
-        <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">Dev Tools</h3>
+        <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">
+          Dev Tools
+        </h3>
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -171,21 +196,15 @@ peer peer-focus:outline-none
               <span class="text-xs text-theme-primary">Show Taps</span>
             </div>
             <label class="relative inline-flex items-center cursor-pointer select-none">
-              <input type="checkbox" class="sr-only peer" v-model="store.showTapsEnabled"
-                @change="store.toggleShowTaps(store.showTapsEnabled)" />
-              <div class="w-8 h-[18px] bg-theme-toggle-track rounded-full 
-                          peer peer-focus:outline-none
-                          peer-checked:bg-accent-emerald 
-                          after:content-[''] after:absolute after:top-[2px] after:start-[2px] 
-                          after:bg-[#06100d] 
-                          after:rounded-full after:h-3.5 after:w-3.5 
-                          after:shadow-md after:transition-all after:duration-300 
-                          after:ease-[cubic-bezier(0.34,1.56,0.64,1)]
-                          peer-checked:after:translate-x-[12px] 
-                          rtl:peer-checked:after:-translate-x-[12px] 
-                          peer-checked:after:bg-accent-emerald 
-                          peer-checked:after:bg-accent-emerald
-                          peer-active:after:w-[18px]"></div>
+              <input
+                v-model="store.showTapsEnabled"
+                type="checkbox"
+                class="sr-only peer"
+                @change="store.toggleShowTaps(store.showTapsEnabled)"
+              />
+              <div
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+              ></div>
             </label>
           </div>
 
@@ -195,21 +214,15 @@ peer peer-focus:outline-none
               <span class="text-xs text-theme-primary">Layout Bounds</span>
             </div>
             <label class="relative inline-flex items-center cursor-pointer select-none">
-              <input type="checkbox" class="sr-only peer" v-model="store.layoutBoundsEnabled"
-                @change="store.toggleLayoutBounds(store.layoutBoundsEnabled)" />
-              <div class="w-8 h-[18px] bg-theme-toggle-track rounded-full 
-                          peer peer-focus:outline-none
-                          peer-checked:bg-accent-emerald 
-                          after:content-[''] after:absolute after:top-[2px] after:start-[2px] 
-                          after:bg-[#06100d] 
-                          after:rounded-full after:h-3.5 after:w-3.5 
-                          after:shadow-md after:transition-all after:duration-300 
-                          after:ease-[cubic-bezier(0.34,1.56,0.64,1)]
-                          peer-checked:after:translate-x-[12px] 
-                          rtl:peer-checked:after:-translate-x-[12px] 
-                          peer-checked:after:bg-accent-emerald 
-                          peer-checked:after:bg-accent-emerald
-                          peer-active:after:w-[18px]"></div>
+              <input
+                v-model="store.layoutBoundsEnabled"
+                type="checkbox"
+                class="sr-only peer"
+                @change="store.toggleLayoutBounds(store.layoutBoundsEnabled)"
+              />
+              <div
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+              ></div>
             </label>
           </div>
         </div>
@@ -217,86 +230,121 @@ peer peer-focus:outline-none
 
       <!-- Display -->
       <div ref="displayRef" class="mb-6">
-        <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">Display</h3>
+        <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">
+          Display
+        </h3>
         <div class="flex items-center gap-2">
           <Sun :size="14" class="opacity-70 shrink-0" />
-          <input type="range" min="0" max="255" v-model.number="store.brightness"
+          <input
+            v-model.number="store.brightness"
+            type="range"
+            min="0"
+            max="255"
+            class="flex-1 accent-theme cursor-pointer min-w-0"
             @change="store.setBrightness(store.brightness)"
-            class="flex-1 accent-theme cursor-pointer min-w-0" />
+          />
           <span class="text-[10px] text-theme-muted w-6 text-right">{{ store.brightness }}</span>
         </div>
       </div>
 
       <!-- Remote Controls -->
       <div ref="remoteRef" class="mb-6">
-        <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">Remote Controls</h3>
+        <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">
+          Remote Controls
+        </h3>
         <div class="space-y-2">
           <div class="grid grid-cols-3 gap-1.5">
-            <button @click="store.pressHome"
-              class="flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all">
+            <button
+              class="flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              @click="store.pressHome"
+            >
               <Home :size="16" class="opacity-70" />
               <span class="text-[9px] font-medium">Home</span>
             </button>
-            <button @click="store.pressBack"
-              class="flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all">
+            <button
+              class="flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              @click="store.pressBack"
+            >
               <ArrowLeft :size="16" class="opacity-70" />
               <span class="text-[9px] font-medium">Back</span>
             </button>
-            <button @click="store.pressRecent"
-              class="flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all">
+            <button
+              class="flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              @click="store.pressRecent"
+            >
               <History :size="16" class="opacity-70" />
               <span class="text-[9px] font-medium">Recent</span>
             </button>
           </div>
 
           <div class="grid grid-cols-3 gap-1.5">
-            <button @click="store.pressVolDown"
+            <button
               class="flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
-              title="Volume Down">
+              title="Volume Down"
+              @click="store.pressVolDown"
+            >
               <Volume1 :size="14" class="opacity-70" />
             </button>
-            <button @click="store.pressMute"
+            <button
               class="flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
-              title="Mute">
+              title="Mute"
+              @click="store.pressMute"
+            >
               <VolumeX :size="14" class="opacity-70" />
             </button>
-            <button @click="store.pressVolUp"
+            <button
               class="flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
-              title="Volume Up">
+              title="Volume Up"
+              @click="store.pressVolUp"
+            >
               <Volume2 :size="14" class="opacity-70" />
             </button>
           </div>
 
           <div class="grid grid-cols-3 gap-1.5">
-            <button @click="store.pressPrev"
+            <button
               class="flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
-              title="Previous">
+              title="Previous"
+              @click="store.pressPrev"
+            >
               <SkipBack :size="14" class="opacity-70" />
             </button>
-            <button @click="store.pressPlayPause"
+            <button
               class="flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
-              title="Play/Pause">
+              title="Play/Pause"
+              @click="store.pressPlayPause"
+            >
               <Play :size="14" class="opacity-70" />
             </button>
-            <button @click="store.pressNext"
+            <button
               class="flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
-              title="Next">
+              title="Next"
+              @click="store.pressNext"
+            >
               <SkipForward :size="14" class="opacity-70" />
             </button>
           </div>
 
-          <button @click="store.pressPower"
-            class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all">
+          <button
+            class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+            @click="store.pressPower"
+          >
             <Power :size="16" class="opacity-70" />
             <span class="text-xs font-medium">Power</span>
           </button>
 
           <div class="flex flex-col gap-1.5">
-            <input v-model="store.textInput" @keydown.enter="store.sendText"
-              type="text" placeholder="Input text..."
-              class="w-full bg-theme-input border border-theme-secondary rounded-lg px-2 py-1.5 text-xs text-theme-primary focus:outline-none focus:border-accent-emerald/50 placeholder:text-theme-muted" />
-            <button @click="store.sendText"
-              class="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent-emerald/10 border border-accent-emerald/25 hover-accent transition-all text-xs font-medium group">
+            <input
+              v-model="store.textInput"
+              type="text"
+              placeholder="Input text..."
+              class="w-full bg-theme-input border border-theme-secondary rounded-lg px-2 py-1.5 text-xs text-theme-primary focus:outline-none focus:border-accent-emerald/50 placeholder:text-theme-muted"
+              @keydown.enter="store.sendText"
+            />
+            <button
+              class="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent-emerald/10 border border-accent-emerald/25 hover-accent transition-all text-xs font-medium group"
+              @click="store.sendText"
+            >
               <Send :size="12" class="text-accent-emerald group-hover:text-[var(--text-inverse)]" />
               <span class="text-accent-emerald group-hover:text-[var(--text-inverse)]">Enter</span>
             </button>
@@ -306,35 +354,52 @@ peer peer-focus:outline-none
 
       <!-- System -->
       <div ref="systemRef" class="mb-4">
-        <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">System</h3>
+        <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">
+          System
+        </h3>
         <div class="space-y-1.5">
-          <button @click="store.takeScreenshot"
-            class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all">
+          <button
+            class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+            @click="store.takeScreenshot"
+          >
             <Image :size="16" class="opacity-70" />
             <span class="text-xs font-medium">Screenshot</span>
           </button>
 
           <div class="relative reboot-menu-container">
-            <button @click="store.showRebootMenu = !store.showRebootMenu"
-              class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all">
+            <button
+              class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              @click="store.showRebootMenu = !store.showRebootMenu"
+            >
               <RotateCcw :size="16" class="opacity-70" />
               <span class="text-xs font-medium">Reboot</span>
               <ChevronDown :size="12" class="opacity-50" />
             </button>
-            <div v-if="store.showRebootMenu"
-              class="absolute left-0 right-0 top-full mt-1 rounded-xl bg-theme-sidebar border border-theme-secondary overflow-hidden z-30">
-              <button @click="store.rebootDevice(); store.showRebootMenu = false"
-                class="w-full px-3 py-2 text-xs text-left hover-accent transition-all flex items-center gap-2 text-theme-primary">
+            <div
+              v-if="store.showRebootMenu"
+              class="absolute left-0 right-0 top-full mt-1 rounded-xl bg-theme-sidebar border border-theme-secondary overflow-hidden z-30"
+            >
+              <button
+                class="w-full px-3 py-2 text-xs text-left hover-accent transition-all flex items-center gap-2 text-theme-primary"
+                @click="
+                  store.rebootDevice();
+                  store.showRebootMenu = false;
+                "
+              >
                 <MonitorUp :size="12" class="opacity-70" />
                 Normal Reboot
               </button>
-              <button @click="store.rebootRecovery()"
-                class="w-full px-3 py-2 text-xs text-left hover-accent transition-all text-color-warning flex items-center gap-2">
+              <button
+                class="w-full px-3 py-2 text-xs text-left hover-accent transition-all text-color-warning flex items-center gap-2"
+                @click="store.rebootRecovery()"
+              >
                 <RotateCcw :size="12" class="opacity-70" />
                 Recovery
               </button>
-              <button @click="store.rebootBootloader()"
-                class="w-full px-3 py-2 text-xs text-left hover-accent transition-all text-[var(--color-tertiary)] flex items-center gap-2">
+              <button
+                class="w-full px-3 py-2 text-xs text-left hover-accent transition-all text-[var(--color-tertiary)] flex items-center gap-2"
+                @click="store.rebootBootloader()"
+              >
                 <Power :size="12" class="opacity-70" />
                 Bootloader
               </button>
@@ -342,7 +407,6 @@ peer peer-focus:outline-none
           </div>
         </div>
       </div>
-
     </div>
   </aside>
 </template>

@@ -1,6 +1,6 @@
-import { defineStore } from "pinia";
-import { ref } from "vue";
-import { load, Store } from "@tauri-apps/plugin-store";
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
+import { load, Store } from '@tauri-apps/plugin-store';
 
 export interface SavedDevice {
   id: string;
@@ -9,7 +9,7 @@ export interface SavedDevice {
   label: string;
   model: string;
   lastConnected: string;
-  method: "wifi" | "pairing";
+  method: 'wifi' | 'pairing';
 }
 
 function deviceId(ip: string, port: number): string {
@@ -20,18 +20,18 @@ let storeInstance: Store | null = null;
 
 async function getStore(): Promise<Store> {
   if (!storeInstance) {
-    storeInstance = await load("connection_history.json", { autoSave: true, defaults: {} });
+    storeInstance = await load('connection_history.json', { autoSave: true, defaults: {} });
   }
   return storeInstance;
 }
 
-export const useConnectionHistoryStore = defineStore("connectionHistory", () => {
+export const useConnectionHistoryStore = defineStore('connectionHistory', () => {
   const devices = ref<SavedDevice[]>([]);
 
   async function init() {
     try {
       const s = await getStore();
-      const saved = await s.get<SavedDevice[]>("devices");
+      const saved = await s.get<SavedDevice[]>('devices');
       if (saved) {
         devices.value = saved;
       }
@@ -43,7 +43,7 @@ export const useConnectionHistoryStore = defineStore("connectionHistory", () => 
   async function persist() {
     try {
       const s = await getStore();
-      await s.set("devices", devices.value);
+      await s.set('devices', devices.value);
     } catch {
       // ignore
     }

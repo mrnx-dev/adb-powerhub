@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useDeviceStore } from "../stores/device";
-import { useNavigationStore } from "../stores/navigation";
-import { Smartphone, Battery, Cpu, Zap, ChevronDown, RefreshCw, Unplug } from "lucide-vue-next";
-import { ref, onMounted, onUnmounted, nextTick, watch } from "vue";
+import { useDeviceStore } from '../stores/device';
+import { useNavigationStore } from '../stores/navigation';
+import { Smartphone, Battery, Cpu, Zap, ChevronDown, RefreshCw, Unplug } from '@lucide/vue';
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 
 const store = useDeviceStore();
 const nav = useNavigationStore();
@@ -22,17 +22,22 @@ function updateDropdownPosition() {
   if (badgeRef.value) {
     const rect = badgeRef.value.getBoundingClientRect();
     dropdownStyle.value = {
-      position: "fixed",
+      position: 'fixed',
       top: `${rect.bottom + 4}px`,
       left: `${rect.left}px`,
-      minWidth: "160px",
+      minWidth: '160px',
     };
   }
 }
 
 function handleClickOutside(e: MouseEvent) {
   const target = e.target as Node;
-  if (dropdownRef.value && !dropdownRef.value.contains(target) && badgeRef.value && !badgeRef.value.contains(target)) {
+  if (
+    dropdownRef.value &&
+    !dropdownRef.value.contains(target) &&
+    badgeRef.value &&
+    !badgeRef.value.contains(target)
+  ) {
     dropdownOpen.value = false;
   }
 }
@@ -44,13 +49,13 @@ function handleScroll() {
 }
 
 onMounted(() => {
-  document.addEventListener("mousedown", handleClickOutside);
-  window.addEventListener("scroll", handleScroll, true);
+  document.addEventListener('mousedown', handleClickOutside);
+  window.addEventListener('scroll', handleScroll, true);
 });
 
 onUnmounted(() => {
-  document.removeEventListener("mousedown", handleClickOutside);
-  window.removeEventListener("scroll", handleScroll, true);
+  document.removeEventListener('mousedown', handleClickOutside);
+  window.removeEventListener('scroll', handleScroll, true);
 });
 
 watch(dropdownOpen, (val) => {
@@ -93,9 +98,11 @@ function handleDisconnect() {
       <div class="flex items-center justify-between gap-4">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 text-[10px] text-theme-muted mb-1">
-            <span class="capitalize">{{ store.connectMethod === "pairing" ? "Android 11+ Pairing" : store.connectMethod }}</span>
+            <span class="capitalize">{{
+              store.connectMethod === 'pairing' ? 'Android 11+ Pairing' : store.connectMethod
+            }}</span>
             <span>&middot;</span>
-            <span>{{ store.transport === "wifi" ? "Wi-Fi" : "USB" }}</span>
+            <span>{{ store.transport === 'wifi' ? 'Wi-Fi' : 'USB' }}</span>
             <span>&middot;</span>
             <span>{{ store.deviceId }}</span>
           </div>
@@ -110,7 +117,11 @@ function handleDisconnect() {
             <div class="h-4 w-px bg-theme-secondary"></div>
 
             <div class="flex items-center gap-2">
-              <Battery :size="14" class="shrink-0" :class="store.batteryLevel > 20 ? 'text-color-success' : 'text-color-error'" />
+              <Battery
+                :size="14"
+                class="shrink-0"
+                :class="store.batteryLevel > 20 ? 'text-color-success' : 'text-color-error'"
+              />
               <span class="text-sm font-bold leading-none">{{ store.batteryLevel }}%</span>
               <span class="text-[10px]" :class="store.batteryColor">{{ store.batteryStatus }}</span>
             </div>
@@ -121,32 +132,51 @@ function handleDisconnect() {
               <Cpu :size="14" class="text-accent-emerald shrink-0" />
               <span class="text-[10px] text-theme-secondary w-7">CPU</span>
               <div class="flex-1 progress-bar-track">
-                <div class="progress-bar-fill transition-all duration-500" :style="{ width: store.cpuUsage + '%' }"></div>
+                <div
+                  class="progress-bar-fill transition-all duration-500"
+                  :style="{ width: store.cpuUsage + '%' }"
+                ></div>
               </div>
-              <span class="text-[10px] text-theme-secondary w-8 text-right">{{ store.cpuUsage.toFixed(0) }}%</span>
+              <span class="text-[10px] text-theme-secondary w-8 text-right"
+                >{{ store.cpuUsage.toFixed(0) }}%</span
+              >
             </div>
           </div>
         </div>
 
         <!-- Connected badge + dropdown -->
         <div ref="badgeRef" class="shrink-0">
-          <button @click="toggleDropdown"
-            class="status-badge status-badge-active hover:opacity-90 transition-opacity">
+          <button
+            class="status-badge status-badge-active hover:opacity-90 transition-opacity"
+            @click="toggleDropdown"
+          >
             <span class="status-dot status-dot-active"></span>
             <span>Connected</span>
-            <ChevronDown :size="12" class="transition-transform duration-200" :class="dropdownOpen ? 'rotate-180' : ''" />
+            <ChevronDown
+              :size="12"
+              class="transition-transform duration-200"
+              :class="dropdownOpen ? 'rotate-180' : ''"
+            />
           </button>
 
           <Transition name="dropdown">
             <Teleport v-if="dropdownOpen" to="body">
-              <div ref="dropdownRef" :style="dropdownStyle" class="fixed rounded-lg bg-theme-sidebar border border-theme-secondary shadow-theme-modal overflow-hidden z-[100]">
-                <button @click="handleReconnect"
-                  class="w-full flex items-center gap-2 px-3 py-2.5 text-[11px] text-theme-secondary hover:bg-theme-hover hover:text-theme-primary transition-colors">
+              <div
+                ref="dropdownRef"
+                :style="dropdownStyle"
+                class="fixed rounded-lg bg-theme-sidebar border border-theme-secondary shadow-theme-modal overflow-hidden z-[100]"
+              >
+                <button
+                  class="w-full flex items-center gap-2 px-3 py-2.5 text-[11px] text-theme-secondary hover:bg-theme-hover hover:text-theme-primary transition-colors"
+                  @click="handleReconnect"
+                >
                   <RefreshCw :size="13" />
                   Reconnect
                 </button>
-                <button @click="handleDisconnect"
-                  class="w-full flex items-center gap-2 px-3 py-2.5 text-[11px] text-color-error hover:bg-color-error-container transition-colors border-t border-theme-tertiary">
+                <button
+                  class="w-full flex items-center gap-2 px-3 py-2.5 text-[11px] text-color-error hover:bg-color-error-container transition-colors border-t border-theme-tertiary"
+                  @click="handleDisconnect"
+                >
                   <Unplug :size="13" />
                   Disconnect
                 </button>
@@ -164,8 +194,10 @@ function handleDisconnect() {
           <Smartphone :size="16" class="opacity-30" />
           <span class="text-xs">No device connected</span>
         </div>
-        <button @click="nav.openConnectPanel()"
-          class="btn-primary flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold">
+        <button
+          class="btn-primary flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold"
+          @click="nav.openConnectPanel()"
+        >
           <Zap :size="13" />
           Connect
         </button>

@@ -1,12 +1,12 @@
-import { defineStore } from "pinia";
-import { ref } from "vue";
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
 
-export const useNavigationStore = defineStore("navigation", () => {
-  const currentPage = ref<"dashboard" | "settings">("dashboard");
+export const useNavigationStore = defineStore('navigation', () => {
+  const currentPage = ref<'dashboard' | 'settings'>('dashboard');
   const focusTerminalRequested = ref(false);
   const connectPanelOpen = ref(false);
 
-  function navigateTo(page: "dashboard" | "settings") {
+  function navigateTo(page: 'dashboard' | 'settings') {
     currentPage.value = page;
   }
 
@@ -30,5 +30,15 @@ export const useNavigationStore = defineStore("navigation", () => {
     connectPanelOpen.value = !connectPanelOpen.value;
   }
 
-  return { currentPage, focusTerminalRequested, connectPanelOpen, navigateTo, requestTerminalFocus, clearTerminalFocusRequest, openConnectPanel, closeConnectPanel, toggleConnectPanel };
+  return {
+    currentPage,
+    focusTerminalRequested,
+    connectPanelOpen,
+    navigateTo,
+    requestTerminalFocus,
+    clearTerminalFocusRequest,
+    openConnectPanel,
+    closeConnectPanel,
+    toggleConnectPanel,
+  };
 });

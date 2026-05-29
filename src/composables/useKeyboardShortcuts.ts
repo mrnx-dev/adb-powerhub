@@ -1,13 +1,13 @@
-import { onMounted, onUnmounted } from "vue";
-import { useNavigationStore } from "../stores/navigation";
-import { useDeviceStore } from "../stores/device";
+import { onMounted, onUnmounted } from 'vue';
+import { useNavigationStore } from '../stores/navigation';
+import { useDeviceStore } from '../stores/device';
 
 export function useKeyboardShortcuts() {
   const navStore = useNavigationStore();
   const deviceStore = useDeviceStore();
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
+    if (e.key === 'Escape') {
       if (navStore.connectPanelOpen) {
         navStore.closeConnectPanel();
         e.preventDefault();
@@ -19,14 +19,14 @@ export function useKeyboardShortcuts() {
       }
     }
 
-    if (e.ctrlKey && e.key === "k") {
+    if (e.ctrlKey && e.key === 'k') {
       e.preventDefault();
-      navStore.navigateTo("dashboard");
+      navStore.navigateTo('dashboard');
       navStore.requestTerminalFocus();
       return;
     }
 
-    if (e.ctrlKey && e.key.toLowerCase() === "m") {
+    if (e.ctrlKey && e.key.toLowerCase() === 'm') {
       e.preventDefault();
       if (deviceStore.mirroring) {
         deviceStore.stopMirror();
@@ -36,13 +36,13 @@ export function useKeyboardShortcuts() {
       return;
     }
 
-    if (e.ctrlKey && e.key === ",") {
+    if (e.ctrlKey && e.key === ',') {
       e.preventDefault();
-      navStore.navigateTo("settings");
+      navStore.navigateTo('settings');
       return;
     }
 
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
       e.preventDefault();
       if (deviceStore.connected) {
         deviceStore.disconnect();
@@ -52,10 +52,10 @@ export function useKeyboardShortcuts() {
   }
 
   onMounted(() => {
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
   });
 
   onUnmounted(() => {
-    document.removeEventListener("keydown", handleKeyDown);
+    document.removeEventListener('keydown', handleKeyDown);
   });
 }

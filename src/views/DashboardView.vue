@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import DeviceStatsCard from "../components/DeviceStatsCard.vue";
-import MirrorCard from "../components/MirrorCard.vue";
-import TerminalCard from "../components/TerminalCard.vue";
+import DeviceStatsCard from '../components/DeviceStatsCard.vue';
+import MirrorCard from '../components/MirrorCard.vue';
+import TerminalCard from '../components/TerminalCard.vue';
 </script>
 
 <template>
