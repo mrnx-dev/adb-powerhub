@@ -59,7 +59,7 @@ async function confirmDelete(preset: Preset) {
       </div>
 
       <!-- Scrollable Chip Area -->
-      <div class="flex-1 flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+      <div class="flex-1 flex items-center gap-1.5 overflow-x-auto scrollbar-thin">
         <!-- Empty State Inline -->
         <span v-if="presetsStore.presets.length === 0" class="text-[10px] text-theme-muted italic">
           No presets
