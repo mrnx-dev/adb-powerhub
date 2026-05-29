@@ -3,6 +3,7 @@ import { ref, nextTick, watch } from 'vue';
 import { useDeviceStore } from '../stores/device';
 import { useNavigationStore } from '../stores/navigation';
 import { Terminal, Copy, Check } from '@lucide/vue';
+import PresetPanel from './PresetPanel.vue';
 
 const store = useDeviceStore();
 const navStore = useNavigationStore();
@@ -100,6 +101,9 @@ async function copyLogs() {
         </button>
       </div>
     </div>
+
+    <!-- Presets -->
+    <PresetPanel />
 
     <!-- Log Area -->
     <div

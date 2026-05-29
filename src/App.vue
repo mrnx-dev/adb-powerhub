@@ -15,12 +15,14 @@ import AppToast from './components/AppToast.vue';
 import ConnectPanel from './components/ConnectPanel.vue';
 
 import { useThemeStore } from './stores/theme';
+import { usePresetsStore } from './stores/presets';
 
 const deviceStore = useDeviceStore();
 const settingsStore = useSettingsStore();
 const navStore = useNavigationStore();
 const themeStore = useThemeStore();
 const connectionHistoryStore = useConnectionHistoryStore();
+const presetsStore = usePresetsStore();
 
 useKeyboardShortcuts();
 
@@ -28,6 +30,7 @@ onMounted(async () => {
   themeStore.init();
   await settingsStore.init();
   await connectionHistoryStore.init();
+  await presetsStore.loadPresets();
 
   if (settingsStore.autoConnectOnLaunch && settingsStore.adbValid) {
     await deviceStore.autoConnect();
