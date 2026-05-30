@@ -3,12 +3,13 @@ dist/
 src-tauri/target/
 *.local
 .DS_Store
-Thumbs.db
+Thumbs.db 
 
-# Miko AI coding agent files
-AGENTS.md
-ORCHESTRATOR.md
-SOUL.md
-miko.bat
-skills/
-.miko/
+# Miko AI coding agent files 
+AGENTS.md 
+ORCHESTRATOR.md 
+SOUL.md 
+miko.bat 
+miko.ps1 
+skills/ 
+.miko/ 
