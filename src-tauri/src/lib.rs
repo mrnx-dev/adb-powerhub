@@ -18,6 +18,20 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tokio::sync::Mutex as AsyncMutex;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LogEntry {
+    pub id: u64,
+    pub timestamp: String,
+    pub pid: String,
+    pub tid: String,
+    pub level: char,
+    pub tag: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub raw: Option<String>,
+}
 
 pub struct AppState {
     pub adb_path: Mutex<String>,
@@ -28,6 +42,9 @@ pub struct AppState {
     pub command_lock: AsyncMutex<()>,
     pub cancel_connect: Arc<AtomicBool>,
     pub connect_process: Arc<std::sync::Mutex<Option<u32>>>,
+    pub logcat_process: Arc<std::sync::Mutex<Option<u32>>>,
+    pub logcat_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    pub logcat_cancel: Arc<AtomicBool>,
 }
 
 #[tauri::command]
@@ -50,6 +67,9 @@ pub fn run() {
             command_lock: AsyncMutex::new(()),
             cancel_connect: Arc::new(AtomicBool::new(false)),
             connect_process: Arc::new(std::sync::Mutex::new(None)),
+            logcat_process: Arc::new(std::sync::Mutex::new(None)),
+            logcat_thread: Mutex::new(None),
+            logcat_cancel: Arc::new(AtomicBool::new(false)),
         })
         .invoke_handler(tauri::generate_handler![
             open_folder,
@@ -97,6 +117,10 @@ pub fn run() {
             adb_connect_port,
             adb_cancel_connect,
             adb_pair,
+            adb_start_logcat,
+            adb_stop_logcat,
+            adb_clear_logcat_buffer,
+            write_text_file,
             settings_set_adb_path,
             settings_set_scrcpy_path,
             settings_validate_adb,

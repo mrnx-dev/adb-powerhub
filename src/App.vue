@@ -10,6 +10,7 @@ import TitleBar from './components/TitleBar.vue';
 import AppSidebarLeft from './components/AppSidebarLeft.vue';
 import AppSidebarRight from './components/AppSidebarRight.vue';
 import DashboardView from './views/DashboardView.vue';
+import LogcatView from './views/LogcatView.vue';
 import SettingsView from './views/SettingsView.vue';
 import AppToast from './components/AppToast.vue';
 import ConnectPanel from './components/ConnectPanel.vue';
@@ -48,10 +49,11 @@ onMounted(async () => {
     <TitleBar />
     <main class="flex flex-1 overflow-hidden">
       <AppSidebarLeft />
-      <Transition name="page-fade" mode="out-in">
+      <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
         <DashboardView v-if="navStore.currentPage === 'dashboard'" />
+        <LogcatView v-else-if="navStore.currentPage === 'logcat'" />
         <SettingsView v-else-if="navStore.currentPage === 'settings'" />
-      </Transition>
+      </div>
       <AppSidebarRight />
     </main>
     <AppToast />
@@ -59,13 +61,4 @@ onMounted(async () => {
   </div>
 </template>
 
-<style scoped>
-.page-fade-enter-active,
-.page-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.page-fade-enter-from,
-.page-fade-leave-to {
-  opacity: 0;
-}
-</style>
+<style scoped></style>

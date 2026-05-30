@@ -3,7 +3,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::State;
+use tauri::{Emitter, State};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -906,6 +906,284 @@ fn chrono_or_simple_timestamp() -> String {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs().to_string())
         .unwrap_or_else(|_| "0".to_string())
+}
+
+use std::io::BufRead;
+use regex::Regex;
+use std::sync::OnceLock;
+use crate::LogEntry;
+
+// ─── Logcat Parser ─────────────────────────────────────────
+
+static LOGCAT_RE: OnceLock<Regex> = OnceLock::new();
+
+fn get_logcat_re() -> &'static Regex {
+    LOGCAT_RE.get_or_init(|| {
+        Regex::new(
+            r"^(\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+(\d+)\s+(\d+)\s+([VDIWEF])\s+(.+?):\s*(.*)$"
+        ).expect("hardcoded regex must compile")
+    })
+}
+
+enum LogLine {
+    Entry(LogEntry),
+    Separator(String),
+    Raw(String),
+    Empty,
+}
+
+fn parse_logcat_line(line: &str) -> LogLine {
+    if line.starts_with("------") {
+        return LogLine::Separator(line.to_string());
+    }
+    if line.trim().is_empty() {
+        return LogLine::Empty;
+    }
+    if let Some(caps) = get_logcat_re().captures(line) {
+        return LogLine::Entry(LogEntry {
+            id: 0,
+            timestamp: caps[1].to_string(),
+            pid: caps[2].to_string(),
+            tid: caps[3].to_string(),
+            level: caps[4].chars().next().unwrap_or('V'),
+            tag: caps[5].trim().to_string(),
+            message: caps[6].to_string(),
+            raw: None,
+        });
+    }
+    LogLine::Raw(line.to_string())
+}
+
+// ─── Logcat Commands ───────────────────────────────────────
+
+#[tauri::command]
+pub fn adb_start_logcat(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    channel: tauri::ipc::Channel<LogEntry>,
+) -> Result<(), String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state)
+        .ok_or("No device connected")?;
+
+    {
+        let proc = lock_state!(state.logcat_process);
+        if proc.is_some() {
+            return Err("Logcat already running".to_string());
+        }
+    }
+
+    // Clean up any stale thread handle from a previous run.
+    // We intentionally do NOT join() — joining a stuck reader thread would
+    // block this command and freeze the UI. Dropping the handle detaches it.
+    {
+        let mut thread = lock_state!(state.logcat_thread);
+        if let Some(handle) = thread.take() {
+            drop(handle);
+        }
+    }
+
+    state.logcat_cancel.store(false, Ordering::SeqCst);
+
+    let args_owned: Vec<String> = vec![
+        "-s".to_string(), serial.clone(),
+        "logcat".to_string(),
+        "-v".to_string(), "threadtime".to_string(),
+    ];
+
+    #[cfg(windows)]
+    let mut child = Command::new(&adb)
+        .args(&args_owned)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .creation_flags(0x08000000)
+        .spawn()
+        .map_err(|e| format!("Failed to spawn adb logcat: {}", e))?;
+
+    #[cfg(not(windows))]
+    let mut child = Command::new(&adb)
+        .args(&args_owned)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn adb logcat: {}", e))?;
+
+    let pid = child.id();
+    {
+        let mut proc = lock_state!(state.logcat_process);
+        *proc = Some(pid);
+    }
+
+    let cancel = state.logcat_cancel.clone();
+    let logcat_process = state.logcat_process.clone();
+    let app_handle = app.clone();
+
+    let handle = std::thread::spawn(move || {
+        // Spawn a stderr reader thread to capture any error output
+        let stderr_pipe = child.stderr.take();
+        let stderr_cancel = cancel.clone();
+        let stderr_thread = stderr_pipe.map(|pipe| {
+            std::thread::spawn(move || {
+                let reader = std::io::BufReader::new(pipe);
+                let mut output = String::new();
+                for line in reader.lines() {
+                    if stderr_cancel.load(Ordering::SeqCst) { break; }
+                    match line {
+                        Ok(l) => {
+                            output.push_str(&l);
+                            output.push('\n');
+                        }
+                        Err(_) => break,
+                    }
+                }
+                output
+            })
+        });
+
+        let stdout = child.stdout.take();
+        if let Some(out) = stdout {
+            let reader = std::io::BufReader::new(out);
+            let mut last_entry: Option<LogEntry> = None;
+            let mut monotonic_id: u64 = 0;
+
+            for line_result in reader.lines() {
+                if cancel.load(Ordering::SeqCst) { break; }
+                let line = line_result.unwrap_or_default();
+
+                match parse_logcat_line(&line) {
+                    LogLine::Entry(mut entry) => {
+                        if let Some(e) = last_entry.take() {
+                            let _ = channel.send(e);
+                        }
+                        monotonic_id += 1;
+                        entry.id = monotonic_id;
+                        last_entry = Some(entry);
+                    }
+                    LogLine::Raw(text) => {
+                        if let Some(ref mut e) = last_entry {
+                            e.message.push('\n');
+                            e.message.push_str(&text);
+                        } else {
+                            monotonic_id += 1;
+                            let _ = channel.send(LogEntry {
+                                id: monotonic_id,
+                                timestamp: String::new(),
+                                pid: String::new(),
+                                tid: String::new(),
+                                level: 'V',
+                                tag: "UNKNOWN".to_string(),
+                                message: text.clone(),
+                                raw: Some(text),
+                            });
+                        }
+                    }
+                    LogLine::Separator(text) => {
+                        if let Some(e) = last_entry.take() {
+                            let _ = channel.send(e);
+                        }
+                        monotonic_id += 1;
+                        let _ = channel.send(LogEntry {
+                            id: monotonic_id,
+                            timestamp: String::new(),
+                            pid: String::new(),
+                            tid: String::new(),
+                            level: 'V',
+                            tag: "SYSTEM".to_string(),
+                            message: text,
+                            raw: None,
+                        });
+                    }
+                    LogLine::Empty => {}
+                }
+            }
+
+            if let Some(e) = last_entry {
+                let _ = channel.send(e);
+            }
+        }
+
+        // ── Process exited – clean up and notify frontend ────────────────
+        let exit_status = child.wait().ok();
+        let was_cancelled = cancel.load(Ordering::SeqCst);
+
+        // Collect stderr output from the reader thread
+        let stderr_output = stderr_thread
+            .and_then(|h| h.join().ok())
+            .unwrap_or_default();
+
+        // Clear the stored PID so a new start won't hit "Logcat already running"
+        {
+            let mut proc = logcat_process.lock().unwrap();
+            *proc = None;
+        }
+
+        // Emit event to frontend so it can update UI state
+        let _ = app_handle.emit(
+            "logcat-exited",
+            serde_json::json!({
+                "cancelled": was_cancelled,
+                "exitCode": exit_status.and_then(|s| s.code()),
+                "stderr": stderr_output.trim(),
+            }),
+        );
+    });
+
+    {
+        let mut thread = lock_state!(state.logcat_thread);
+        *thread = Some(handle);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn adb_stop_logcat(state: State<AppState>) -> Result<(), String> {
+    state.logcat_cancel.store(true, Ordering::SeqCst);
+    let pid = {
+        let mut proc = lock_state!(state.logcat_process);
+        proc.take()
+    };
+    if let Some(pid) = pid {
+        kill_process_tree(pid);
+    }
+
+    // Do NOT block on join() — if kill_process_tree failed to terminate the
+    // process, the reader thread would hang forever and freeze the UI.
+    // Dropping the JoinHandle detaches the thread; it will exit on its own
+    // once the process dies and stdout reaches EOF.
+    let _ = {
+        let mut thread = lock_state!(state.logcat_thread);
+        thread.take()
+    };
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn adb_clear_logcat_buffer(state: State<AppState>) -> Result<String, String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state)
+        .ok_or("No device connected")?;
+
+    let result = run_adb_cmd_with_device(&adb, Some(&serial), &["logcat", "-c"]
+    );
+
+    if let Err(ref e) = result {
+        if e.contains("permission") || e.contains("failed to clear") || e.contains("denied") {
+            return run_adb_cmd_with_device(
+                &adb, Some(&serial), &["logcat", "-b", "all", "-c"]
+            );
+        }
+    }
+    result
+}
+
+// ─── Utility ─────────────────────────────────────────────
+
+#[tauri::command]
+pub fn write_text_file(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, content)
+        .map_err(|e| format!("Failed to write file: {}", e))
 }
 
 fn dirs_or_fallback_screenshots() -> String {
