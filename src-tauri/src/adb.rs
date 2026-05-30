@@ -1178,6 +1178,71 @@ pub fn adb_clear_logcat_buffer(state: State<AppState>) -> Result<String, String>
     result
 }
 
+// ─── Active App Filter (Logcat) ────────────────────────────
+
+#[tauri::command]
+pub fn adb_get_foreground_package(state: State<AppState>) -> Result<String, String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state)
+        .ok_or("No device connected")?;
+
+    // dumpsys window windows | grep mCurrentFocus
+    let output = run_adb_cmd_with_device(
+        &adb,
+        Some(&serial),
+        &["shell", "dumpsys", "window", "windows", "|", "grep", "mCurrentFocus"],
+    )?;
+
+    // Parse: mCurrentFocus=Window{... com.package.name/.ActivityName}
+    // Also handle: mCurrentFocus=Window{... com.package.name/com.other.ActivityName}
+    let package = output
+        .lines()
+        .find(|l| l.contains("mCurrentFocus"))
+        .and_then(|line| {
+            // Find the last space-separated token that looks like a package/activity
+            line.split_whitespace()
+                .filter(|token| token.contains('/'))
+                .last()
+                .map(|token| token.split('/').next().unwrap_or("").trim())
+        })
+        .unwrap_or("")
+        .to_string();
+
+    if package.is_empty() {
+        return Err("Could not determine foreground package".to_string());
+    }
+
+    Ok(package)
+}
+
+#[tauri::command]
+pub fn adb_get_pids_for_package(state: State<AppState>, package: String) -> Result<Vec<String>, String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state)
+        .ok_or("No device connected")?;
+
+    // pidof returns space-separated PIDs
+    let output = run_adb_cmd_with_device(
+        &adb,
+        Some(&serial),
+        &["shell", "pidof", &package],
+    )
+    .unwrap_or_default()
+    .trim()
+    .to_string();
+
+    if output.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let pids: Vec<String> = output
+        .split_whitespace()
+        .map(|s| s.to_string())
+        .collect();
+
+    Ok(pids)
+}
+
 // ─── Utility ─────────────────────────────────────────────
 
 #[tauri::command]

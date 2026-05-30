@@ -120,6 +120,8 @@ pub fn run() {
             adb_start_logcat,
             adb_stop_logcat,
             adb_clear_logcat_buffer,
+            adb_get_foreground_package,
+            adb_get_pids_for_package,
             write_text_file,
             settings_set_adb_path,
             settings_set_scrcpy_path,

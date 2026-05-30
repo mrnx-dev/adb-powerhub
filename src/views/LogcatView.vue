@@ -18,11 +18,25 @@ onMounted(() => {
 });
 
 watch(
+  () => store.streaming,
+  (isStreaming) => {
+    if (!isStreaming) {
+      store.stopActiveAppPolling();
+    } else if (store.activeAppOnly) {
+      store.startActiveAppPolling();
+    }
+  }
+);
+
+watch(
   () => deviceStore.connected,
   (connected) => {
-    if (!connected && store.streaming) {
-      store.status = 'DISCONNECTED';
-      channel.stop();
+    if (!connected) {
+      store.setActiveAppOnly(false);
+      if (store.streaming) {
+        store.status = 'DISCONNECTED';
+        channel.stop();
+      }
     }
   }
 );

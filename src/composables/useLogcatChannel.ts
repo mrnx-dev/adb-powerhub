@@ -75,7 +75,7 @@ export function useLogcatChannel() {
           store.error = errMsg;
           store.status = 'DISCONNECTED';
         }
-      },
+      }
     );
 
     try {

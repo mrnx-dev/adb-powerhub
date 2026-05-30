@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { useLogcatStore } from '../stores/logcat';
-import { Search, Tag } from '@lucide/vue';
+import { useDeviceStore } from '../stores/device';
+import { Search, Tag, Smartphone } from '@lucide/vue';
 import { ref, watch } from 'vue';
 
 const store = useLogcatStore();
+const deviceStore = useDeviceStore();
 
 const levelOptions: { label: string; value: 'ALL' | 'V' | 'D' | 'I' | 'W' | 'E' | 'F' }[] = [
   { label: 'All', value: 'ALL' },
@@ -34,6 +36,11 @@ watch(localSearch, (val) => {
     store.searchQuery = val;
   }, 200);
 });
+
+function onActiveAppToggle(e: Event) {
+  const checked = (e.target as HTMLInputElement).checked;
+  store.setActiveAppOnly(checked);
+}
 </script>
 
 <template>
@@ -49,6 +56,33 @@ watch(localSearch, (val) => {
           {{ opt.label }}
         </option>
       </select>
+    </div>
+
+    <!-- Active App Filter -->
+    <div class="flex items-center gap-2">
+      <label
+        class="flex items-center gap-1.5 cursor-pointer"
+        :class="{
+          'opacity-50 cursor-not-allowed': !deviceStore.connected || !store.streaming,
+        }"
+      >
+        <input
+          :checked="store.activeAppOnly"
+          type="checkbox"
+          class="accent-accent-emerald"
+          :disabled="!deviceStore.connected || !store.streaming"
+          @change="onActiveAppToggle"
+        />
+        <Smartphone :size="14" class="text-theme-muted shrink-0" />
+        <span class="text-xs text-theme-primary whitespace-nowrap">Current App Only</span>
+      </label>
+      <span
+        v-if="store.activeAppOnly && store.activeAppPackage"
+        class="text-[11px] px-2 py-0.5 rounded bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20 max-w-[140px] truncate"
+        :title="store.activeAppPackage"
+      >
+        {{ store.activeAppPackage }}
+      </span>
     </div>
 
     <!-- Tag Filter -->

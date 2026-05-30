@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface LogEntry {
   id: number;
@@ -20,10 +21,11 @@ export type LogcatStatus = 'IDLE' | 'LIVE' | 'PAUSED' | 'DISCONNECTED' | 'ERROR'
 
 const MAX_BUFFER = 500;
 const MAX_LINE_LEN = 500;
+const ACTIVE_APP_POLL_MS = 3000;
 
 export const useLogcatStore = defineStore('logcat', () => {
   const entries = ref<LogEntry[]>([]);
-  const lastAppendAt = ref(0); // monotonic tick, increments on every append
+  const lastAppendAt = ref(0);
   const droppedCount = ref(0);
   const nextId = ref(0);
 
@@ -41,15 +43,32 @@ export const useLogcatStore = defineStore('logcat', () => {
   const restartRequested = ref(false);
   const restarting = ref(false);
 
+  // ─── Active App Filter ─────────────────────────────────
+  const activeAppOnly = ref(false);
+  const activeAppPackage = ref('');
+  const activeAppPids = ref<string[]>([]);
+  let activeAppPoller: ReturnType<typeof setInterval> | null = null;
+
   const filteredEntries = computed(() => {
     let result = entries.value;
+
+    // Level filter
     if (filterLevel.value !== 'ALL') {
       result = result.filter((e) => e.level === filterLevel.value);
     }
+
+    // Tag filter (legacy single query — to be replaced by multi-filter later)
     if (tagQuery.value.trim()) {
       const q = tagQuery.value.toLowerCase();
       result = result.filter((e) => e.tag.toLowerCase().includes(q));
     }
+
+    // Active App filter — only show logs from the foreground app's PIDs
+    if (activeAppOnly.value && activeAppPids.value.length > 0) {
+      result = result.filter((e) => activeAppPids.value.some((pid) => pid === e.pid.trim()));
+    }
+
+    // Global search
     if (searchQuery.value.trim()) {
       const q = searchQuery.value.toLowerCase();
       result = result.filter((e) => {
@@ -57,11 +76,53 @@ export const useLogcatStore = defineStore('logcat', () => {
         return haystack.toLowerCase().includes(q);
       });
     }
+
     return result;
   });
 
   const visibleCount = computed(() => filteredEntries.value.length);
   const totalCount = computed(() => entries.value.length);
+
+  // ─── Active App Polling ────────────────────────────────
+
+  async function pollActiveApp() {
+    try {
+      const pkg: string = await invoke('adb_get_foreground_package');
+      if (pkg !== activeAppPackage.value) {
+        activeAppPackage.value = pkg;
+      }
+      const pids: string[] = await invoke('adb_get_pids_for_package', { package: pkg });
+      activeAppPids.value = pids;
+    } catch {
+      // Device might be in transition; keep previous values
+    }
+  }
+
+  function startActiveAppPolling() {
+    stopActiveAppPolling();
+    if (!activeAppOnly.value) return;
+    // Immediate first poll
+    pollActiveApp();
+    activeAppPoller = setInterval(pollActiveApp, ACTIVE_APP_POLL_MS);
+  }
+
+  function stopActiveAppPolling() {
+    if (activeAppPoller) {
+      clearInterval(activeAppPoller);
+      activeAppPoller = null;
+    }
+  }
+
+  function setActiveAppOnly(enabled: boolean) {
+    activeAppOnly.value = enabled;
+    if (enabled) {
+      startActiveAppPolling();
+    } else {
+      stopActiveAppPolling();
+      activeAppPackage.value = '';
+      activeAppPids.value = [];
+    }
+  }
 
   function appendEntries(newEntries: LogEntry[]) {
     for (const entry of newEntries) {
@@ -137,6 +198,12 @@ export const useLogcatStore = defineStore('logcat', () => {
   function setPaused(val: boolean) {
     paused.value = val;
     status.value = val ? 'PAUSED' : streaming.value ? 'LIVE' : 'IDLE';
+    // Pause/resume stream affects whether active app polling should run
+    if (val) {
+      stopActiveAppPolling();
+    } else if (activeAppOnly.value) {
+      startActiveAppPolling();
+    }
   }
 
   function requestStart() {
@@ -166,6 +233,9 @@ export const useLogcatStore = defineStore('logcat', () => {
     startRequested,
     restartRequested,
     restarting,
+    activeAppOnly,
+    activeAppPackage,
+    activeAppPids,
     appendEntries,
     appendEntry,
     clearLocalBuffer,
@@ -173,5 +243,8 @@ export const useLogcatStore = defineStore('logcat', () => {
     setPaused,
     requestStart,
     requestRestart,
+    setActiveAppOnly,
+    startActiveAppPolling,
+    stopActiveAppPolling,
   };
 });
