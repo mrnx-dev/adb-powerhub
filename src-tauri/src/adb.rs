@@ -1181,26 +1181,13 @@ pub fn adb_clear_logcat_buffer(state: State<AppState>) -> Result<String, String>
 // ─── Active App Filter (Logcat) ────────────────────────────
 
 #[tauri::command]
-pub fn adb_get_foreground_package(state: State<AppState>) -> Result<String, String> {
-    let adb = get_adb_path(&state);
-    let serial = get_device_serial(&state)
-        .ok_or("No device connected")?;
+fn get_foreground_package_via_window(adb: &str, serial: &str) -> Result<String, String> {
+    let output = run_adb_cmd_with_device(adb, Some(serial), &["shell", "dumpsys", "window", "windows"])?;
 
-    let output = run_adb_cmd_with_device(
-        &adb,
-        Some(&serial),
-        &["shell", "dumpsys", "window", "windows"],
-    )?;
-
-    // Parse: mCurrentFocus=Window{... com.package.name/.ActivityName}
-    // Also handle: mCurrentFocus=Window{... com.package.name/com.other.ActivityName}
     let package = output
         .lines()
-        .find(|l| l.contains("mCurrentFocus"))
+        .find(|l| l.contains("mCurrentFocus") || l.contains("mFocusedWindow"))
         .and_then(|line| {
-            // The line looks like:
-            //   mCurrentFocus=Window{...} com.package/.Activity
-            // Find the last token containing '/' (package/activity)
             line.split_whitespace()
                 .filter(|token| token.contains('/'))
                 .last()
@@ -1209,11 +1196,46 @@ pub fn adb_get_foreground_package(state: State<AppState>) -> Result<String, Stri
         .unwrap_or("")
         .to_string();
 
-    if package.is_empty() {
-        return Err("Could not determine foreground package".to_string());
-    }
+    Ok(package)
+}
+
+fn get_foreground_package_via_activity(adb: &str, serial: &str) -> Result<String, String> {
+    let output = run_adb_cmd_with_device(adb, Some(serial), &["shell", "dumpsys", "activity", "activities"])?;
+
+    let package = output
+        .lines()
+        .find(|l| l.contains("mResumedActivity") || l.contains("topResumedActivity"))
+        .and_then(|line| {
+            line.split_whitespace()
+                .filter(|token| token.contains('/'))
+                .last()
+                .map(|token| token.split('/').next().unwrap_or("").trim().trim_end_matches('}'))
+        })
+        .unwrap_or("")
+        .to_string();
 
     Ok(package)
+}
+
+#[tauri::command]
+pub fn adb_get_foreground_package(state: State<AppState>) -> Result<String, String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state)
+        .ok_or("No device connected")?;
+
+    if let Ok(pkg) = get_foreground_package_via_window(&adb, &serial) {
+        if !pkg.is_empty() {
+            return Ok(pkg);
+        }
+    }
+
+    if let Ok(pkg) = get_foreground_package_via_activity(&adb, &serial) {
+        if !pkg.is_empty() {
+            return Ok(pkg);
+        }
+    }
+
+    Err("Could not determine foreground package".to_string())
 }
 
 #[tauri::command]

@@ -88,11 +88,11 @@ function chipClasses(mode: 'include' | 'exclude') {
         <span class="text-xs text-theme-primary whitespace-nowrap">Current App Only</span>
       </label>
       <span
-        v-if="store.activeAppOnly && store.activeAppPackage"
+        v-if="store.activeAppOnly"
         class="text-[11px] px-2 py-0.5 rounded bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20 max-w-[140px] truncate"
-        :title="store.activeAppPackage"
+        :title="store.activeAppPackage || store.activeAppPollingError || 'Detecting…'"
       >
-        {{ store.activeAppPackage }}
+        {{ store.activeAppPollingError ? 'Unknown' : store.activeAppPackage || 'Detecting…' }}
       </span>
     </div>
 

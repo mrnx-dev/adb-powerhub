@@ -52,6 +52,7 @@ export const useLogcatStore = defineStore('logcat', () => {
   const activeAppOnly = ref(false);
   const activeAppPackage = ref('');
   const activeAppPids = ref<string[]>([]);
+  const activeAppPollingError = ref('');
   let activeAppPoller: ReturnType<typeof setInterval> | null = null;
 
   const filteredEntries = computed(() => {
@@ -100,13 +101,15 @@ export const useLogcatStore = defineStore('logcat', () => {
 
   async function pollActiveApp() {
     try {
+      activeAppPollingError.value = '';
       const pkg: string = await invoke('adb_get_foreground_package');
       if (pkg !== activeAppPackage.value) {
         activeAppPackage.value = pkg;
       }
       const pids: string[] = await invoke('adb_get_pids_for_package', { package: pkg });
       activeAppPids.value = pids;
-    } catch {
+    } catch (e) {
+      activeAppPollingError.value = e instanceof Error ? e.message : String(e);
       // Device might be in transition; keep previous values
     }
   }
@@ -128,6 +131,7 @@ export const useLogcatStore = defineStore('logcat', () => {
 
   function setActiveAppOnly(enabled: boolean) {
     activeAppOnly.value = enabled;
+    activeAppPollingError.value = '';
     if (enabled) {
       startActiveAppPolling();
     } else {
@@ -271,6 +275,7 @@ export const useLogcatStore = defineStore('logcat', () => {
     activeAppOnly,
     activeAppPackage,
     activeAppPids,
+    activeAppPollingError,
     appendEntries,
     appendEntry,
     clearLocalBuffer,
