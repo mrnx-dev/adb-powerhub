@@ -1186,11 +1186,10 @@ pub fn adb_get_foreground_package(state: State<AppState>) -> Result<String, Stri
     let serial = get_device_serial(&state)
         .ok_or("No device connected")?;
 
-    // dumpsys window windows | grep mCurrentFocus
     let output = run_adb_cmd_with_device(
         &adb,
         Some(&serial),
-        &["shell", "dumpsys", "window", "windows", "|", "grep", "mCurrentFocus"],
+        &["shell", "dumpsys", "window", "windows"],
     )?;
 
     // Parse: mCurrentFocus=Window{... com.package.name/.ActivityName}
@@ -1199,7 +1198,9 @@ pub fn adb_get_foreground_package(state: State<AppState>) -> Result<String, Stri
         .lines()
         .find(|l| l.contains("mCurrentFocus"))
         .and_then(|line| {
-            // Find the last space-separated token that looks like a package/activity
+            // The line looks like:
+            //   mCurrentFocus=Window{...} com.package/.Activity
+            // Find the last token containing '/' (package/activity)
             line.split_whitespace()
                 .filter(|token| token.contains('/'))
                 .last()
