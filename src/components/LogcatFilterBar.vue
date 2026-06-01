@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useLogcatStore } from '../stores/logcat';
 import { useDeviceStore } from '../stores/device';
-import { Search, Tag, Smartphone } from '@lucide/vue';
+import { Search, Tag, Smartphone, X } from '@lucide/vue';
 import { ref, watch } from 'vue';
 
 const store = useLogcatStore();
@@ -17,18 +17,10 @@ const levelOptions: { label: string; value: 'ALL' | 'V' | 'D' | 'I' | 'W' | 'E' 
   { label: 'Fatal', value: 'F' },
 ];
 
-const localTag = ref(store.tagQuery);
+const tagInput = ref('');
 const localSearch = ref(store.searchQuery);
 
-let tagDebounce: ReturnType<typeof setTimeout> | null = null;
 let searchDebounce: ReturnType<typeof setTimeout> | null = null;
-
-watch(localTag, (val) => {
-  if (tagDebounce) clearTimeout(tagDebounce);
-  tagDebounce = setTimeout(() => {
-    store.tagQuery = val;
-  }, 200);
-});
 
 watch(localSearch, (val) => {
   if (searchDebounce) clearTimeout(searchDebounce);
@@ -37,9 +29,28 @@ watch(localSearch, (val) => {
   }, 200);
 });
 
+function onTagKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    addTagFromInput();
+  }
+}
+
+function addTagFromInput() {
+  if (!tagInput.value.trim()) return;
+  store.addTagFilter(tagInput.value);
+  tagInput.value = '';
+}
+
 function onActiveAppToggle(e: Event) {
   const checked = (e.target as HTMLInputElement).checked;
   store.setActiveAppOnly(checked);
+}
+
+function chipClasses(mode: 'include' | 'exclude') {
+  return mode === 'include'
+    ? 'bg-accent-emerald/10 text-accent-emerald border-accent-emerald/25'
+    : 'bg-red-500/10 text-red-400 border-red-500/25';
 }
 </script>
 
@@ -85,15 +96,43 @@ function onActiveAppToggle(e: Event) {
       </span>
     </div>
 
-    <!-- Tag Filter -->
-    <div class="flex items-center gap-2 flex-1 min-w-[120px] max-w-[240px]">
+    <!-- Tag Filter Chips -->
+    <div class="flex items-center gap-2 flex-1 min-w-[200px]">
       <Tag :size="14" class="text-theme-muted shrink-0" />
-      <input
-        v-model="localTag"
-        type="text"
-        placeholder="Filter by tag..."
-        class="w-full bg-theme-input border border-theme-tertiary rounded-md px-2 py-1 text-xs text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-accent-emerald transition-colors"
-      />
+      <div
+        class="flex items-center gap-1.5 flex-wrap flex-1 bg-theme-input border border-theme-tertiary rounded-md px-2 py-1 min-h-[28px]"
+      >
+        <span
+          v-for="(filter, i) in store.tagFilters"
+          :key="filter.value + filter.mode"
+          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border cursor-pointer select-none transition-colors"
+          :class="chipClasses(filter.mode)"
+          @click="store.toggleTagMode(i)"
+        >
+          <span>{{ filter.mode === 'include' ? '+' : '−' }}</span>
+          <span class="max-w-[100px] truncate">{{ filter.value }}</span>
+          <button class="hover:opacity-80" @click.stop="store.removeTagFilter(i)">
+            <X :size="10" />
+          </button>
+        </span>
+
+        <input
+          v-model="tagInput"
+          type="text"
+          placeholder="Type tag & press Enter..."
+          class="bg-transparent text-xs text-theme-primary placeholder:text-theme-muted focus:outline-none min-w-[120px] flex-1"
+          @keydown="onTagKeydown"
+          @blur="addTagFromInput"
+        />
+      </div>
+
+      <button
+        v-if="store.tagFilters.length > 0"
+        class="text-[11px] text-theme-muted hover:text-red-400 transition-colors"
+        @click="store.clearTagFilters"
+      >
+        Clear
+      </button>
     </div>
 
     <!-- Search -->

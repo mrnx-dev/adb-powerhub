@@ -17,6 +17,11 @@ export interface LogEntry {
   displayMessage: string;
 }
 
+export interface TagFilter {
+  value: string;
+  mode: 'include' | 'exclude';
+}
+
 export type LogcatStatus = 'IDLE' | 'LIVE' | 'PAUSED' | 'DISCONNECTED' | 'ERROR';
 
 const MAX_BUFFER = 500;
@@ -30,7 +35,7 @@ export const useLogcatStore = defineStore('logcat', () => {
   const nextId = ref(0);
 
   const filterLevel = ref<'ALL' | 'V' | 'D' | 'I' | 'W' | 'E' | 'F'>('ALL');
-  const tagQuery = ref('');
+  const tagFilters = ref<TagFilter[]>([]);
   const searchQuery = ref('');
 
   const streaming = ref(false);
@@ -57,10 +62,18 @@ export const useLogcatStore = defineStore('logcat', () => {
       result = result.filter((e) => e.level === filterLevel.value);
     }
 
-    // Tag filter (legacy single query — to be replaced by multi-filter later)
-    if (tagQuery.value.trim()) {
-      const q = tagQuery.value.toLowerCase();
-      result = result.filter((e) => e.tag.toLowerCase().includes(q));
+    // Tag filters — multi-chip with include/exclude modes
+    const includes = tagFilters.value.filter((f) => f.mode === 'include');
+    const excludes = tagFilters.value.filter((f) => f.mode === 'exclude');
+    if (includes.length > 0) {
+      result = result.filter((e) =>
+        includes.some((f) => e.tag.toLowerCase().includes(f.value.toLowerCase()))
+      );
+    }
+    if (excludes.length > 0) {
+      result = result.filter(
+        (e) => !excludes.some((f) => e.tag.toLowerCase().includes(f.value.toLowerCase()))
+      );
     }
 
     // Active App filter — only show logs from the foreground app's PIDs
@@ -195,6 +208,28 @@ export const useLogcatStore = defineStore('logcat', () => {
     }
   }
 
+  // ─── Tag Filter Helpers ────────────────────────────────
+
+  function addTagFilter(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    if (tagFilters.value.some((f) => f.value.toLowerCase() === trimmed.toLowerCase())) return;
+    tagFilters.value.push({ value: trimmed, mode: 'include' });
+  }
+
+  function removeTagFilter(index: number) {
+    tagFilters.value.splice(index, 1);
+  }
+
+  function clearTagFilters() {
+    tagFilters.value = [];
+  }
+
+  function toggleTagMode(index: number) {
+    const f = tagFilters.value[index];
+    if (f) f.mode = f.mode === 'include' ? 'exclude' : 'include';
+  }
+
   function setPaused(val: boolean) {
     paused.value = val;
     status.value = val ? 'PAUSED' : streaming.value ? 'LIVE' : 'IDLE';
@@ -221,7 +256,7 @@ export const useLogcatStore = defineStore('logcat', () => {
     visibleCount,
     totalCount,
     filterLevel,
-    tagQuery,
+    tagFilters,
     searchQuery,
     streaming,
     paused,
@@ -246,5 +281,9 @@ export const useLogcatStore = defineStore('logcat', () => {
     setActiveAppOnly,
     startActiveAppPolling,
     stopActiveAppPolling,
+    addTagFilter,
+    removeTagFilter,
+    clearTagFilters,
+    toggleTagMode,
   };
 });
