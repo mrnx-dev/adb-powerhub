@@ -98,7 +98,7 @@ function toggleMirror() {
         <!-- Start/Stop Button (Compact) -->
         <button
           :disabled="!store.connected"
-          class="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+          class="btn-pressable text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
           :class="
             store.mirroring
               ? 'bg-accent-emerald text-white border border-accent-emerald hover:bg-accent-emerald-hover'
@@ -154,7 +154,7 @@ function toggleMirror() {
     <!-- Quick Actions Grid -->
     <div v-show="expanded" class="grid grid-cols-3 gap-2">
       <button
-        class="action-card"
+        class="action-card btn-pressable"
         :class="{ 'action-card-active': store.showTouches }"
         @click="store.toggleMirrorFlag('showTouches')"
       >
@@ -164,7 +164,7 @@ function toggleMirror() {
       </button>
 
       <button
-        class="action-card"
+        class="action-card btn-pressable"
         :disabled="screenOffDisabled"
         :class="{
           'action-card-active': store.turnScreenOff,
@@ -179,7 +179,7 @@ function toggleMirror() {
       </button>
 
       <button
-        class="action-card"
+        class="action-card btn-pressable"
         :class="{ 'action-card-active': store.alwaysOnTop }"
         @click="store.toggleMirrorFlag('alwaysOnTop')"
       >
@@ -189,7 +189,7 @@ function toggleMirror() {
       </button>
 
       <button
-        class="action-card"
+        class="action-card btn-pressable"
         :disabled="noControlDisabled"
         :class="{
           'action-card-active': store.noControl,
@@ -204,7 +204,7 @@ function toggleMirror() {
       </button>
 
       <button
-        class="action-card"
+        class="action-card btn-pressable"
         :class="{ 'action-card-active': store.stayAwakeEnabled }"
         @click="store.toggleStayAwake(!store.stayAwakeEnabled)"
       >
@@ -215,7 +215,7 @@ function toggleMirror() {
         >
       </button>
 
-      <button class="action-card" @click="store.rotateDevice()">
+      <button class="action-card btn-pressable" @click="store.rotateDevice()">
         <RotateCw :size="14" />
         <span class="flex-1 text-left text-[11px]">Rotate</span>
       </button>

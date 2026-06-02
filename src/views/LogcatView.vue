@@ -71,7 +71,7 @@ watch(
 </script>
 
 <template>
-  <div class="flex-1 min-h-0 overflow-hidden bg-glow p-6 flex flex-col gap-4">
+  <div tabindex="-1" class="flex-1 min-h-0 overflow-hidden bg-glow p-6 flex flex-col gap-4">
     <div
       v-if="!deviceStore.connected"
       class="flex-1 flex flex-col items-center justify-center gap-4"

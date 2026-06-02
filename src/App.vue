@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { listen } from '@tauri-apps/api/event';
 import { useDeviceStore } from './stores/device';
 import { useSettingsStore } from './stores/settings';
 import { useNavigationStore } from './stores/navigation';
 import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts';
 import { useConnectionHistoryStore } from './stores/connectionHistory';
+import { useDropdownRegistry } from './composables/useDropdownRegistry';
 import TitleBar from './components/TitleBar.vue';
 import AppSidebarLeft from './components/AppSidebarLeft.vue';
 import AppSidebarRight from './components/AppSidebarRight.vue';
@@ -26,6 +27,46 @@ const connectionHistoryStore = useConnectionHistoryStore();
 const presetsStore = usePresetsStore();
 
 useKeyboardShortcuts();
+
+// Page transition (FR-4) — map currentPage → component for <component :is> wrapper
+const currentViewComponent = computed(() => {
+  switch (navStore.currentPage) {
+    case 'logcat':
+      return LogcatView;
+    case 'settings':
+      return SettingsView;
+    case 'dashboard':
+    default:
+      return DashboardView;
+  }
+});
+
+// P25/M25: close all open Teleport-mounted dropdowns on view switch
+// (e.g. DeviceStatsCard badge dropdown). The dropdown's own leave
+// transition (100ms) completes within the first half of the page leave
+// (150ms), so the dropdown disappears gracefully before the page does.
+const dropdowns = useDropdownRegistry();
+watch(
+  () => navStore.currentPage,
+  () => {
+    if (dropdowns.state.openDropdowns.size > 0) {
+      dropdowns.closeAll();
+    }
+  }
+);
+
+// Focus management (B4 fix) — after <Transition mode="out-in"> completes,
+// move focus to new view's root so keyboard Tab navigation works smoothly.
+const activeViewRef = ref<HTMLElement | null>(null);
+
+function focusNewView(el: unknown) {
+  if (el && el instanceof HTMLElement) {
+    activeViewRef.value = el;
+    nextTick(() => {
+      el.focus({ preventScroll: true });
+    });
+  }
+}
 
 onMounted(async () => {
   themeStore.init();
@@ -49,10 +90,14 @@ onMounted(async () => {
     <TitleBar />
     <main class="flex flex-1 overflow-hidden">
       <AppSidebarLeft />
-      <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <DashboardView v-if="navStore.currentPage === 'dashboard'" />
-        <LogcatView v-else-if="navStore.currentPage === 'logcat'" />
-        <SettingsView v-else-if="navStore.currentPage === 'settings'" />
+      <div class="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+        <Transition name="page-switch" mode="out-in">
+          <component
+            :is="currentViewComponent"
+            :key="navStore.currentPage"
+            @vue:mounted="focusNewView"
+          />
+        </Transition>
       </div>
       <AppSidebarRight />
     </main>
@@ -61,4 +106,9 @@ onMounted(async () => {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+/* Ensure view root can receive focus (B3 + B4 fix) */
+:deep([tabindex='-1']) {
+  outline: none;
+}
+</style>
