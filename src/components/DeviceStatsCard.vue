@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useDeviceStore } from '../stores/device';
 import { useNavigationStore } from '../stores/navigation';
+import { useDropdownRegistry } from '../composables/useDropdownRegistry';
 import { Smartphone, Battery, Cpu, Zap, ChevronDown, RefreshCw, Unplug } from '@lucide/vue';
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 
 const store = useDeviceStore();
 const nav = useNavigationStore();
+const dropdown = useDropdownRegistry('device-stats-badge');
 const dropdownOpen = ref(false);
 const dropdownRef = ref<HTMLElement | null>(null);
 const dropdownStyle = ref<Record<string, string>>({});
@@ -14,18 +16,27 @@ const badgeRef = ref<HTMLElement | null>(null);
 function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value;
   if (dropdownOpen.value) {
+    dropdown.open();
     nextTick(updateDropdownPosition);
+  } else {
+    dropdown.close();
   }
 }
 
+/* FR-8: origin-aware dropdown. Teleport moves DOM to <body>, so
+   transform-origin can't reference the trigger via CSS alone.
+   Compute trigger position and set inline transform-origin. */
 function updateDropdownPosition() {
   if (badgeRef.value) {
     const rect = badgeRef.value.getBoundingClientRect();
+    const triggerCenterX = rect.left + rect.width / 2;
+    const triggerBottomY = rect.bottom;
     dropdownStyle.value = {
       position: 'fixed',
       top: `${rect.bottom + 4}px`,
       left: `${rect.left}px`,
       minWidth: '160px',
+      transformOrigin: `${triggerCenterX}px ${triggerBottomY}px`,
     };
   }
 }
@@ -51,16 +62,24 @@ function handleScroll() {
 onMounted(() => {
   document.addEventListener('mousedown', handleClickOutside);
   window.addEventListener('scroll', handleScroll, true);
+  // R5 mitigation: re-compute position on window resize to prevent drift
+  window.addEventListener('resize', updateDropdownPosition);
 });
 
 onUnmounted(() => {
   document.removeEventListener('mousedown', handleClickOutside);
   window.removeEventListener('scroll', handleScroll, true);
+  window.removeEventListener('resize', updateDropdownPosition);
+  // P25/M25: ensure registry state is clean if component unmounts mid-open
+  dropdown.close();
 });
 
 watch(dropdownOpen, (val) => {
   if (val) {
+    dropdown.open();
     nextTick(updateDropdownPosition);
+  } else {
+    dropdown.close();
   }
 });
 
@@ -132,10 +151,7 @@ function handleDisconnect() {
               <Cpu :size="14" class="text-accent-emerald shrink-0" />
               <span class="text-[10px] text-theme-secondary w-7">CPU</span>
               <div class="flex-1 progress-bar-track">
-                <div
-                  class="progress-bar-fill transition-all duration-500"
-                  :style="{ width: store.cpuUsage + '%' }"
-                ></div>
+                <div class="progress-bar-fill" :style="{ width: store.cpuUsage + '%' }"></div>
               </div>
               <span class="text-[10px] text-theme-secondary w-8 text-right"
                 >{{ store.cpuUsage.toFixed(0) }}%</span
@@ -147,7 +163,7 @@ function handleDisconnect() {
         <!-- Connected badge + dropdown -->
         <div ref="badgeRef" class="shrink-0">
           <button
-            class="status-badge status-badge-active hover:opacity-90 transition-opacity"
+            class="btn-pressable status-badge status-badge-active hover:opacity-90 transition-opacity"
             @click="toggleDropdown"
           >
             <span class="status-dot status-dot-active"></span>
@@ -167,14 +183,14 @@ function handleDisconnect() {
                 class="fixed rounded-lg bg-theme-sidebar border border-theme-secondary shadow-theme-modal overflow-hidden z-[100]"
               >
                 <button
-                  class="w-full flex items-center gap-2 px-3 py-2.5 text-[11px] text-theme-secondary hover:bg-theme-hover hover:text-theme-primary transition-colors"
+                  class="btn-pressable w-full flex items-center gap-2 px-3 py-2.5 text-[11px] text-theme-secondary hover:bg-theme-hover hover:text-theme-primary transition-colors"
                   @click="handleReconnect"
                 >
                   <RefreshCw :size="13" />
                   Reconnect
                 </button>
                 <button
-                  class="w-full flex items-center gap-2 px-3 py-2.5 text-[11px] text-color-error hover:bg-color-error-container transition-colors border-t border-theme-tertiary"
+                  class="btn-pressable w-full flex items-center gap-2 px-3 py-2.5 text-[11px] text-color-error hover:bg-color-error-container transition-colors border-t border-theme-tertiary"
                   @click="handleDisconnect"
                 >
                   <Unplug :size="13" />
@@ -195,7 +211,7 @@ function handleDisconnect() {
           <span class="text-xs">No device connected</span>
         </div>
         <button
-          class="btn-primary flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold"
+          class="btn-pressable btn-primary flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold"
           @click="nav.openConnectPanel()"
         >
           <Zap :size="13" />
@@ -207,15 +223,20 @@ function handleDisconnect() {
 </template>
 
 <style scoped>
+/* Dropdown motion (FR-8) — origin-aware scale + opacity, custom easing */
 .dropdown-enter-active {
-  transition: all 0.15s ease-out;
+  transition:
+    opacity var(--duration-standard) var(--ease-emphasized),
+    transform var(--duration-standard) var(--ease-emphasized);
 }
 .dropdown-leave-active {
-  transition: all 0.1s ease-in;
+  transition:
+    opacity 100ms var(--ease-accelerate),
+    transform 100ms var(--ease-accelerate);
 }
 .dropdown-enter-from,
 .dropdown-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: scale(0.97) translateY(-4px);
 }
 </style>

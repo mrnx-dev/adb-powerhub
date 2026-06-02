@@ -69,6 +69,23 @@
 
   --glow-center: rgba(16, 185, 129, 0.15);
   --glow-edge: #06100d;
+
+  /* ——— MOTION TOKENS (Dashboard Motion & UX Polish) ——— */
+  /* Easing curves (MD3 + Emil recommendations) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.6, 1);
+  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Duration scale */
+  --duration-quick: 120ms;
+  --duration-standard: 200ms;
+  --duration-card: 250ms;
+  --duration-slow: 300ms;
+
+  /* Press scale for :active feedback */
+  --scale-press: 0.97;
 }
 
 /* ——— LIGHT TOKENS ———————————————————————————————————————— */
@@ -273,6 +290,84 @@ body {
 }
 
 /* ============================================================
+   MOTION UTILITIES (Dashboard Motion & UX Polish)
+   ============================================================ */
+
+/* Button press feedback — respects :disabled (P21) */
+.btn-pressable {
+  transition: transform var(--duration-quick) var(--ease-out);
+}
+.btn-pressable:active:not(:disabled) {
+  transform: scale(var(--scale-press));
+}
+
+/* Sidebar resize hint — toggled on during collapse/expand (P26) */
+.is-resizing {
+  will-change: width;
+  contain: layout;
+}
+
+/* Gate hover-only effects to mouse devices (P31, Emil Cat 4.8).
+   Touch devices trigger :hover on tap, causing false positives. */
+@media (hover: hover) and (pointer: fine) {
+  .action-card:hover {
+    border-color: var(--border-secondary);
+    background-color: var(--bg-hover);
+  }
+  .toggle-pill:hover {
+    border-color: var(--border-secondary);
+  }
+  .card-glass:hover {
+    box-shadow: 0 0 24px rgba(16, 185, 129, 0.22);
+  }
+  .action-card-active:hover {
+    background-color: var(--color-success-container);
+    border-color: var(--color-success);
+  }
+}
+
+/* ============================================================
+   PAGE TRANSITION (FR-4) — App.vue view switch
+   Total budget: 150ms exit + 200ms enter = 350ms
+   ============================================================ */
+
+.page-switch-enter-active {
+  transition:
+    opacity var(--duration-standard) var(--ease-emphasized),
+    transform var(--duration-standard) var(--ease-emphasized);
+}
+.page-switch-leave-active {
+  transition:
+    opacity 100ms var(--ease-accelerate),
+    transform 100ms var(--ease-accelerate);
+}
+.page-switch-enter-from {
+  opacity: 0;
+  transform: translateX(4px);
+}
+.page-switch-leave-to {
+  opacity: 0;
+  transform: translateX(-4px);
+}
+
+/* ============================================================
+   CARD STAGGER (FR-5) — DashboardView children
+   Per-child delay via --stagger-index inline style
+   Total budget: 120ms delay + 250ms duration = 370ms
+   ============================================================ */
+
+.card-stagger-enter-active {
+  transition:
+    opacity var(--duration-card) var(--ease-out),
+    transform var(--duration-card) var(--ease-out);
+  transition-delay: calc(var(--stagger-index, 0) * 60ms);
+}
+.card-stagger-enter-from {
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+}
+
+/* ============================================================
    ELEVATION & CARD SYSTEM
    ============================================================ */
 
@@ -293,8 +388,8 @@ body {
   border-radius: 0.5rem;
   box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
   transition:
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+    box-shadow var(--duration-standard) var(--ease-out),
+    border-color var(--duration-standard) var(--ease-out);
 }
 
 .card-glass:hover {
@@ -314,7 +409,7 @@ body {
   border-bottom: 2px solid var(--text-muted);
   border-radius: 0;
   background: transparent;
-  transition: border-color 0.2s ease;
+  transition: border-color var(--duration-standard) var(--ease-out);
 }
 
 .input-terminal:focus {
@@ -336,6 +431,7 @@ body {
   height: 2px;
   background: var(--color-primary);
   border-radius: 1px;
+  transition: width var(--duration-card) var(--ease-out);
 }
 
 /* ============================================================
@@ -442,7 +538,11 @@ input[type='range']::-moz-range-thumb {
   background: var(--bg-button);
   color: var(--text-primary);
   border: 1px solid var(--border-secondary);
-  transition: all 0.2s ease;
+  transition:
+    background-color var(--duration-standard) var(--ease-out),
+    color var(--duration-standard) var(--ease-out),
+    border-color var(--duration-standard) var(--ease-out),
+    transform var(--duration-quick) var(--ease-out);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -586,7 +686,9 @@ input[type='range']::-moz-range-thumb {
   flex-shrink: 0;
   border: 2px solid var(--border-secondary);
   background: transparent;
-  transition: all 0.3s ease;
+  transition:
+    background-color var(--duration-slow) var(--ease-out),
+    border-color var(--duration-slow) var(--ease-out);
 }
 
 .stepper-dot-done {
@@ -604,7 +706,7 @@ input[type='range']::-moz-range-thumb {
   width: 1px;
   height: 12px;
   background-color: var(--border-secondary);
-  transition: background-color 0.3s ease;
+  transition: background-color var(--duration-slow) var(--ease-out);
 }
 
 .stepper-line-done {
@@ -625,7 +727,10 @@ input[type='range']::-moz-range-thumb {
   font-weight: 500;
   cursor: pointer;
   user-select: none;
-  transition: all 0.2s ease;
+  transition:
+    background-color var(--duration-standard) var(--ease-out),
+    border-color var(--duration-standard) var(--ease-out),
+    color var(--duration-standard) var(--ease-out);
   background-color: var(--bg-button);
   border: 1px solid var(--border-tertiary);
   color: var(--text-secondary);
@@ -646,7 +751,9 @@ input[type='range']::-moz-range-thumb {
   height: 14px;
   border-radius: 50%;
   background-color: var(--text-muted);
-  transition: all 0.2s ease;
+  transition:
+    transform var(--duration-slow) var(--ease-bounce),
+    background-color var(--duration-standard) var(--ease-out);
   position: relative;
 }
 
@@ -668,7 +775,11 @@ input[type='range']::-moz-range-thumb {
   font-weight: 500;
   cursor: pointer;
   user-select: none;
-  transition: all 0.2s ease;
+  transition:
+    background-color var(--duration-standard) var(--ease-out),
+    border-color var(--duration-standard) var(--ease-out),
+    color var(--duration-standard) var(--ease-out),
+    transform var(--duration-quick) var(--ease-out);
   background-color: var(--bg-button);
   border: 1px solid var(--border-tertiary);
   color: var(--text-secondary);
@@ -688,6 +799,51 @@ input[type='range']::-moz-range-thumb {
 .action-card-active:hover {
   background-color: var(--color-success-container);
   border-color: var(--color-success);
+}
+
+/* ============================================================
+   REDUCED MOTION (a11y) — P22
+   Honors user OS preference. Disables transform motion, reduces
+   durations. Applies globally via cascade. Token overrides
+   (--scale-press: 1, durations: 0-100ms) propagate to all
+   utility classes that use var(--...).
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-quick: 0ms;
+    --duration-standard: 100ms;
+    --duration-card: 150ms;
+    --duration-slow: 0ms;
+    --scale-press: 1;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 100ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn-pressable:active:not(:disabled) {
+    transform: none;
+  }
+  .slide-panel-enter-active,
+  .slide-panel-leave-active {
+    transition: opacity 100ms linear !important;
+    transform: none !important;
+  }
+  .page-switch-enter-active,
+  .page-switch-leave-active,
+  .card-stagger-enter-active {
+    transition: opacity 150ms linear !important;
+    transform: none !important;
+    transition-delay: 0ms !important;
+  }
+  .dropdown-enter-active,
+  .dropdown-leave-active {
+    transition: opacity 100ms linear !important;
+    transform: none !important;
+  }
 }
 
 /* --- Scrollbar Thin (Horizontal) --- */

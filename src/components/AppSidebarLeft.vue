@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onUnmounted, ref } from 'vue';
 import { useNavigationStore } from '../stores/navigation';
 import { useDeviceStore } from '../stores/device';
 import { LayoutDashboard, Settings, PanelLeftOpen, PanelLeftClose, ScrollText } from '@lucide/vue';
@@ -7,12 +7,49 @@ import { LayoutDashboard, Settings, PanelLeftOpen, PanelLeftClose, ScrollText } 
 const navStore = useNavigationStore();
 const deviceStore = useDeviceStore();
 const expanded = ref(false);
+
+/* FR-7: lifecycle for is-resizing class — only on during transition
+   to avoid GPU memory bloat (R3). P26: setTimeout safety fallback in
+   case transitionend event is throttled/dropped during rapid toggle. */
+const sidebarRef = ref<HTMLElement | null>(null);
+const resizingTimeoutId = ref<number | null>(null);
+
+function toggleSidebar() {
+  expanded.value = !expanded.value;
+  sidebarRef.value?.classList.add('is-resizing');
+  if (resizingTimeoutId.value !== null) {
+    clearTimeout(resizingTimeoutId.value);
+  }
+  resizingTimeoutId.value = window.setTimeout(() => {
+    sidebarRef.value?.classList.remove('is-resizing');
+    resizingTimeoutId.value = null;
+  }, 250);
+}
+
+function onTransitionEnd(e: TransitionEvent) {
+  if (e.propertyName === 'width') {
+    sidebarRef.value?.classList.remove('is-resizing');
+    if (resizingTimeoutId.value !== null) {
+      clearTimeout(resizingTimeoutId.value);
+      resizingTimeoutId.value = null;
+    }
+  }
+}
+
+onUnmounted(() => {
+  if (resizingTimeoutId.value !== null) {
+    clearTimeout(resizingTimeoutId.value);
+  }
+});
 </script>
 
 <template>
   <aside
-    class="relative z-10 bg-sidebar-dark sidebar-blur border-r border-theme-tertiary flex flex-col shrink-0 transition-all duration-200 overflow-hidden"
+    ref="sidebarRef"
+    class="relative z-10 bg-sidebar-dark sidebar-blur border-r border-theme-tertiary flex flex-col shrink-0 overflow-hidden"
     :class="expanded ? 'w-56' : 'w-12'"
+    :style="{ transition: 'width var(--duration-standard) var(--ease-out)' }"
+    @transitionend="onTransitionEnd"
   >
     <div
       class="flex items-center shrink-0"
@@ -21,7 +58,7 @@ const expanded = ref(false);
       <button
         class="p-1.5 rounded-lg hover:bg-theme-hover transition-all"
         :title="expanded ? 'Collapse sidebar' : 'Expand sidebar'"
-        @click="expanded = !expanded"
+        @click="toggleSidebar"
       >
         <PanelLeftClose v-if="expanded" :size="18" class="opacity-70" />
         <PanelLeftOpen v-else :size="18" class="opacity-70" />
@@ -37,7 +74,7 @@ const expanded = ref(false);
       </h3>
 
       <button
-        class="rounded-lg border transition-all"
+        class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'dashboard'
             ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
@@ -54,7 +91,7 @@ const expanded = ref(false);
       </button>
 
       <button
-        class="rounded-lg border transition-all"
+        class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'logcat'
             ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
@@ -73,7 +110,7 @@ const expanded = ref(false);
       </button>
 
       <button
-        class="rounded-lg border transition-all"
+        class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'settings'
             ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
