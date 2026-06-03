@@ -125,8 +125,9 @@ function handleDisconnect() {
 
     <!-- Connected state -->
     <template v-else-if="store.connected">
-      <div class="flex items-center justify-between gap-4">
+      <div class="flex items-start justify-between gap-4">
         <div class="flex-1 min-w-0">
+          <!-- Line 1: connection meta -->
           <div class="flex items-center gap-2 text-[10px] text-theme-muted mb-1">
             <span class="capitalize">{{
               store.connectMethod === 'pairing' ? 'Android 11+ Pairing' : store.connectMethod
@@ -136,6 +137,7 @@ function handleDisconnect() {
             <span>&middot;</span>
             <span>{{ store.deviceId }}</span>
           </div>
+          <!-- Line 2: model + battery -->
           <div class="flex items-center gap-6 flex-wrap">
             <div class="flex items-center gap-2">
               <Smartphone :size="14" class="text-accent-emerald shrink-0" />
@@ -172,45 +174,64 @@ function handleDisconnect() {
                 >
               </template>
             </div>
+          </div>
 
-            <div class="h-4 w-px bg-theme-secondary"></div>
-
-            <div v-if="store.ramTotal > 0" class="flex items-center gap-2 min-w-[140px]">
-              <MemoryStick :size="14" class="text-accent-emerald shrink-0" />
-              <span class="text-[10px] text-theme-secondary w-7">RAM</span>
-              <div class="flex-1 progress-bar-track">
+          <!-- Line 3: progress bars (RAM / Disk / CPU) — full width row -->
+          <div
+            v-if="store.ramTotal > 0 || store.storageTotal > 0"
+            class="flex items-center gap-3 mt-1.5"
+          >
+            <div v-if="store.ramTotal > 0" class="flex items-center gap-1.5 flex-1 min-w-0">
+              <MemoryStick :size="12" class="text-accent-emerald shrink-0" />
+              <span class="text-[10px] text-theme-secondary w-7 shrink-0">RAM</span>
+              <div class="flex-1 progress-bar-track min-w-0">
                 <div class="progress-bar-fill" :style="{ width: store.ramPercent + '%' }"></div>
               </div>
-              <span class="text-[10px] text-theme-secondary w-16 text-right"
-                >{{ store.ramUsedGb }} / {{ store.ramTotalGb }} GB</span
+              <span class="text-[10px] text-theme-secondary whitespace-nowrap"
+                >{{ store.ramUsedGb }}/{{ store.ramTotalGb }} GB</span
               >
             </div>
 
-            <div v-if="store.ramTotal > 0" class="h-4 w-px bg-theme-secondary"></div>
+            <div
+              v-if="store.ramTotal > 0 && store.storageTotal > 0"
+              class="h-4 w-px bg-theme-secondary shrink-0"
+            ></div>
 
-            <div v-if="store.storageTotal > 0" class="flex items-center gap-2 min-w-[140px]">
-              <HardDrive :size="14" class="text-accent-emerald shrink-0" />
-              <span class="text-[10px] text-theme-secondary w-7">Disk</span>
-              <div class="flex-1 progress-bar-track">
+            <div v-if="store.storageTotal > 0" class="flex items-center gap-1.5 flex-1 min-w-0">
+              <HardDrive :size="12" class="text-accent-emerald shrink-0" />
+              <span class="text-[10px] text-theme-secondary w-7 shrink-0">Disk</span>
+              <div class="flex-1 progress-bar-track min-w-0">
                 <div class="progress-bar-fill" :style="{ width: store.storagePercent + '%' }"></div>
               </div>
-              <span class="text-[10px] text-theme-secondary w-16 text-right"
-                >{{ store.storageUsed }} / {{ store.storageTotal }} GB</span
+              <span class="text-[10px] text-theme-secondary whitespace-nowrap"
+                >{{ store.storageUsed }}/{{ store.storageTotal }} GB</span
               >
             </div>
 
-            <div v-if="store.storageTotal > 0" class="h-4 w-px bg-theme-secondary"></div>
+            <div class="h-4 w-px bg-theme-secondary shrink-0"></div>
 
-            <div class="flex items-center gap-2 min-w-[140px]">
-              <Cpu :size="14" class="text-accent-emerald shrink-0" />
-              <span class="text-[10px] text-theme-secondary w-7">CPU</span>
-              <div class="flex-1 progress-bar-track">
+            <div class="flex items-center gap-1.5 flex-1 min-w-0">
+              <Cpu :size="12" class="text-accent-emerald shrink-0" />
+              <span class="text-[10px] text-theme-secondary w-7 shrink-0">CPU</span>
+              <div class="flex-1 progress-bar-track min-w-0">
                 <div class="progress-bar-fill" :style="{ width: store.cpuUsage + '%' }"></div>
               </div>
-              <span class="text-[10px] text-theme-secondary w-8 text-right"
+              <span class="text-[10px] text-theme-secondary whitespace-nowrap"
                 >{{ store.cpuUsage.toFixed(0) }}%</span
               >
             </div>
+          </div>
+
+          <!-- Fallback: CPU only (when no RAM/Storage data) -->
+          <div v-else class="flex items-center gap-2 mt-1.5">
+            <Cpu :size="14" class="text-accent-emerald shrink-0" />
+            <span class="text-[10px] text-theme-secondary w-7">CPU</span>
+            <div class="flex-1 progress-bar-track">
+              <div class="progress-bar-fill" :style="{ width: store.cpuUsage + '%' }"></div>
+            </div>
+            <span class="text-[10px] text-theme-secondary w-8 text-right"
+              >{{ store.cpuUsage.toFixed(0) }}%</span
+            >
           </div>
         </div>
 
