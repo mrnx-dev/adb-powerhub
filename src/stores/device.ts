@@ -56,6 +56,9 @@ export const useDeviceStore = defineStore('device', () => {
   const layoutBoundsEnabled = ref(false);
   const stayAwakeEnabled = ref(false);
   const brightness = ref(128);
+  const physicalDensity = ref(0);
+  const currentDensity = ref(0);
+  const densityOverride = ref<number | null>(null);
   const textInput = ref('');
   const showRebootMenu = ref(false);
 
@@ -103,6 +106,9 @@ export const useDeviceStore = defineStore('device', () => {
     model.value = '—';
     androidVersion.value = '—';
     sdkVersion.value = '—';
+    physicalDensity.value = 0;
+    currentDensity.value = 0;
+    densityOverride.value = null;
   }
 
   async function onConnected(deviceIdStr: string, method: 'manual' | 'wifi' | 'pairing') {
@@ -572,6 +578,9 @@ export const useDeviceStore = defineStore('device', () => {
         layout_bounds: boolean;
         stay_awake: boolean;
         brightness: number;
+        density: number;
+        density_override: number | null;
+        density_physical: number;
       }>('adb_sync_toggles');
       wifiEnabled.value = toggles.wifi;
       dataEnabled.value = toggles.data;
@@ -581,6 +590,9 @@ export const useDeviceStore = defineStore('device', () => {
       layoutBoundsEnabled.value = toggles.layout_bounds;
       stayAwakeEnabled.value = toggles.stay_awake;
       brightness.value = toggles.brightness;
+      currentDensity.value = toggles.density;
+      densityOverride.value = toggles.density_override;
+      physicalDensity.value = toggles.density_physical;
     } catch {
       // Silently fail — toggles default to false
     }
@@ -710,6 +722,32 @@ export const useDeviceStore = defineStore('device', () => {
       await invoke('adb_set_brightness', { value: clamped });
     } catch (e) {
       addLog(String(e), 'error');
+    }
+  }
+
+  async function setDensity(val: number) {
+    const clamped = Math.max(120, Math.min(640, val));
+    currentDensity.value = clamped;
+    try {
+      await invoke('adb_set_density', { value: clamped });
+      addLog(`Density set to ${clamped} dpi`, 'success');
+      toast.show(`Density set to ${clamped} dpi`, 'success');
+    } catch (e) {
+      addLog(String(e), 'error');
+      toast.show('Failed to set density', 'error');
+    }
+  }
+
+  async function resetDensity() {
+    try {
+      await invoke('adb_reset_density');
+      currentDensity.value = physicalDensity.value;
+      densityOverride.value = null;
+      addLog(`Density reset to ${physicalDensity.value} dpi`, 'success');
+      toast.show(`Density reset to ${physicalDensity.value} dpi`, 'success');
+    } catch (e) {
+      addLog(String(e), 'error');
+      toast.show('Failed to reset density', 'error');
     }
   }
 
@@ -900,6 +938,9 @@ export const useDeviceStore = defineStore('device', () => {
     layoutBoundsEnabled,
     stayAwakeEnabled,
     brightness,
+    physicalDensity,
+    currentDensity,
+    densityOverride,
     textInput,
     showRebootMenu,
     addLog,
@@ -937,6 +978,8 @@ export const useDeviceStore = defineStore('device', () => {
     pressNext,
     sendText,
     setBrightness,
+    setDensity,
+    resetDensity,
     rebootDevice,
     rebootRecovery,
     rebootBootloader,

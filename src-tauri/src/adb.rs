@@ -858,6 +858,9 @@ pub struct ToggleStates {
     pub layout_bounds: bool,
     pub stay_awake: bool,
     pub brightness: i32,
+    pub density: i32,
+    pub density_override: Option<i32>,
+    pub density_physical: i32,
 }
 
 fn parse_bool(output: &str) -> bool {
@@ -881,6 +884,29 @@ pub fn adb_sync_toggles(state: State<AppState>) -> Result<ToggleStates, String> 
     let brightness_output = run_adb_cmd_with_device(&adb, s, &["shell", "settings", "get", "system", "screen_brightness"]).unwrap_or_default();
     let brightness_val: i32 = brightness_output.trim().parse().unwrap_or(128).clamp(0, 255);
 
+    let density_output = run_adb_cmd_with_device(&adb, s, &["shell", "wm", "density"]).unwrap_or_default();
+    let mut density_physical: i32 = 0;
+    let mut density_override: Option<i32> = None;
+    for line in density_output.lines() {
+        let line = line.trim();
+        if line.starts_with("Physical density:") {
+            density_physical = line.split(':').nth(1)
+                .unwrap_or("0").trim()
+                .parse().unwrap_or(0);
+        } else if line.starts_with("Override density:") {
+            density_override = Some(
+                line.split(':').nth(1)
+                    .unwrap_or("0").trim()
+                    .parse().unwrap_or(0)
+            );
+        }
+    }
+    if density_physical == 0 {
+        let prop = run_adb_cmd_with_device(&adb, s, &["shell", "getprop", "ro.sf.lcd_density"]).unwrap_or_default();
+        density_physical = prop.trim().parse().unwrap_or(0);
+    }
+    let density_current = density_override.unwrap_or(density_physical);
+
     Ok(ToggleStates {
         wifi: parse_bool(&wifi_output),
         data: parse_bool(&data_output),
@@ -890,6 +916,9 @@ pub fn adb_sync_toggles(state: State<AppState>) -> Result<ToggleStates, String> 
         layout_bounds: parse_bool(&layout_output),
         stay_awake: parse_bool(&awake_output),
         brightness: brightness_val,
+        density: density_current,
+        density_override: density_override,
+        density_physical: density_physical,
     })
 }
 
@@ -899,6 +928,73 @@ pub fn adb_rotate(state: State<AppState>) -> Result<String, String> {
     let serial = get_device_serial(&state);
     let _ = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "settings", "put", "system", "accelerometer_rotation", "0"]);
     run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "input", "keyevent", "276"])
+}
+
+// ─── Density Commands ───────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DensityInfo {
+    pub physical: i32,
+    pub override_density: Option<i32>,
+    pub current: i32,
+}
+
+#[tauri::command]
+pub fn adb_get_density(state: State<AppState>) -> Result<DensityInfo, String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+
+    let output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "wm", "density"])?;
+
+    let mut physical: i32 = 0;
+    let mut override_density: Option<i32> = None;
+
+    for line in output.lines() {
+        let line = line.trim();
+        if line.starts_with("Physical density:") {
+            physical = line.split(':').nth(1)
+                .unwrap_or("0").trim()
+                .parse().unwrap_or(0);
+        } else if line.starts_with("Override density:") {
+            override_density = Some(
+                line.split(':').nth(1)
+                    .unwrap_or("0").trim()
+                    .parse().unwrap_or(0)
+            );
+        }
+    }
+
+    // R1 Mitigation: fallback to getprop if wm density returns nothing
+    if physical == 0 {
+        let prop = run_adb_cmd_with_device(&adb, serial.as_deref(),
+            &["shell", "getprop", "ro.sf.lcd_density"])
+            .unwrap_or_default();
+        physical = prop.trim().parse().unwrap_or(0);
+    }
+
+    let current = override_density.unwrap_or(physical);
+
+    Ok(DensityInfo {
+        physical,
+        override_density,
+        current,
+    })
+}
+
+#[tauri::command]
+pub fn adb_set_density(state: State<AppState>, value: i32) -> Result<String, String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+    let clamped = value.clamp(120, 640);
+    let val_str = clamped.to_string();
+    run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "wm", "density", &val_str])
+}
+
+#[tauri::command]
+pub fn adb_reset_density(state: State<AppState>) -> Result<String, String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+    run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "wm", "density", "reset"])
 }
 
 fn chrono_or_simple_timestamp() -> String {

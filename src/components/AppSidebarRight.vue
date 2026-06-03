@@ -8,6 +8,7 @@ import {
   Pointer,
   LayoutGrid,
   Sun,
+  Scaling,
   Home,
   ArrowLeft,
   History,
@@ -365,6 +366,33 @@ watch(
             @change="store.setBrightness(store.brightness)"
           />
           <span class="text-[10px] text-theme-muted w-6 text-right">{{ store.brightness }}</span>
+        </div>
+
+        <div
+          class="flex items-center gap-2 mt-3"
+          :class="{ 'opacity-40 pointer-events-none': !store.connected || !store.currentDensity }"
+        >
+          <Scaling :size="14" class="opacity-70 shrink-0" />
+          <input
+            v-model.number="store.currentDensity"
+            type="range"
+            min="120"
+            max="640"
+            step="10"
+            class="flex-1 accent-theme cursor-pointer min-w-0"
+            @change="store.setDensity(store.currentDensity)"
+          />
+          <span class="text-[10px] text-theme-muted w-8 text-right">{{
+            store.currentDensity || '—'
+          }}</span>
+          <button
+            v-if="store.densityOverride !== null"
+            class="btn-pressable text-[10px] px-1.5 py-0.5 rounded bg-theme-btn border border-theme-tertiary hover-accent transition-all whitespace-nowrap"
+            title="Reset to factory density"
+            @click="store.resetDensity()"
+          >
+            Reset
+          </button>
         </div>
       </div>
 
