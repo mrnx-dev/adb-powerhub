@@ -56,7 +56,7 @@ async function clearBuffer() {
 
     <!-- Refresh / Reconnect -->
     <button
-      class="btn-pressable px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-btn border border-theme-tertiary text-theme-secondary hover-accent"
+      class="btn-pressable flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-btn border border-theme-tertiary text-theme-secondary hover-accent"
       :disabled="!deviceStore.connected || store.restarting"
       :class="{ 'opacity-40 cursor-not-allowed': !deviceStore.connected || store.restarting }"
       @click="store.requestRestart()"
