@@ -997,6 +997,165 @@ pub fn adb_reset_density(state: State<AppState>) -> Result<String, String> {
     run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "wm", "density", "reset"])
 }
 
+
+// ─── Clipboard Sync Commands ──────────────────────────────────
+
+#[tauri::command]
+pub fn adb_clipboard_to_device(state: State<AppState>, text: String) -> Result<String, String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+    let s = serial.as_deref();
+
+    // Truncate to 2000 chars (R4: max length safety)
+    let text: String = text.chars().take(2000).collect();
+    if text.is_empty() {
+        return Err("Clipboard is empty".to_string());
+    }
+
+    // Strategy 1: Set clipboard via broadcast (Android 10+)
+    let result = run_adb_cmd_with_device(&adb, s, &[
+        "shell", "am", "broadcast", "-a",
+        "com.android.intent.action.SET_CLIPBOARD",
+        "--es", "text", &text,
+    ]);
+
+    if let Ok(output) = result {
+        if output.contains("Broadcast completed") || output.contains("result=0") || output.contains("BroadcastQueue") {
+            let preview = truncate_str(&text, 30);
+            return Ok(format!("Clipboard set: {}...", preview));
+        }
+    }
+
+    // Strategy 2: Fallback to input text (types into focused field)
+    let encoded = encode_adb_text(&text);
+    run_adb_cmd_with_device(&adb, s, &["shell", "input", "text", &encoded])
+}
+
+fn truncate_str(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let truncated: String = s.chars().take(max_len).collect();
+        format!("{}...", truncated)
+    }
+}
+
+#[tauri::command]
+pub fn adb_clipboard_from_device(state: State<AppState>) -> Result<String, String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+
+    let output = run_adb_cmd_with_device(&adb, serial.as_deref(),
+        &["shell", "service", "call", "clipboard", "1"])?;
+
+    parse_clipboard_parcel(&output)
+}
+
+fn parse_clipboard_parcel(output: &str) -> Result<String, String> {
+    // Strategy 1: Look for text in single quotes (some Android versions)
+    if let Some(text) = extract_quoted_text(output) {
+        if !text.is_empty() {
+            return Ok(text);
+        }
+    }
+
+    // Strategy 2: Parse hex words as UTF-16LE
+    if let Some(text) = extract_utf16le_text(output) {
+        if !text.is_empty() {
+            return Ok(text);
+        }
+    }
+
+    // Strategy 3: Parse hex as UTF-8
+    if let Some(text) = extract_utf8_hex_text(output) {
+        if !text.is_empty() {
+            return Ok(text);
+        }
+    }
+
+    // Empty clipboard indicator
+    if output.contains("00000000 00000000") {
+        return Ok(String::new());
+    }
+
+    Err("Could not parse device clipboard".to_string())
+}
+
+fn extract_quoted_text(output: &str) -> Option<String> {
+    let re = Regex::new(r"'([^']{1,500})'").ok()?;
+    for cap in re.captures_iter(output) {
+        let text = cap.get(1)?.as_str();
+        if !text.is_empty() && text.chars().any(|c| c.is_alphabetic() || c.is_numeric()) {
+            return Some(text.to_string());
+        }
+    }
+    None
+}
+
+fn extract_utf16le_text(output: &str) -> Option<String> {
+    // Extract 8-hex-digit words from Parcel output
+    let re = Regex::new(r"[0-9a-fA-F]{8}").ok()?;
+    let hex_words: Vec<&str> = re.find_iter(output).map(|m| m.as_str()).collect();
+
+    let mut u16_values = Vec::new();
+    for word in hex_words.iter().skip(2) {
+        if let Ok(val) = u32::from_str_radix(word, 16) {
+            // Each 8-hex-digit word is two u16 values in little-endian order
+            let lo = (val & 0xFFFF) as u16;
+            let hi = ((val >> 16) & 0xFFFF) as u16;
+
+            // Check if lo looks like a printable UTF-16LE char (common ASCII range)
+            if lo >= 0x20 && lo < 0xD800 {
+                u16_values.push(lo);
+                if hi >= 0x20 && hi < 0xD800 {
+                    u16_values.push(hi);
+                }
+            }
+        }
+    }
+
+    if u16_values.is_empty() {
+        return None;
+    }
+
+    String::from_utf16(&u16_values).ok().filter(|s| {
+        !s.is_empty() && s.chars().any(|c| c.is_alphabetic())
+    })
+}
+
+fn extract_utf8_hex_text(output: &str) -> Option<String> {
+    // Find continuous hex sequences that decode to valid UTF-8
+    let re = Regex::new(r"[0-9a-fA-F]{4,}").ok()?;
+    let mut best: Option<String> = None;
+    let mut best_len = 0;
+
+    for m in re.find_iter(output) {
+        let hex = m.as_str();
+        if hex.len() < 8 || hex.len() % 2 != 0 { continue; }
+
+        let mut bytes = Vec::with_capacity(hex.len() / 2);
+        let hex_bytes = hex.as_bytes();
+        let mut i = 0;
+        while i + 1 < hex_bytes.len() {
+            if let Ok(byte) = u8::from_str_radix(
+                std::str::from_utf8(&hex_bytes[i..i+2]).unwrap_or(""), 16
+            ) {
+                bytes.push(byte);
+            }
+            i += 2;
+        }
+
+        if let Ok(s) = String::from_utf8(bytes) {
+            if s.len() > best_len && s.chars().any(|c| c.is_alphabetic()) {
+                best_len = s.len();
+                best = Some(s);
+            }
+        }
+    }
+
+    best
+}
+
 fn chrono_or_simple_timestamp() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()

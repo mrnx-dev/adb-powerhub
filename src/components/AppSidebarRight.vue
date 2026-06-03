@@ -9,6 +9,8 @@ import {
   LayoutGrid,
   Sun,
   Scaling,
+  ClipboardPaste,
+  ClipboardCopy,
   Home,
   ArrowLeft,
   History,
@@ -514,6 +516,30 @@ watch(
             <Image :size="16" class="opacity-70" />
             <span class="text-xs font-medium">Screenshot</span>
           </button>
+
+          <!-- Clipboard Sync -->
+          <div class="grid grid-cols-2 gap-1.5">
+            <button
+              class="btn-pressable flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              :class="{
+                'opacity-40 pointer-events-none': !store.connected || store.isClipboardBusy,
+              }"
+              @click="store.clipboardToDevice()"
+            >
+              <ClipboardPaste :size="14" class="opacity-70" />
+              <span class="text-xs font-medium">Paste</span>
+            </button>
+            <button
+              class="btn-pressable flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              :class="{
+                'opacity-40 pointer-events-none': !store.connected || store.isClipboardBusy,
+              }"
+              @click="store.clipboardFromDevice()"
+            >
+              <ClipboardCopy :size="14" class="opacity-70" />
+              <span class="text-xs font-medium">Copy</span>
+            </button>
+          </div>
 
           <div class="relative reboot-menu-container">
             <button

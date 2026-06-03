@@ -125,6 +125,8 @@ pub fn run() {
             adb_get_density,
             adb_set_density,
             adb_reset_density,
+            adb_clipboard_to_device,
+            adb_clipboard_from_device,
             write_text_file,
             settings_set_adb_path,
             settings_set_scrcpy_path,
