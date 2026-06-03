@@ -105,13 +105,13 @@ function chipClasses(mode: 'include' | 'exclude') {
         <span
           v-for="(filter, i) in store.tagFilters"
           :key="filter.value + filter.mode"
-          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border cursor-pointer select-none transition-colors"
+          class="btn-pressable inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border cursor-pointer select-none"
           :class="chipClasses(filter.mode)"
           @click="store.toggleTagMode(i)"
         >
           <span>{{ filter.mode === 'include' ? '+' : '−' }}</span>
           <span class="max-w-[100px] truncate">{{ filter.value }}</span>
-          <button class="hover:opacity-80" @click.stop="store.removeTagFilter(i)">
+          <button class="btn-pressable hover:opacity-80" @click.stop="store.removeTagFilter(i)">
             <X :size="10" />
           </button>
         </span>
@@ -128,7 +128,7 @@ function chipClasses(mode: 'include' | 'exclude') {
 
       <button
         v-if="store.tagFilters.length > 0"
-        class="text-[11px] text-theme-muted hover:text-red-400 transition-colors"
+        class="btn-pressable text-[11px] text-theme-muted hover:text-red-400"
         @click="store.clearTagFilters"
       >
         Clear

@@ -82,7 +82,7 @@ watch(
     <!-- New Logs Badge -->
     <div
       v-if="newEntriesBadge"
-      class="absolute top-2 right-1/2 translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent-emerald/15 border border-accent-emerald/30 text-accent-emerald cursor-pointer hover:bg-accent-emerald/25 transition-all"
+      class="btn-pressable absolute top-2 right-1/2 translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent-emerald/15 border border-accent-emerald/30 text-accent-emerald cursor-pointer hover:bg-accent-emerald/25"
       @click="scrollToBottom"
     >
       <Activity :size="12" /> New logs
@@ -144,14 +144,14 @@ watch(
       <div class="flex-1" />
 
       <label
-        class="flex items-center gap-1.5 cursor-pointer hover:text-theme-secondary transition-colors"
+        class="btn-pressable flex items-center gap-1.5 cursor-pointer hover:text-theme-secondary"
       >
         <input v-model="store.autoScroll" type="checkbox" class="accent-accent-emerald" />
         Auto-scroll
       </label>
 
       <button
-        class="flex items-center gap-1 hover:text-theme-secondary transition-colors"
+        class="btn-pressable flex items-center gap-1 hover:text-theme-secondary"
         @click="scrollToBottom"
       >
         <ChevronDown :size="12" /> Bottom
