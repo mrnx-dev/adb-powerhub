@@ -230,6 +230,7 @@ pub struct BatteryInfo {
     pub health: String,
     pub temperature: f32,
     pub plugged: bool,
+    pub voltage: i32,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -239,6 +240,12 @@ pub struct DeviceStats {
     pub model: String,
     pub android_version: String,
     pub sdk_version: String,
+    pub ram_total_mb: u64,
+    pub ram_available_mb: u64,
+    pub storage_total_gb: f64,
+    pub storage_used_gb: f64,
+    pub screen_width: u32,
+    pub screen_height: u32,
 }
 
 #[tauri::command]
@@ -325,6 +332,7 @@ fn battery_internal(adb: &str, serial: Option<&str>) -> Result<BatteryInfo, Stri
     let mut health = String::from("Unknown");
     let mut temperature = 0.0f32;
     let mut plugged = false;
+    let mut voltage = 0i32;
 
     for line in output.lines() {
         let line = line.trim();
@@ -346,6 +354,8 @@ fn battery_internal(adb: &str, serial: Option<&str>) -> Result<BatteryInfo, Stri
             let temp_str = line.split(':').nth(1).unwrap_or("0").trim();
             let temp_int: i32 = temp_str.parse().unwrap_or(0);
             temperature = temp_int as f32 / 10.0;
+        } else if line.starts_with("voltage:") {
+            voltage = line.split(':').nth(1).unwrap_or("0").trim().parse().unwrap_or(0);
         } else if line.starts_with("AC powered:") || line.starts_with("USB powered:") || line.starts_with("Wireless powered:") {
             if line.contains("true") {
                 plugged = true;
@@ -359,6 +369,7 @@ fn battery_internal(adb: &str, serial: Option<&str>) -> Result<BatteryInfo, Stri
         health,
         temperature,
         plugged,
+        voltage,
     })
 }
 
@@ -432,6 +443,12 @@ pub fn adb_get_device_info(state: State<AppState>) -> Result<DeviceStats, String
         model,
         android_version,
         sdk_version,
+        ram_total_mb: 0,
+        ram_available_mb: 0,
+        storage_total_gb: 0.0,
+        storage_used_gb: 0.0,
+        screen_width: 0,
+        screen_height: 0,
     })
 }
 
@@ -817,6 +834,61 @@ pub fn adb_pair(state: State<AppState>, ip: String, pair_port: u16, code: String
 }
 
 #[tauri::command]
+fn parse_meminfo(output: &str) -> (u64, u64) {
+    let mut total_mb = 0u64;
+    let mut avail_mb = 0u64;
+    for line in output.lines() {
+        let line = line.trim();
+        if line.starts_with("MemTotal:") {
+            let kb: u64 = line.split_whitespace().nth(1).unwrap_or("0").parse().unwrap_or(0);
+            total_mb = kb / 1024;
+        } else if line.starts_with("MemAvailable:") {
+            let kb: u64 = line.split_whitespace().nth(1).unwrap_or("0").parse().unwrap_or(0);
+            avail_mb = kb / 1024;
+        }
+    }
+    (total_mb, avail_mb)
+}
+
+fn parse_df_data(output: &str) -> (f64, f64) {
+    // df /data output has header line + data line
+    let lines: Vec<&str> = output.lines().collect();
+    if lines.len() < 2 {
+        return (0.0, 0.0);
+    }
+    let data_line = lines[1];
+    let parts: Vec<&str> = data_line.split_whitespace().collect();
+    if parts.len() < 3 {
+        return (0.0, 0.0);
+    }
+    let total_kb: f64 = parts[1].parse().unwrap_or(0.0);
+    let used_kb: f64 = parts[2].parse().unwrap_or(0.0);
+    let total_gb = (total_kb / 1048576.0 * 10.0).round() / 10.0;
+    let used_gb = (used_kb / 1048576.0 * 10.0).round() / 10.0;
+    (total_gb, used_gb)
+}
+
+fn parse_wm_size(output: &str) -> (u32, u32) {
+    for line in output.lines() {
+        let line = line.trim();
+        if line.starts_with("Physical size:") {
+            let size_str = line.split(':').nth(1).unwrap_or("").trim();
+            for sep in &['x', 'X'] {
+                let dims: Vec<&str> = size_str.split(*sep).collect();
+                if dims.len() == 2 {
+                    let w: u32 = dims[0].parse().unwrap_or(0);
+                    let h: u32 = dims[1].parse().unwrap_or(0);
+                    if w > 0 && h > 0 {
+                        return (w, h);
+                    }
+                }
+            }
+        }
+    }
+    (0, 0)
+}
+
+#[tauri::command]
 pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceStats, String> {
     let _guard = CommandGuard::acquire(&state).await?;
     let battery = adb_get_battery(state.clone())?;
@@ -839,12 +911,33 @@ pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceS
         .trim()
         .to_string();
 
+    // RAM info
+    let meminfo_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "cat", "/proc/meminfo"])
+        .unwrap_or_default();
+    let (ram_total_mb, ram_available_mb) = parse_meminfo(&meminfo_output);
+
+    // Storage info
+    let df_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "df", "/data"])
+        .unwrap_or_default();
+    let (storage_total_gb, storage_used_gb) = parse_df_data(&df_output);
+
+    // Screen resolution
+    let wm_size_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "wm", "size"])
+        .unwrap_or_default();
+    let (screen_width, screen_height) = parse_wm_size(&wm_size_output);
+
     Ok(DeviceStats {
         battery,
         cpu_usage: cpu,
         model,
         android_version,
         sdk_version,
+        ram_total_mb,
+        ram_available_mb,
+        storage_total_gb,
+        storage_used_gb,
+        screen_width,
+        screen_height,
     })
 }
 

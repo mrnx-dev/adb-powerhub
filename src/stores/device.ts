@@ -39,6 +39,14 @@ export const useDeviceStore = defineStore('device', () => {
   const logs = ref<string[]>([]);
   const commandInput = ref('');
 
+  const ramTotal = ref(0);
+  const ramAvailable = ref(0);
+  const storageTotal = ref(0);
+  const storageUsed = ref(0);
+  const screenWidth = ref(0);
+  const screenHeight = ref(0);
+  const batteryVoltage = ref(0);
+
   const scrcpyAvailable = ref(false);
   const scrcpyPath = ref<string | null>(null);
   const mirroring = ref(false);
@@ -81,6 +89,31 @@ export const useDeviceStore = defineStore('device', () => {
     return 'text-color-error';
   });
 
+  const ramUsedGb = computed(() => {
+    if (ramTotal.value === 0) return 0;
+    const used = ramTotal.value - ramAvailable.value;
+    return Math.round((used / 1024) * 10) / 10;
+  });
+
+  const ramTotalGb = computed(() => Math.round((ramTotal.value / 1024) * 10) / 10);
+
+  const ramPercent = computed(() => {
+    if (ramTotal.value === 0) return 0;
+    return Math.round(((ramTotal.value - ramAvailable.value) / ramTotal.value) * 100);
+  });
+
+  const storagePercent = computed(() => {
+    if (storageTotal.value === 0) return 0;
+    return Math.round((storageUsed.value / storageTotal.value) * 100);
+  });
+
+  const screenResolution = computed(() => {
+    if (screenWidth.value > 0 && screenHeight.value > 0) {
+      return `${screenWidth.value}×${screenHeight.value}`;
+    }
+    return '';
+  });
+
   const MAX_LOG_LENGTH = 500;
 
   function addLog(message: string, type: 'info' | 'error' | 'success' = 'info') {
@@ -109,6 +142,13 @@ export const useDeviceStore = defineStore('device', () => {
     physicalDensity.value = 0;
     currentDensity.value = 0;
     densityOverride.value = null;
+    ramTotal.value = 0;
+    ramAvailable.value = 0;
+    storageTotal.value = 0;
+    storageUsed.value = 0;
+    screenWidth.value = 0;
+    screenHeight.value = 0;
+    batteryVoltage.value = 0;
   }
 
   async function onConnected(deviceIdStr: string, method: 'manual' | 'wifi' | 'pairing') {
@@ -443,11 +483,18 @@ export const useDeviceStore = defineStore('device', () => {
           health: string;
           temperature: number;
           plugged: boolean;
+          voltage: number;
         };
         cpu_usage: number;
         model: string;
         android_version: string;
         sdk_version: string;
+        ram_total_mb: number;
+        ram_available_mb: number;
+        storage_total_gb: number;
+        storage_used_gb: number;
+        screen_width: number;
+        screen_height: number;
       }>('adb_poll_device_stats');
 
       batteryLevel.value = stats.battery.level;
@@ -455,10 +502,17 @@ export const useDeviceStore = defineStore('device', () => {
       batteryHealth.value = stats.battery.health;
       batteryTemp.value = stats.battery.temperature;
       batteryPlugged.value = stats.battery.plugged;
+      batteryVoltage.value = stats.battery.voltage;
       cpuUsage.value = stats.cpu_usage;
       model.value = stats.model || '—';
       androidVersion.value = stats.android_version || '—';
       sdkVersion.value = stats.sdk_version || '—';
+      ramTotal.value = stats.ram_total_mb;
+      ramAvailable.value = stats.ram_available_mb;
+      storageTotal.value = stats.storage_total_gb;
+      storageUsed.value = stats.storage_used_gb;
+      screenWidth.value = stats.screen_width;
+      screenHeight.value = stats.screen_height;
       pollFailCount = 0;
       pollCount++;
       if (pollCount % 5 === 0) {
@@ -996,6 +1050,18 @@ export const useDeviceStore = defineStore('device', () => {
     physicalDensity,
     currentDensity,
     densityOverride,
+    ramTotal,
+    ramAvailable,
+    ramUsedGb,
+    ramTotalGb,
+    ramPercent,
+    storageTotal,
+    storageUsed,
+    storagePercent,
+    screenWidth,
+    screenHeight,
+    screenResolution,
+    batteryVoltage,
     textInput,
     showRebootMenu,
     addLog,

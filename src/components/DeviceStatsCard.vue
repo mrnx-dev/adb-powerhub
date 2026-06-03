@@ -2,7 +2,18 @@
 import { useDeviceStore } from '../stores/device';
 import { useNavigationStore } from '../stores/navigation';
 import { useDropdownRegistry } from '../composables/useDropdownRegistry';
-import { Smartphone, Battery, Cpu, Zap, ChevronDown, RefreshCw, Unplug } from '@lucide/vue';
+import {
+  Smartphone,
+  Battery,
+  Cpu,
+  Zap,
+  ChevronDown,
+  RefreshCw,
+  Unplug,
+  HardDrive,
+  MemoryStick,
+  Thermometer,
+} from '@lucide/vue';
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 
 const store = useDeviceStore();
@@ -131,6 +142,9 @@ function handleDisconnect() {
               <span class="text-xs font-semibold text-theme-primary">{{ store.model }}</span>
               <span class="text-[10px] text-theme-muted">Android {{ store.androidVersion }}</span>
               <span class="text-[10px] text-theme-muted">SDK {{ store.sdkVersion }}</span>
+              <span v-if="store.screenResolution" class="text-[10px] text-theme-muted">{{
+                store.screenResolution
+              }}</span>
             </div>
 
             <div class="h-4 w-px bg-theme-secondary"></div>
@@ -143,9 +157,49 @@ function handleDisconnect() {
               />
               <span class="text-sm font-bold leading-none">{{ store.batteryLevel }}%</span>
               <span class="text-[10px]" :class="store.batteryColor">{{ store.batteryStatus }}</span>
+              <template v-if="store.batteryTemp > 0 || store.batteryVoltage > 0">
+                <span class="text-[10px] text-theme-muted">·</span>
+                <Thermometer
+                  v-if="store.batteryTemp > 0"
+                  :size="11"
+                  class="text-theme-muted shrink-0"
+                />
+                <span v-if="store.batteryTemp > 0" class="text-[10px] text-theme-muted"
+                  >{{ store.batteryTemp.toFixed(1) }}°C</span
+                >
+                <span v-if="store.batteryVoltage > 0" class="text-[10px] text-theme-muted"
+                  >{{ (store.batteryVoltage / 1000).toFixed(1) }}V</span
+                >
+              </template>
             </div>
 
             <div class="h-4 w-px bg-theme-secondary"></div>
+
+            <div v-if="store.ramTotal > 0" class="flex items-center gap-2 min-w-[140px]">
+              <MemoryStick :size="14" class="text-accent-emerald shrink-0" />
+              <span class="text-[10px] text-theme-secondary w-7">RAM</span>
+              <div class="flex-1 progress-bar-track">
+                <div class="progress-bar-fill" :style="{ width: store.ramPercent + '%' }"></div>
+              </div>
+              <span class="text-[10px] text-theme-secondary w-16 text-right"
+                >{{ store.ramUsedGb }} / {{ store.ramTotalGb }} GB</span
+              >
+            </div>
+
+            <div v-if="store.ramTotal > 0" class="h-4 w-px bg-theme-secondary"></div>
+
+            <div v-if="store.storageTotal > 0" class="flex items-center gap-2 min-w-[140px]">
+              <HardDrive :size="14" class="text-accent-emerald shrink-0" />
+              <span class="text-[10px] text-theme-secondary w-7">Disk</span>
+              <div class="flex-1 progress-bar-track">
+                <div class="progress-bar-fill" :style="{ width: store.storagePercent + '%' }"></div>
+              </div>
+              <span class="text-[10px] text-theme-secondary w-16 text-right"
+                >{{ store.storageUsed }} / {{ store.storageTotal }} GB</span
+              >
+            </div>
+
+            <div v-if="store.storageTotal > 0" class="h-4 w-px bg-theme-secondary"></div>
 
             <div class="flex items-center gap-2 min-w-[140px]">
               <Cpu :size="14" class="text-accent-emerald shrink-0" />
