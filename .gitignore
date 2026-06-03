@@ -13,3 +13,7 @@ miko.bat
 miko.ps1 
 skills/ 
 .miko/ 
+
+# Windows CMD artifacts (e.g. `echo done > nul`)
+nul
+*.lnk

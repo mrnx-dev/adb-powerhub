@@ -1,0 +1,88 @@
+# Auto detect text files, normalize line endings to LF on commit
+# https://git-scm.com/docs/gitattributes
+* text=auto eol=lf
+
+# Explicitly declare binary files to prevent line-ending mangling
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.bmp binary
+*.tiff binary
+
+# Vector graphics (treat as text for diff purposes, but keep LF)
+*.svg text eol=lf
+
+# Fonts
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+
+# Audio / Video
+*.mp3 binary
+*.mp4 binary
+*.wav binary
+*.ogg binary
+*.webm binary
+
+# Archives / Compressed
+*.zip binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.7z binary
+*.rar binary
+
+# Documents
+*.pdf binary
+
+# Executables / Native
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.wasm binary
+
+# Tauri platform-specific (lock + native)
+src-tauri/target/** binary
+*.lock binary
+
+# Shell scripts and config files must stay LF (not CRLF)
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+*.ps1 text eol=lf
+*.bat text eol=lf
+*.cmd text eol=lf
+
+# Web/JS/TS source — text LF
+*.js text eol=lf
+*.cjs text eol=lf
+*.mjs text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.jsx text eol=lf
+*.vue text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.sass text eol=lf
+*.less text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.xml text eol=lf
+*.md text eol=lf
+*.mdx text eol=lf
+
+# Rust
+*.rs text eol=lf
+*.toml text eol=lf
+Cargo.lock text eol=lf linguist-generated=true
