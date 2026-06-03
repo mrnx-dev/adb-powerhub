@@ -66,6 +66,7 @@ fn kill_process_tree(pid: u32) {
     #[cfg(windows)]
     {
         let _ = Command::new("taskkill")
+            .creation_flags(0x08000000)
             .args(["/F", "/T", "/PID", &pid.to_string()])
             .output();
     }

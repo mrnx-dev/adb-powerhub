@@ -2,6 +2,14 @@ use serde::Serialize;
 use std::process::Command;
 use tauri::{Emitter, State};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// Windows `CREATE_NO_WINDOW` flag — prevents child processes from
+/// spawning a visible console window.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 use crate::AppState;
 
 #[derive(Serialize, Clone)]
@@ -37,6 +45,26 @@ pub fn adb_find_scrcpy(state: State<AppState>) -> Result<ScrcpyStatus, String> {
         available: found.is_some(),
         path: found,
     })
+}
+
+/// Helper to run a `Command` with `CREATE_NO_WINDOW` on Windows.
+/// On non-Windows platforms this is a no-op.
+trait NoWindowSpawn {
+    fn no_window(&mut self) -> &mut Self;
+}
+
+#[cfg(windows)]
+impl NoWindowSpawn for Command {
+    fn no_window(&mut self) -> &mut Self {
+        self.creation_flags(CREATE_NO_WINDOW)
+    }
+}
+
+#[cfg(not(windows))]
+impl NoWindowSpawn for Command {
+    fn no_window(&mut self) -> &mut Self {
+        self
+    }
 }
 
 #[tauri::command]
@@ -123,6 +151,7 @@ pub fn adb_launch_scrcpy(
     }
 
     let mut child = cmd
+        .no_window()
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()
@@ -155,6 +184,7 @@ pub async fn adb_stop_scrcpy(state: State<'_, AppState>) -> Result<String, Strin
         #[cfg(windows)]
         {
             let _ = Command::new("taskkill")
+                .no_window()
                 .args(["/PID", &pid.to_string()])
                 .output();
         }
@@ -177,6 +207,7 @@ pub async fn adb_stop_scrcpy(state: State<'_, AppState>) -> Result<String, Strin
         #[cfg(windows)]
         {
             let _ = Command::new("taskkill")
+                .no_window()
                 .args(["/PID", &pid.to_string(), "/F"])
                 .output();
         }
@@ -204,6 +235,7 @@ fn is_process_alive(pid: u32) -> bool {
     #[cfg(windows)]
     {
         let output = Command::new("tasklist")
+            .no_window()
             .args(["/FI", &format!("PID eq {}", pid), "/NH"])
             .output();
         match output {

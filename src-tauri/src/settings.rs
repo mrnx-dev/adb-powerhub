@@ -5,6 +5,30 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::Ordering;
 use tauri::{Emitter, Manager, State};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+trait NoWindowSpawn {
+    fn no_window(&mut self) -> &mut Self;
+}
+
+#[cfg(windows)]
+impl NoWindowSpawn for Command {
+    fn no_window(&mut self) -> &mut Self {
+        self.creation_flags(CREATE_NO_WINDOW)
+    }
+}
+
+#[cfg(not(windows))]
+impl NoWindowSpawn for Command {
+    fn no_window(&mut self) -> &mut Self {
+        self
+    }
+}
+
 use crate::AppState;
 
 #[derive(Serialize, Clone)]
@@ -48,6 +72,7 @@ pub fn settings_validate_adb(path: String) -> Result<ValidationResult, String> {
         return Err("ADB path is empty".to_string());
     }
     let output = Command::new(&path)
+        .no_window()
         .arg("version")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -81,6 +106,7 @@ pub fn settings_validate_scrcpy(path: String) -> Result<ValidationResult, String
         return Err("scrcpy path is empty".to_string());
     }
     let output = Command::new(&path)
+        .no_window()
         .arg("--version")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -300,6 +326,7 @@ pub async fn settings_download_adb(
 #[tauri::command]
 pub fn settings_get_adb_version(path: String) -> Result<(u32, u32, u32), String> {
     let output = Command::new(&path)
+        .no_window()
         .arg("version")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
