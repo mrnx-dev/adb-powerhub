@@ -205,26 +205,5 @@ async function applyAdbPath() {
         </button>
       </div>
     </div>
-
-    <!-- Auto-detect toggle -->
-    <div class="mt-6 pt-4 border-t border-theme-tertiary">
-      <div class="flex items-center justify-between">
-        <div>
-          <span class="text-sm">Auto-detect binaries on launch</span>
-          <p class="text-[10px] text-theme-muted">Scan system PATH for adb and scrcpy on startup</p>
-        </div>
-        <label class="relative inline-flex items-center cursor-pointer">
-          <input
-            v-model="store.autoDetectBinaries"
-            type="checkbox"
-            class="sr-only peer"
-            @change="store.setAutoDetectBinaries(store.autoDetectBinaries)"
-          />
-          <div
-            class="w-9 h-5 bg-theme-toggle-track rounded-full peer peer-focus:outline-none after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-4 after:w-4 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[14px] rtl:peer-checked:after:-translate-x-[14px] peer-checked:after:bg-accent-emerald peer-active:after:w-[22px]"
-          ></div>
-        </label>
-      </div>
-    </div>
   </section>
 </template>
