@@ -58,7 +58,7 @@ const pollingOptions = [1, 2, 3, 5, 10, 15, 30];
         <label class="text-sm block mb-2">Device Stats Polling Interval</label>
         <select
           v-model.number="store.pollingInterval"
-          class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50 cursor-pointer"
+          class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50 cursor-pointer hover:border-accent-emerald/30"
           @change="store.setPollingInterval(store.pollingInterval)"
         >
           <option v-for="opt in pollingOptions" :key="opt" :value="opt" class="bg-theme-card">

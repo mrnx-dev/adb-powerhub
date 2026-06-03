@@ -56,7 +56,7 @@ async function clearBuffer() {
 
     <!-- Refresh / Reconnect -->
     <button
-      class="px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-btn border border-theme-tertiary text-theme-secondary hover-accent transition-all flex items-center gap-1.5"
+      class="btn-pressable px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-btn border border-theme-tertiary text-theme-secondary hover-accent"
       :disabled="!deviceStore.connected || store.restarting"
       :class="{ 'opacity-40 cursor-not-allowed': !deviceStore.connected || store.restarting }"
       @click="store.requestRestart()"
@@ -68,7 +68,7 @@ async function clearBuffer() {
     <!-- Start (if idle/disconnected) -->
     <button
       v-if="!store.streaming && deviceStore.connected"
-      class="px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-emerald/10 border border-accent-emerald/25 text-accent-emerald hover:bg-accent-emerald/20 transition-all flex items-center gap-1.5"
+      class="btn-pressable px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-emerald/10 border border-accent-emerald/25 text-accent-emerald hover:bg-accent-emerald/20 flex items-center gap-1.5"
       @click="store.requestStart()"
     >
       <Play :size="14" /> Start
@@ -77,7 +77,7 @@ async function clearBuffer() {
     <!-- Pause / Resume -->
     <button
       v-if="store.streaming"
-      class="px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-btn border border-theme-tertiary text-theme-secondary hover-accent transition-all flex items-center gap-1.5"
+      class="btn-pressable px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-btn border border-theme-tertiary text-theme-secondary hover-accent flex items-center gap-1.5"
       @click="togglePause"
     >
       <Pause v-if="!store.paused" :size="14" />
@@ -87,7 +87,7 @@ async function clearBuffer() {
 
     <!-- Clear -->
     <button
-      class="px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-btn border border-theme-tertiary text-theme-secondary hover-accent transition-all flex items-center gap-1.5"
+      class="btn-pressable px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-btn border border-theme-tertiary text-theme-secondary hover-accent flex items-center gap-1.5"
       :disabled="store.totalCount === 0 || !deviceStore.connected"
       :class="{ 'opacity-40 cursor-not-allowed': store.totalCount === 0 || !deviceStore.connected }"
       @click="clearBuffer"
@@ -97,7 +97,7 @@ async function clearBuffer() {
 
     <!-- Export -->
     <button
-      class="px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-btn border border-theme-tertiary text-theme-secondary hover-accent transition-all flex items-center gap-1.5"
+      class="btn-pressable px-3 py-1.5 rounded-lg text-xs font-medium bg-theme-btn border border-theme-tertiary text-theme-secondary hover-accent flex items-center gap-1.5"
       :disabled="store.visibleCount === 0"
       :class="{ 'opacity-40 cursor-not-allowed': store.visibleCount === 0 }"
       @click="store.exportLogs()"

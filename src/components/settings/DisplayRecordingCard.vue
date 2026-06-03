@@ -32,7 +32,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
         <button
           v-for="preset in qualityPresets"
           :key="preset.key"
-          class="flex flex-col items-center px-3 py-3 rounded-xl border transition-all"
+          class="btn-pressable flex flex-col items-center px-3 py-3 rounded-xl border"
           :class="
             store.videoQuality === preset.key
               ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
@@ -85,7 +85,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
         <button
           v-for="fmt in formatOptions"
           :key="fmt.key"
-          class="flex items-center justify-center px-4 py-3 rounded-xl border transition-all text-sm font-semibold"
+          class="btn-pressable flex items-center justify-center px-4 py-3 rounded-xl border text-sm font-semibold"
           :class="
             store.recordingFormat === fmt.key
               ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
@@ -116,7 +116,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
           @blur="store.saveSetting('screenshotSaveDir', store.screenshotSaveDir)"
         />
         <button
-          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent transition-all"
+          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent"
           @click="store.browseScreenshotDir"
         >
           Browse
@@ -138,7 +138,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
           @blur="store.saveSetting('recordingSaveDir', store.recordingSaveDir)"
         />
         <button
-          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent transition-all"
+          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent"
           @click="store.browseRecordingDir"
         >
           Browse

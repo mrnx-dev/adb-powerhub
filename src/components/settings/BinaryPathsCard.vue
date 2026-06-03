@@ -48,7 +48,7 @@ async function applyAdbPath() {
           @blur="applyAdbPath"
         />
         <button
-          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent transition-all"
+          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent"
           @click="store.browseAdbPath"
         >
           Browse
@@ -64,7 +64,7 @@ async function applyAdbPath() {
         >
           <p class="text-xs text-color-error mb-2">✗ Download failed: {{ store.downloadError }}</p>
           <button
-            class="flex items-center gap-2 px-4 py-2 rounded-lg btn-primary text-xs font-semibold"
+            class="btn-pressable flex items-center gap-2 px-4 py-2 rounded-lg btn-primary text-xs font-semibold"
             @click="store.downloadAdb"
           >
             <RefreshCw :size="14" /> Retry Download
@@ -78,7 +78,7 @@ async function applyAdbPath() {
         >
           <p class="text-xs text-color-warning mb-2">Download cancelled</p>
           <button
-            class="flex items-center gap-2 px-4 py-2 rounded-lg btn-primary text-xs font-semibold"
+            class="btn-pressable flex items-center gap-2 px-4 py-2 rounded-lg btn-primary text-xs font-semibold"
             @click="store.downloadAdb"
           >
             <RefreshCw :size="14" /> Retry Download
@@ -89,7 +89,7 @@ async function applyAdbPath() {
         <div v-else class="bg-color-warning-container border border-color-warning rounded-xl p-3">
           <p class="text-xs text-color-warning mb-3">⚠ ADB not found on your system</p>
           <button
-            class="flex items-center gap-2 px-4 py-2.5 rounded-lg btn-primary text-xs font-semibold"
+            class="btn-pressable flex items-center gap-2 px-4 py-2.5 rounded-lg btn-primary text-xs font-semibold"
             @click="store.downloadAdb"
           >
             <Download :size="14" />
@@ -124,7 +124,7 @@ async function applyAdbPath() {
           ></div>
         </div>
         <button
-          class="flex items-center gap-2 px-4 py-2 rounded-lg bg-color-error-container border border-color-error text-color-error text-xs font-semibold hover:bg-color-error-container transition-colors"
+          class="btn-pressable flex items-center gap-2 px-4 py-2 rounded-lg bg-color-error-container border border-color-error text-color-error text-xs font-semibold hover:bg-color-error-container"
           @click="store.cancelDownload"
         >
           <XCircle :size="14" /> Cancel Download
@@ -134,7 +134,7 @@ async function applyAdbPath() {
       <!-- Update button (when adb found) -->
       <div v-if="store.adbValid && !store.downloading" class="mt-3">
         <button
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-secondary text-xs text-theme-secondary hover-accent transition-all"
+          class="btn-pressable flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-secondary text-xs text-theme-secondary hover-accent"
           @click="store.downloadAdb"
         >
           <Download :size="12" /> Update ADB
@@ -162,7 +162,7 @@ async function applyAdbPath() {
           "
         />
         <button
-          class="px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent transition-all"
+          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent"
           @click="store.browseScrcpyPath"
         >
           Browse
@@ -176,7 +176,7 @@ async function applyAdbPath() {
       >
         <p class="text-xs text-color-warning mb-3">⚠ Scrcpy not found</p>
         <button
-          class="flex items-center gap-2 px-4 py-2.5 rounded-lg btn-primary text-xs font-semibold"
+          class="btn-pressable flex items-center gap-2 px-4 py-2.5 rounded-lg btn-primary text-xs font-semibold"
           @click="store.openScrcpyLink"
         >
           <ExternalLink :size="14" />
@@ -187,7 +187,7 @@ async function applyAdbPath() {
             {{ store.downloadInfo.scrcpy_install_hint }}
           </p>
           <button
-            class="text-[10px] text-accent-emerald hover:underline"
+            class="btn-pressable text-[10px] text-accent-emerald hover:underline"
             @click="store.copyToClipboard(store.downloadInfo!.scrcpy_install_hint)"
           >
             {{ store.copiedHint ? 'Copied!' : 'Copy command' }}
@@ -198,7 +198,7 @@ async function applyAdbPath() {
       <!-- Visit link (when scrcpy found) -->
       <div v-if="store.scrcpyValid && store.downloadInfo" class="mt-3">
         <button
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-secondary text-xs text-theme-secondary hover-accent transition-all"
+          class="btn-pressable flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-secondary text-xs text-theme-secondary hover-accent"
           @click="store.openScrcpyLink"
         >
           <ExternalLink :size="12" /> Visit Scrcpy Page
