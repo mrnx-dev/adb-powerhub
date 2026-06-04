@@ -57,7 +57,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
             type="number"
             min="1"
             max="100"
-            class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
+            class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-focus"
             @change="store.setCustomBitRate(store.customBitRate)"
           />
         </div>
@@ -70,7 +70,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
             type="number"
             min="0"
             max="7680"
-            class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
+            class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-focus"
             @change="store.setCustomMaxSize(store.customMaxSize)"
           />
           <p class="text-[10px] text-theme-muted mt-1">0 = unlimited (native resolution)</p>
@@ -112,11 +112,11 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
           v-model="store.screenshotSaveDir"
           type="text"
           placeholder="Default: ~/Pictures/adb-powerhub"
-          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
+          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-focus"
           @blur="store.saveSetting('screenshotSaveDir', store.screenshotSaveDir)"
         />
         <button
-          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent"
+          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm hover-accent"
           @click="store.browseScreenshotDir"
         >
           Browse
@@ -134,11 +134,11 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
           v-model="store.recordingSaveDir"
           type="text"
           placeholder="Default: ~/Videos/adb-powerhub"
-          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
+          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-focus"
           @blur="store.saveSetting('recordingSaveDir', store.recordingSaveDir)"
         />
         <button
-          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent"
+          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm hover-accent"
           @click="store.browseRecordingDir"
         >
           Browse

@@ -80,7 +80,7 @@ async function copyLogs() {
       <div class="flex gap-2">
         <button
           :disabled="store.logs.length === 0"
-          class="flex items-center gap-1 px-3 py-1 bg-theme-btn border border-theme-secondary rounded-md text-[10px] font-medium hover-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          class="flex items-center gap-1 px-3 py-1 bg-theme-btn border border-theme-tertiary rounded-md text-[10px] font-medium hover-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           @click="copyLogs"
         >
           <Check v-if="copied" :size="10" class="text-accent-emerald" />
@@ -88,13 +88,13 @@ async function copyLogs() {
           {{ copied ? 'Copied' : 'Copy' }}
         </button>
         <button
-          class="px-3 py-1 bg-theme-btn border border-theme-secondary rounded-md text-[10px] font-medium hover-accent"
+          class="px-3 py-1 bg-theme-btn border border-theme-tertiary rounded-md text-[10px] font-medium hover-accent"
           @click="store.clearLogs"
         >
           Clear
         </button>
         <button
-          class="px-3 py-1 bg-theme-btn border border-theme-secondary rounded-md text-[10px] font-medium hover-accent"
+          class="px-3 py-1 bg-theme-btn border border-theme-tertiary rounded-md text-[10px] font-medium hover-accent"
           @click="exportLogs"
         >
           Export
@@ -126,7 +126,7 @@ async function copyLogs() {
 
     <!-- Input Area -->
     <div
-      class="bg-theme-input backdrop-blur-md border-t border-theme-secondary rounded-b-lg p-2 shrink-0 group focus-within:border-accent-50"
+      class="bg-theme-input backdrop-blur-md border-t border-theme-secondary rounded-b-lg p-2 shrink-0 group focus-within:border-accent-focus"
     >
       <div class="flex items-center gap-3">
         <span class="text-xs font-mono font-bold text-accent-emerald pl-2">$ adb</span>

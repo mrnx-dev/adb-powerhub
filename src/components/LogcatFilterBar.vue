@@ -49,8 +49,8 @@ function onActiveAppToggle(e: Event) {
 
 function chipClasses(mode: 'include' | 'exclude') {
   return mode === 'include'
-    ? 'bg-accent-10 text-accent-emerald border-accent-25'
-    : 'bg-red-500/10 text-red-400 border-red-500/25';
+    ? 'bg-accent-light text-accent-emerald border-accent-default'
+    : 'bg-color-error-container text-color-error border-color-error';
 }
 </script>
 
@@ -61,7 +61,7 @@ function chipClasses(mode: 'include' | 'exclude') {
       <label class="text-xs text-theme-muted">Level</label>
       <select
         v-model="store.filterLevel"
-        class="bg-theme-input border border-theme-tertiary rounded-md px-2 py-1 text-xs text-theme-primary focus:outline-none focus:border-accent-emerald transition-colors"
+        class="bg-theme-input border border-theme-tertiary rounded-md px-2 py-1 text-xs text-theme-primary focus:outline-none focus-border-accent transition-colors"
       >
         <option v-for="opt in levelOptions" :key="opt.value" :value="opt.value">
           {{ opt.label }}
@@ -89,7 +89,7 @@ function chipClasses(mode: 'include' | 'exclude') {
       </label>
       <span
         v-if="store.activeAppOnly"
-        class="text-[11px] px-2 py-0.5 rounded bg-accent-10 text-accent-emerald border border-accent-20 max-w-[140px] truncate"
+        class="text-[11px] px-2 py-0.5 rounded bg-accent-light text-accent-emerald border border-accent-default max-w-[140px] truncate"
         :title="store.activeAppPackage || store.activeAppPollingError || 'Detecting…'"
       >
         {{ store.activeAppPollingError ? 'Unknown' : store.activeAppPackage || 'Detecting…' }}
@@ -128,7 +128,7 @@ function chipClasses(mode: 'include' | 'exclude') {
 
       <button
         v-if="store.tagFilters.length > 0"
-        class="btn-pressable text-[11px] text-theme-muted hover:text-red-400"
+        class="btn-pressable text-[11px] text-theme-muted hover:text-color-error"
         @click="store.clearTagFilters"
       >
         Clear
@@ -142,7 +142,7 @@ function chipClasses(mode: 'include' | 'exclude') {
         v-model="localSearch"
         type="text"
         placeholder="Search logs..."
-        class="w-full bg-theme-input border border-theme-tertiary rounded-md px-2 py-1 text-xs text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-accent-emerald transition-colors"
+        class="w-full bg-theme-input border border-theme-tertiary rounded-md px-2 py-1 text-xs text-theme-primary placeholder:text-theme-muted focus:outline-none focus-border-accent transition-colors"
       />
     </div>
   </div>

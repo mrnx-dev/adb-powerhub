@@ -103,7 +103,7 @@ function handleAutoReconnectChange(val: boolean) {
               @click="themeStore.setDarkTheme(theme.id)"
             >
               <span
-                class="w-3.5 h-3.5 rounded-full shrink-0 border border-white/10"
+                class="w-3.5 h-3.5 rounded-full shrink-0 border border-theme-tertiary"
                 :style="{ backgroundColor: theme.accent }"
               />
               <span class="truncate">{{ theme.name }}</span>
@@ -126,7 +126,7 @@ function handleAutoReconnectChange(val: boolean) {
               @click="themeStore.setLightTheme(theme.id)"
             >
               <span
-                class="w-3.5 h-3.5 rounded-full shrink-0 border border-white/10"
+                class="w-3.5 h-3.5 rounded-full shrink-0 border border-theme-tertiary"
                 :style="{ backgroundColor: theme.accent }"
               />
               <span class="truncate">{{ theme.name }}</span>
@@ -153,7 +153,7 @@ function handleAutoReconnectChange(val: boolean) {
               @click="selectTheme(theme.id)"
             >
               <span
-                class="w-3.5 h-3.5 rounded-full shrink-0 border border-white/10"
+                class="w-3.5 h-3.5 rounded-full shrink-0 border border-theme-tertiary"
                 :style="{ backgroundColor: theme.accent }"
               />
               <span class="truncate">{{ theme.name }}</span>
@@ -224,7 +224,7 @@ function handleAutoReconnectChange(val: boolean) {
         <label class="text-sm block mb-2">Device Stats Polling Interval</label>
         <select
           v-model.number="store.pollingInterval"
-          class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50 cursor-pointer hover:border-accent-30"
+          class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-focus cursor-pointer hover:border-accent-strong"
           @change="store.setPollingInterval(store.pollingInterval)"
         >
           <option v-for="opt in pollingOptions" :key="opt" :value="opt" class="bg-theme-card">

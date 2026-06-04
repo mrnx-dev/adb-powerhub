@@ -13,7 +13,7 @@ const deviceStore = useDeviceStore();
     <!-- Reconnecting indicator -->
     <div
       v-if="!deviceStore.connected && deviceStore.isReconnecting"
-      class="flex items-center gap-2.5 py-2.5 px-3 rounded-lg bg-accent-10 border border-accent-20"
+      class="flex items-center gap-2.5 py-2.5 px-3 rounded-lg bg-accent-light border border-accent-default"
     >
       <Loader2 :size="14" class="text-accent-emerald animate-spin shrink-0" />
       <div class="flex-1 min-w-0">

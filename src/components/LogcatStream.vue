@@ -11,19 +11,19 @@ const newEntriesBadge = ref(false);
 function levelColorClass(level: string): string {
   switch (level) {
     case 'V':
-      return 'text-gray-400';
+      return 'text-theme-muted';
     case 'D':
-      return 'text-blue-400';
+      return 'text-color-info';
     case 'I':
       return 'text-accent-emerald';
     case 'W':
-      return 'text-amber-400';
+      return 'text-color-warning';
     case 'E':
-      return 'text-red-400';
+      return 'text-color-error';
     case 'F':
-      return 'text-pink-400';
+      return 'text-color-error';
     default:
-      return 'text-gray-400';
+      return 'text-theme-muted';
   }
 }
 
@@ -73,7 +73,7 @@ watch(
     <!-- Error / Disconnect banner -->
     <div
       v-if="store.error && (store.status === 'ERROR' || store.status === 'DISCONNECTED')"
-      class="absolute top-2 right-1/2 translate-x-1/2 z-20 flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-red-500/15 border border-red-500/30 text-red-400 max-w-[80%] text-center"
+      class="absolute top-2 right-1/2 translate-x-1/2 z-20 flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-color-error-container border border-color-error text-color-error max-w-[80%] text-center"
       @click="store.error = ''"
     >
       ⚠ {{ store.error }}
@@ -82,7 +82,7 @@ watch(
     <!-- New Logs Badge -->
     <div
       v-if="newEntriesBadge"
-      class="btn-pressable absolute top-2 right-1/2 translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent-15 border border-accent-30 text-accent-emerald cursor-pointer hover:bg-accent-25"
+      class="btn-pressable absolute top-2 right-1/2 translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent-light border border-accent-strong text-accent-emerald cursor-pointer hover:bg-accent-medium"
       @click="scrollToBottom"
     >
       <Activity :size="12" /> New logs
@@ -137,7 +137,7 @@ watch(
         {{ store.totalCount.toLocaleString() }})
       </span>
 
-      <span v-if="store.droppedCount > 0" class="text-amber-400">
+      <span v-if="store.droppedCount > 0" class="text-color-warning">
         ⚠ {{ store.droppedCount.toLocaleString() }} dropped
       </span>
 
@@ -146,7 +146,7 @@ watch(
       <label
         class="btn-pressable flex items-center gap-1.5 cursor-pointer hover:text-theme-secondary"
       >
-        <input v-model="store.autoScroll" type="checkbox" class="accent-accent-emerald" />
+        <input v-model="store.autoScroll" type="checkbox" class="accent-emerald" />
         Auto-scroll
       </label>
 

@@ -173,7 +173,7 @@ function handleBackdropClick() {
       >
         <div class="flex items-center gap-2.5">
           <div
-            class="w-8 h-8 rounded-lg bg-accent-10 border border-accent-25 flex items-center justify-center shrink-0"
+            class="w-8 h-8 rounded-lg bg-accent-light border border-accent-default flex items-center justify-center shrink-0"
           >
             <Link :size="15" class="text-accent-emerald" />
           </div>
@@ -242,7 +242,7 @@ function handleBackdropClick() {
         <div v-if="activeTab === 'auto'" class="space-y-4 pt-2">
           <div class="text-center py-6">
             <div
-              class="w-12 h-12 rounded-2xl bg-accent-10 border border-accent-25 flex items-center justify-center mx-auto mb-3"
+              class="w-12 h-12 rounded-2xl bg-accent-light border border-accent-default flex items-center justify-center mx-auto mb-3"
             >
               <Zap :size="24" class="text-accent-emerald" />
             </div>
@@ -305,7 +305,7 @@ function handleBackdropClick() {
           <!-- Connecting progress bar -->
           <div
             v-if="store.connecting"
-            class="flex items-center gap-2 py-2 px-3 rounded-md bg-accent-10 text-[11px] text-accent-emerald"
+            class="flex items-center gap-2 py-2 px-3 rounded-md bg-accent-light text-[11px] text-accent-emerald"
           >
             <Loader2 :size="14" class="animate-spin shrink-0" />
             <span>{{ statusLabel || 'Connecting...' }}</span>
@@ -314,7 +314,7 @@ function handleBackdropClick() {
           <!-- Connected state -->
           <div v-if="store.autoConnectStatus === 'connected' && store.connected" class="space-y-3">
             <div
-              class="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-accent-10 border border-accent-20"
+              class="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-accent-light border border-accent-default"
             >
               <Check :size="14" class="text-accent-emerald shrink-0" />
               <div>
@@ -397,7 +397,7 @@ function handleBackdropClick() {
           <!-- Connected state in manual tab -->
           <div v-if="store.connected" class="space-y-3 pt-2">
             <div
-              class="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-accent-10 border border-accent-20"
+              class="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-accent-light border border-accent-default"
             >
               <Check :size="14" class="text-accent-emerald shrink-0" />
               <div class="flex-1 min-w-0">
@@ -424,7 +424,7 @@ function handleBackdropClick() {
           <div
             v-for="device in savedDevices"
             :key="device.id"
-            class="flex items-start gap-3 py-3 px-3 rounded-lg border-l-3 border-accent-emerald bg-theme-hover/20 hover:bg-theme-hover/50 transition-colors"
+            class="flex items-start gap-3 py-3 px-3 rounded-lg border-l-4 border-accent-emerald bg-theme-hover/20 hover:bg-theme-hover/50 transition-colors"
           >
             <Smartphone :size="16" class="text-accent-emerald shrink-0 mt-0.5" />
             <div class="flex-1 min-w-0">

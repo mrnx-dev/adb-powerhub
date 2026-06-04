@@ -117,8 +117,8 @@ function handleDisconnect() {
     <template v-if="store.connected && store.isLoadingStats">
       <div class="flex items-center justify-between">
         <div class="space-y-3 flex-1">
-          <div class="h-2.5 bg-gray-700 rounded-full animate-pulse w-full max-w-[200px]"></div>
-          <div class="h-2.5 bg-gray-600 rounded-full animate-pulse w-full max-w-[320px]"></div>
+          <div class="h-2.5 bg-theme-btn rounded-full animate-pulse w-full max-w-[200px]"></div>
+          <div class="h-2.5 bg-theme-btn rounded-full animate-pulse w-full max-w-[320px]"></div>
         </div>
       </div>
     </template>

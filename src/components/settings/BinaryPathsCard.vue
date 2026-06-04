@@ -44,11 +44,11 @@ async function applyAdbPath() {
         <input
           v-model="store.adbPath"
           type="text"
-          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
+          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-focus"
           @blur="applyAdbPath"
         />
         <button
-          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent"
+          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm hover-accent"
           @click="store.browseAdbPath"
         >
           Browse
@@ -106,7 +106,7 @@ async function applyAdbPath() {
       <!-- ADB Download progress -->
       <div
         v-if="store.downloading === 'adb'"
-        class="mt-3 bg-theme-btn border border-theme-secondary rounded-xl p-3"
+        class="mt-3 bg-theme-btn border border-theme-tertiary rounded-xl p-3"
       >
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs text-theme-secondary"
@@ -134,7 +134,7 @@ async function applyAdbPath() {
       <!-- Update button (when adb found) -->
       <div v-if="store.adbValid && !store.downloading" class="mt-3">
         <button
-          class="btn-pressable flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-secondary text-xs text-theme-secondary hover-accent"
+          class="btn-pressable flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-tertiary text-xs text-theme-secondary hover-accent"
           @click="store.downloadAdb"
         >
           <Download :size="12" /> Update ADB
@@ -155,14 +155,14 @@ async function applyAdbPath() {
         <input
           v-model="store.scrcpyPath"
           type="text"
-          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
+          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-focus"
           @blur="
             store.saveSetting('scrcpyPath', store.scrcpyPath);
             store.validateScrcpy();
           "
         />
         <button
-          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-secondary text-sm hover-accent"
+          class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm hover-accent"
           @click="store.browseScrcpyPath"
         >
           Browse
@@ -198,7 +198,7 @@ async function applyAdbPath() {
       <!-- Visit link (when scrcpy found) -->
       <div v-if="store.scrcpyValid && store.downloadInfo" class="mt-3">
         <button
-          class="btn-pressable flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-secondary text-xs text-theme-secondary hover-accent"
+          class="btn-pressable flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-tertiary text-xs text-theme-secondary hover-accent"
           @click="store.openScrcpyLink"
         >
           <ExternalLink :size="12" /> Visit Scrcpy Page

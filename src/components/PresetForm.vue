@@ -88,10 +88,10 @@ function handleCancel() {
         v-model="name"
         type="text"
         placeholder="e.g., List Packages"
-        class="bg-theme-input border border-theme-secondary rounded-md px-2 py-1.5 text-xs text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-accent-emerald transition-colors"
+        class="bg-theme-input border border-theme-secondary rounded-md px-2 py-1.5 text-xs text-theme-primary placeholder:text-theme-muted focus:outline-none focus-border-accent transition-colors"
         @keydown.enter="handleSave"
       />
-      <span v-if="errors.name" class="text-[10px] text-red-400">{{ errors.name }}</span>
+      <span v-if="errors.name" class="text-[10px] text-color-error">{{ errors.name }}</span>
     </div>
 
     <!-- Command -->
@@ -104,16 +104,16 @@ function handleCancel() {
         v-model="command"
         type="text"
         placeholder="e.g., shell pm list packages -3"
-        class="bg-theme-input border border-theme-secondary rounded-md px-2 py-1.5 text-xs font-mono text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-accent-emerald transition-colors"
+        class="bg-theme-input border border-theme-secondary rounded-md px-2 py-1.5 text-xs font-mono text-theme-primary placeholder:text-theme-muted focus:outline-none focus-border-accent transition-colors"
         @keydown.enter="handleSave"
       />
-      <span v-if="errors.command" class="text-[10px] text-red-400">{{ errors.command }}</span>
+      <span v-if="errors.command" class="text-[10px] text-color-error">{{ errors.command }}</span>
     </div>
 
     <!-- Actions -->
     <div class="flex items-center justify-end gap-2 mt-1">
       <button
-        class="px-3 py-1.5 bg-theme-btn border border-theme-secondary rounded-md text-[10px] font-medium text-theme-secondary hover-accent transition-colors"
+        class="px-3 py-1.5 bg-theme-btn border border-theme-tertiary rounded-md text-[10px] font-medium text-theme-secondary hover-accent transition-colors"
         @click="handleCancel"
       >
         Cancel

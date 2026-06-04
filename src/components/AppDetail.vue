@@ -53,8 +53,8 @@ function copyPackageName() {
             class="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-xl font-bold"
             :class="[
               appsStore.appDetail.is_system
-                ? 'bg-amber-500/10 text-amber-500'
-                : 'bg-accent-10 text-accent-emerald',
+                ? 'bg-color-warning-container text-color-warning'
+                : 'bg-accent-light text-accent-emerald',
             ]"
           >
             {{ appsStore.appDetail.label.charAt(0) }}
@@ -65,19 +65,19 @@ function copyPackageName() {
         <div class="flex flex-wrap gap-2 mb-4">
           <span
             v-if="appsStore.appDetail.is_system"
-            class="px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-500/10 text-amber-500"
+            class="px-2 py-0.5 rounded-md text-xs font-semibold bg-color-warning-container text-color-warning"
           >
             System
           </span>
           <span
             v-if="!appsStore.appDetail.is_enabled"
-            class="px-2 py-0.5 rounded-md text-xs font-semibold bg-red-500/10 text-red-400"
+            class="px-2 py-0.5 rounded-md text-xs font-semibold bg-color-error-container text-color-error"
           >
             Disabled
           </span>
           <span
             v-if="appsStore.appDetail.is_updated_system"
-            class="px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-500/10 text-blue-400"
+            class="px-2 py-0.5 rounded-md text-xs font-semibold bg-color-info-container text-color-info"
           >
             Updated System App
           </span>
@@ -113,7 +113,7 @@ function copyPackageName() {
 
             <button
               v-if="!appsStore.appDetail.is_enabled"
-              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent-10 border border-accent-30 text-sm text-accent-emerald hover:bg-accent-20 transition-all"
+              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent-light border border-accent-strong text-sm text-accent-emerald hover:bg-accent-default transition-all"
               :disabled="appsStore.isActioning"
               @click="appsStore.enableApp(appsStore.appDetail!.package_name)"
             >
@@ -141,7 +141,7 @@ function copyPackageName() {
             </button>
 
             <button
-              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400 hover:bg-red-500/20 transition-all"
+              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-color-error-container border border-color-error text-sm text-color-error hover:bg-color-error-container transition-all"
               :disabled="appsStore.isActioning"
               @click="
                 appsStore.uninstallApp(

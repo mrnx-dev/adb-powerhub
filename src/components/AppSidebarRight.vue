@@ -185,7 +185,7 @@ watch(
         class="btn-pressable p-2.5 rounded-xl transition-all"
         :class="[
           activeSection === 'connectivity'
-            ? 'text-accent-emerald bg-accent-10'
+            ? 'text-accent-emerald bg-accent-light'
             : 'hover:bg-accent-emerald',
         ]"
         title="Connectivity"
@@ -197,7 +197,7 @@ watch(
         class="btn-pressable p-2.5 rounded-xl transition-all"
         :class="[
           activeSection === 'devTools'
-            ? 'text-accent-emerald bg-accent-10'
+            ? 'text-accent-emerald bg-accent-light'
             : 'hover:bg-accent-emerald',
         ]"
         title="Dev Tools"
@@ -209,7 +209,7 @@ watch(
         class="btn-pressable p-2.5 rounded-xl transition-all"
         :class="[
           activeSection === 'display'
-            ? 'text-accent-emerald bg-accent-10'
+            ? 'text-accent-emerald bg-accent-light'
             : 'hover:bg-accent-emerald',
         ]"
         title="Display"
@@ -221,7 +221,7 @@ watch(
         class="btn-pressable p-2.5 rounded-xl transition-all"
         :class="[
           activeSection === 'remote'
-            ? 'text-accent-emerald bg-accent-10'
+            ? 'text-accent-emerald bg-accent-light'
             : 'hover:bg-accent-emerald',
         ]"
         title="Remote Controls"
@@ -233,7 +233,7 @@ watch(
         class="btn-pressable p-2.5 rounded-xl transition-all"
         :class="[
           activeSection === 'system'
-            ? 'text-accent-emerald bg-accent-10'
+            ? 'text-accent-emerald bg-accent-light'
             : 'hover:bg-accent-emerald',
         ]"
         title="System"
@@ -517,11 +517,11 @@ watch(
               v-model="store.textInput"
               type="text"
               placeholder="Input text..."
-              class="w-full bg-theme-input border border-theme-secondary rounded-lg px-2 py-1.5 text-xs text-theme-primary focus:outline-none focus:border-accent-50 placeholder:text-theme-muted"
+              class="w-full bg-theme-input border border-theme-secondary rounded-lg px-2 py-1.5 text-xs text-theme-primary focus:outline-none focus:border-accent-focus placeholder:text-theme-muted"
               @keydown.enter="store.sendText"
             />
             <button
-              class="btn-pressable w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent-10 border border-accent-25 hover-accent transition-all text-xs font-medium group"
+              class="btn-pressable w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent-light border border-accent-default hover-accent transition-all text-xs font-medium group"
               @click="store.sendText"
             >
               <Send :size="12" class="text-accent-emerald group-hover:text-[var(--text-inverse)]" />

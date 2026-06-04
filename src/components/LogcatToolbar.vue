@@ -70,7 +70,7 @@ async function clearBuffer() {
     <!-- Start (if idle/disconnected) -->
     <button
       v-if="!store.streaming && deviceStore.connected"
-      class="btn-pressable px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-10 border border-accent-25 text-accent-emerald hover:bg-accent-20 flex items-center gap-1.5"
+      class="btn-pressable px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-light border border-accent-default text-accent-emerald hover:bg-accent-default flex items-center gap-1.5"
       @click="store.requestStart()"
     >
       <Play :size="14" /> Start
