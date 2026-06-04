@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useDeviceStore } from '../stores/device';
 import {
   Wifi,
+  Signal,
   Plane,
   Bluetooth,
   Pointer,
@@ -266,6 +267,24 @@ watch(
               />
               <div
                 class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+              ></div>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Signal :size="14" class="opacity-70" />
+              <span class="text-xs text-theme-primary">Data</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer select-none">
+              <input
+                v-model="store.dataEnabled"
+                type="checkbox"
+                class="sr-only peer"
+                @change="store.toggleData(store.dataEnabled)"
+              />
+              <div
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
