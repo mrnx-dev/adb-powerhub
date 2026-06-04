@@ -960,17 +960,27 @@ export const useDeviceStore = defineStore('device', () => {
       try {
         text = (await navigator.clipboard.readText()) as string;
       } catch {
-        toast.show('Clipboard access denied', 'error');
+        toast.show('Clipboard access denied — click inside the app first, then retry', 'error');
         return;
       }
       if (!text.trim()) {
-        toast.show('Clipboard is empty', 'error');
+        toast.show('PC clipboard is empty', 'error');
         return;
       }
-      await invoke('adb_clipboard_to_device', { text });
+      const result: string = await invoke('adb_clipboard_to_device', { text });
       const preview = text.length > 30 ? text.slice(0, 30) + '...' : text;
-      addLog(`Pasted to device: ${preview}`, 'success');
-      toast.show(`Pasted to device: ${preview}`, 'success');
+      if (result.startsWith('clipboard_set:')) {
+        // Clipboard was successfully set on the device
+        addLog(`Clipboard pasted to device: ${preview}`, 'success');
+        toast.show(`Pasted to device clipboard: ${preview}`, 'success');
+      } else if (result.startsWith('clipboard_typed:')) {
+        // Fallback: text was typed into the focused field instead
+        addLog(`Typed to device (clipboard unavailable, used input): ${preview}`, 'info');
+        toast.show(`Typed into focused field: ${preview}`, 'info');
+      } else {
+        addLog(`Pasted to device: ${preview}`, 'success');
+        toast.show(`Pasted to device: ${preview}`, 'success');
+      }
     } catch (e) {
       addLog(String(e), 'error');
       toast.show('Failed to paste to device', 'error');
@@ -984,14 +994,14 @@ export const useDeviceStore = defineStore('device', () => {
     isClipboardBusy.value = true;
     try {
       const text: string = await invoke('adb_clipboard_from_device');
-      if (!text.trim()) {
-        toast.show('Device clipboard is empty', 'info');
+      if (!text || !text.trim()) {
+        toast.show('Device clipboard is empty or could not be read', 'info');
         return;
       }
       try {
         await navigator.clipboard.writeText(text);
       } catch {
-        toast.show('Cannot write to PC clipboard', 'error');
+        toast.show('Cannot write to PC clipboard — click inside the app first, then retry', 'error');
         return;
       }
       const preview = text.length > 30 ? text.slice(0, 30) + '...' : text;
@@ -999,7 +1009,12 @@ export const useDeviceStore = defineStore('device', () => {
       toast.show(`Copied from device: ${preview}`, 'success');
     } catch (e) {
       addLog(String(e), 'error');
-      toast.show('Failed to copy from device', 'error');
+      const msg = String(e);
+      if (msg.includes('could not parse') || msg.includes('Could not parse')) {
+        toast.show('Could not read clipboard — try copying text on device first', 'error');
+      } else {
+        toast.show('Failed to copy from device', 'error');
+      }
     } finally {
       isClipboardBusy.value = false;
     }

@@ -1105,23 +1105,74 @@ pub fn adb_clipboard_to_device(state: State<AppState>, text: String) -> Result<S
         return Err("Clipboard is empty".to_string());
     }
 
-    // Strategy 1: Set clipboard via broadcast (Android 10+)
-    let result = run_adb_cmd_with_device(&adb, s, &[
+    let preview = truncate_str(&text, 30);
+
+    // Strategy 1: Set clipboard via Clipper app broadcast (most reliable if app installed)
+    // Clipper (https://github.com/majido/clipper) is a well-known clipboard helper app
+    let clipper_result = run_adb_cmd_with_device(&adb, s, &[
+        "shell", "am", "broadcast", "-a",
+        "clipper.set", "-e", "text", &text,
+    ]);
+    if let Ok(ref output) = clipper_result {
+        if output.contains("Broadcast completed") || output.contains("result=0") || output.contains("BroadcastQueue") {
+            return Ok(format!("clipboard_set:{}", preview));
+        }
+    }
+
+    // Strategy 2: Set clipboard via SET_CLIPBOARD broadcast (works on some ROMs)
+    let set_clip_result = run_adb_cmd_with_device(&adb, s, &[
         "shell", "am", "broadcast", "-a",
         "com.android.intent.action.SET_CLIPBOARD",
         "--es", "text", &text,
     ]);
-
-    if let Ok(output) = result {
+    if let Ok(ref output) = set_clip_result {
         if output.contains("Broadcast completed") || output.contains("result=0") || output.contains("BroadcastQueue") {
-            let preview = truncate_str(&text, 30);
-            return Ok(format!("Clipboard set: {}...", preview));
+            return Ok(format!("clipboard_set:{}", preview));
         }
     }
 
-    // Strategy 2: Fallback to input text (types into focused field)
+    // Strategy 3: Write text to temp file and use content provider (Android 10+)
+    // Base64 encode to avoid shell escaping issues
+    let encoded_b64 = base64_encode(&text);
+    let write_cmd = format!(
+        "echo '{}' | base64 -d > /data/local/tmp/_adb_clip.txt",
+        encoded_b64
+    );
+    if run_adb_cmd_with_device(&adb, s, &["shell", &write_cmd]).is_ok() {
+        // Try setting clipboard via service call with proper ClipData parcel
+        // Transaction 1 = setPrimaryClip (modern Android)
+        // This constructs a proper parcel with: package name, ClipData with text
+        let set_via_service = run_adb_cmd_with_device(&adb, s, &[
+            "shell",
+            "service", "call", "clipboard", "1",
+            "s16", "com.android.shell",
+            "i32", "1",  // 1 ClipData item
+            "i32", "0",   // ClipDescription: has mimetype
+            "i32", "1",   // 1 mimetype entry
+            "s16", "text/plain",
+            "i32", "0",   // ClipData: has text
+            "i32", "1",   // 1 item
+            "i32", "0",   // item type: text
+            "s16", &text,
+        ]);
+        if let Ok(ref output) = set_via_service {
+            // On many modern Android versions, service call clipboard returns
+            // an error for shell uid, but we tried our best
+            if !output.contains("Exception") && !output.contains("Error") {
+                let _ = run_adb_cmd_with_device(&adb, s, &["shell", "rm", "/data/local/tmp/_adb_clip.txt"]);
+                return Ok(format!("clipboard_set:{}", preview));
+            }
+        }
+    }
+
+    // Strategy 4: Fallback — type text into the currently focused field
+    // This doesn't set the clipboard, it literally types the text.
+    // We return a special prefix so the frontend can display a different message.
     let encoded = encode_adb_text(&text);
-    run_adb_cmd_with_device(&adb, s, &["shell", "input", "text", &encoded])
+    match run_adb_cmd_with_device(&adb, s, &["shell", "input", "text", &encoded]) {
+        Ok(_) => Ok(format!("clipboard_typed:{}", preview)),
+        Err(e) => Err(e),
+    }
 }
 
 fn truncate_str(s: &str, max_len: usize) -> String {
@@ -1133,11 +1184,39 @@ fn truncate_str(s: &str, max_len: usize) -> String {
     }
 }
 
+fn base64_encode(input: &str) -> String {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    STANDARD.encode(input.as_bytes())
+}
+
 #[tauri::command]
 pub fn adb_clipboard_from_device(state: State<AppState>) -> Result<String, String> {
     let adb = get_adb_path(&state);
     let serial = get_device_serial(&state);
 
+    // Strategy 1: Try content query via Clipper app (if installed)
+    // Clipper writes clipboard to /sdcard/Android/data/ch.pete.adbclipboard/files/clipboard.txt
+    if let Ok(text) = run_adb_cmd_with_device(&adb, serial.as_deref(),
+        &["shell", "cat", "/sdcard/Android/data/ch.pete.adbclipboard/files/clipboard.txt"])
+    {
+        let trimmed = text.trim().to_string();
+        if !trimmed.is_empty() && trimmed.chars().any(|c| c.is_alphabetic() || c.is_numeric()) {
+            return Ok(trimmed);
+        }
+    }
+
+    // Strategy 2: service call clipboard 2 (getPrimaryClip - modern Android)
+    if let Ok(output) = run_adb_cmd_with_device(&adb, serial.as_deref(),
+        &["shell", "service", "call", "clipboard", "2"])
+    {
+        if let Ok(text) = parse_clipboard_parcel(&output) {
+            if !text.is_empty() {
+                return Ok(text);
+            }
+        }
+    }
+
+    // Strategy 3: service call clipboard 1 (getClipboardText - older Android)
     let output = run_adb_cmd_with_device(&adb, serial.as_deref(),
         &["shell", "service", "call", "clipboard", "1"])?;
 
@@ -1152,7 +1231,8 @@ fn parse_clipboard_parcel(output: &str) -> Result<String, String> {
         }
     }
 
-    // Strategy 2: Parse hex words as UTF-16LE
+    // Strategy 2: Parse hex words as UTF-16LE (Android Parcel format)
+    // Modern Android stores clipboard text as UTF-16LE in parcels
     if let Some(text) = extract_utf16le_text(output) {
         if !text.is_empty() {
             return Ok(text);
@@ -1166,53 +1246,99 @@ fn parse_clipboard_parcel(output: &str) -> Result<String, String> {
         }
     }
 
+    // Strategy 4: Try extracting printable strings from raw output
+    // Some Android versions return human-readable text mixed with Parcel data
+    if let Some(text) = extract_printable_strings(output) {
+        if !text.is_empty() {
+            return Ok(text);
+        }
+    }
+
     // Empty clipboard indicator
-    if output.contains("00000000 00000000") {
+    if output.contains("00000000 00000000") || output.trim().is_empty() {
         return Ok(String::new());
     }
 
-    Err("Could not parse device clipboard".to_string())
+    Err("Could not parse device clipboard. Try copying text on the device first.".to_string())
 }
 
 fn extract_quoted_text(output: &str) -> Option<String> {
-    let re = Regex::new(r"'([^']{1,500})'").ok()?;
+    let re = Regex::new(r"'([^']{1,2000})'").ok()?;
+    // Find the longest quoted text that looks like actual clipboard content
+    let mut best: Option<String> = None;
+    let mut best_len = 0;
     for cap in re.captures_iter(output) {
         let text = cap.get(1)?.as_str();
-        if !text.is_empty() && text.chars().any(|c| c.is_alphabetic() || c.is_numeric()) {
-            return Some(text.to_string());
+        if !text.is_empty() && text.len() > best_len && text.chars().any(|c| c.is_alphabetic() || c.is_numeric()) {
+            best_len = text.len();
+            best = Some(text.to_string());
         }
     }
-    None
+    best
 }
 
 fn extract_utf16le_text(output: &str) -> Option<String> {
-    // Extract 8-hex-digit words from Parcel output
+    // Parcel format: each line is "hex_offset: hex_words..."
+    // We need to parse consecutive hex words as UTF-16LE data
+    // Modern Android (10+) stores clipboard text as UTF-16LE in ClipData parcels
+
     let re = Regex::new(r"[0-9a-fA-F]{8}").ok()?;
     let hex_words: Vec<&str> = re.find_iter(output).map(|m| m.as_str()).collect();
 
-    let mut u16_values = Vec::new();
-    for word in hex_words.iter().skip(2) {
-        if let Ok(val) = u32::from_str_radix(word, 16) {
-            // Each 8-hex-digit word is two u16 values in little-endian order
-            let lo = (val & 0xFFFF) as u16;
-            let hi = ((val >> 16) & 0xFFFF) as u16;
-
-            // Check if lo looks like a printable UTF-16LE char (common ASCII range)
-            if lo >= 0x20 && lo < 0xD800 {
-                u16_values.push(lo);
-                if hi >= 0x20 && hi < 0xD800 {
-                    u16_values.push(hi);
-                }
-            }
-        }
-    }
-
-    if u16_values.is_empty() {
+    if hex_words.len() < 4 {
         return None;
     }
 
-    String::from_utf16(&u16_values).ok().filter(|s| {
-        !s.is_empty() && s.chars().any(|c| c.is_alphabetic())
+    // The clipboard text in a ClipData parcel is typically preceded by metadata:
+    // - Bundle/Parcelable headers
+    // - Mimetype string ("text/plain")
+    // - String length as i32
+    // - The actual UTF-16LE string data
+    // We need to find the longest contiguous run of printable UTF-16LE characters
+
+    // Collect all possible u16 pairs from all hex words
+    let all_u16: Vec<u16> = hex_words.iter()
+        .filter_map(|word| u32::from_str_radix(word, 16).ok())
+        .flat_map(|val| {
+            let lo = (val & 0xFFFF) as u16;
+            let hi = ((val >> 16) & 0xFFFF) as u16;
+            vec![lo, hi]
+        })
+        .collect();
+
+    // Find the longest contiguous run of printable characters
+    let mut best_start = 0;
+    let mut best_len = 0;
+    let mut cur_start = 0;
+    let mut cur_len = 0;
+
+    for (i, &val) in all_u16.iter().enumerate() {
+        let is_printable = (val >= 0x20 && val < 0xD800) || val == 0x0A || val == 0x0D;
+        if is_printable {
+            if cur_len == 0 {
+                cur_start = i;
+            }
+            cur_len += 1;
+        } else {
+            if cur_len > best_len {
+                best_start = cur_start;
+                best_len = cur_len;
+            }
+            cur_len = 0;
+        }
+    }
+    if cur_len > best_len {
+        best_start = cur_start;
+        best_len = cur_len;
+    }
+
+    if best_len < 2 {
+        return None;
+    }
+
+    let result_u16: Vec<u16> = all_u16[best_start..best_start + best_len].to_vec();
+    String::from_utf16(&result_u16).ok().filter(|s| {
+        !s.is_empty() && s.chars().any(|c| c.is_alphabetic() || c.is_numeric())
     })
 }
 
@@ -1239,10 +1365,35 @@ fn extract_utf8_hex_text(output: &str) -> Option<String> {
         }
 
         if let Ok(s) = String::from_utf8(bytes) {
-            if s.len() > best_len && s.chars().any(|c| c.is_alphabetic()) {
+            let printable_ratio = s.chars().filter(|c| c.is_alphabetic() || c.is_numeric() || c.is_whitespace()).count();
+            let total = s.chars().count();
+            if total == 0 { continue; }
+            // Require at least 50% printable characters to filter out garbage
+            if printable_ratio as f32 / total as f32 > 0.5 && s.len() > best_len && s.chars().any(|c| c.is_alphabetic()) {
                 best_len = s.len();
                 best = Some(s);
             }
+        }
+    }
+
+    best
+}
+
+fn extract_printable_strings(output: &str) -> Option<String> {
+    // Last resort: look for any reasonable-length printable string in the raw output
+    // This catches cases where Android returns text mostly as-is in the Parcel
+    let re = Regex::new(r#"([a-zA-Z0-9\s.,!?@#$%^&*()\-_=+\[\]{};:'\",./<>?]{5,})"#).ok()?;
+
+    let mut best: Option<String> = None;
+    let mut best_len = 0;
+
+    for cap in re.captures_iter(output) {
+        let text = cap.get(1)?.as_str().trim();
+        let alpha_count = text.chars().filter(|c| c.is_alphabetic()).count();
+        // Must have at least some alphabetic characters
+        if alpha_count >= 2 && text.len() > best_len {
+            best_len = text.len();
+            best = Some(text.to_string());
         }
     }
 

@@ -543,6 +543,7 @@ watch(
               :class="{
                 'opacity-40 pointer-events-none': !store.connected || store.isClipboardBusy,
               }"
+              title="Paste: Copy PC clipboard content to device clipboard"
               @click="store.clipboardToDevice()"
             >
               <ClipboardPaste :size="14" class="opacity-70" />
@@ -553,6 +554,7 @@ watch(
               :class="{
                 'opacity-40 pointer-events-none': !store.connected || store.isClipboardBusy,
               }"
+              title="Copy: Copy device clipboard content to PC clipboard"
               @click="store.clipboardFromDevice()"
             >
               <ClipboardCopy :size="14" class="opacity-70" />
