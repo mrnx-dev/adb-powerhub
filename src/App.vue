@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { listen } from '@tauri-apps/api/event';
 import { useDeviceStore } from './stores/device';
 import { useSettingsStore } from './stores/settings';
@@ -17,8 +17,10 @@ import SettingsView from './views/SettingsView.vue';
 import AppToast from './components/AppToast.vue';
 import ConnectPanel from './components/ConnectPanel.vue';
 
+import { Package, WifiOff } from '@lucide/vue';
 import { useThemeStore } from './stores/theme';
 import { usePresetsStore } from './stores/presets';
+import { useApkDropZone, initApkDropZone, destroyApkDropZone } from './composables/useApkDropZone';
 
 const deviceStore = useDeviceStore();
 const settingsStore = useSettingsStore();
@@ -26,6 +28,8 @@ const navStore = useNavigationStore();
 const themeStore = useThemeStore();
 const connectionHistoryStore = useConnectionHistoryStore();
 const presetsStore = usePresetsStore();
+
+const { isDragOver, hasApkFiles, queueProgress } = useApkDropZone();
 
 useKeyboardShortcuts();
 
@@ -72,6 +76,7 @@ function focusNewView(el: unknown) {
 }
 
 onMounted(async () => {
+  await initApkDropZone();
   themeStore.init();
   await settingsStore.init();
   await connectionHistoryStore.init();
@@ -85,6 +90,10 @@ onMounted(async () => {
     deviceStore.mirroring = false;
     deviceStore.addLog('scrcpy window closed', 'info');
   });
+});
+
+onBeforeUnmount(() => {
+  destroyApkDropZone();
 });
 </script>
 
@@ -106,6 +115,28 @@ onMounted(async () => {
     </main>
     <AppToast />
     <ConnectPanel />
+
+    <!-- APK Drag & Drop overlay -->
+    <Transition name="drop-zone">
+      <div
+        v-if="isDragOver && hasApkFiles"
+        class="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+      >
+        <div class="drop-zone-overlay flex flex-col items-center gap-3 px-8 py-6">
+          <template v-if="deviceStore.connected">
+            <Package :size="48" class="text-accent-emerald drop-zone-icon" />
+            <p class="text-lg font-semibold text-theme-primary">Drop APK to install</p>
+            <p v-if="queueProgress" class="text-sm text-theme-muted">
+              Installing {{ queueProgress.current }}/{{ queueProgress.total }}...
+            </p>
+          </template>
+          <template v-else>
+            <WifiOff :size="48" class="text-theme-muted" />
+            <p class="text-lg font-semibold text-theme-muted">Connect a device first</p>
+          </template>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
