@@ -54,7 +54,7 @@ function copyPackageName() {
             :class="[
               appsStore.appDetail.is_system
                 ? 'bg-amber-500/10 text-amber-500'
-                : 'bg-accent-emerald/10 text-accent-emerald',
+                : 'bg-accent-10 text-accent-emerald',
             ]"
           >
             {{ appsStore.appDetail.label.charAt(0) }}
@@ -113,7 +113,7 @@ function copyPackageName() {
 
             <button
               v-if="!appsStore.appDetail.is_enabled"
-              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent-emerald/10 border border-accent-emerald/30 text-sm text-accent-emerald hover:bg-accent-emerald/20 transition-all"
+              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent-10 border border-accent-30 text-sm text-accent-emerald hover:bg-accent-20 transition-all"
               :disabled="appsStore.isActioning"
               @click="appsStore.enableApp(appsStore.appDetail!.package_name)"
             >

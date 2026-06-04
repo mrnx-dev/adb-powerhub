@@ -49,7 +49,7 @@ function onActiveAppToggle(e: Event) {
 
 function chipClasses(mode: 'include' | 'exclude') {
   return mode === 'include'
-    ? 'bg-accent-emerald/10 text-accent-emerald border-accent-emerald/25'
+    ? 'bg-accent-10 text-accent-emerald border-accent-25'
     : 'bg-red-500/10 text-red-400 border-red-500/25';
 }
 </script>
@@ -89,7 +89,7 @@ function chipClasses(mode: 'include' | 'exclude') {
       </label>
       <span
         v-if="store.activeAppOnly"
-        class="text-[11px] px-2 py-0.5 rounded bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20 max-w-[140px] truncate"
+        class="text-[11px] px-2 py-0.5 rounded bg-accent-10 text-accent-emerald border border-accent-20 max-w-[140px] truncate"
         :title="store.activeAppPackage || store.activeAppPollingError || 'Detecting…'"
       >
         {{ store.activeAppPollingError ? 'Unknown' : store.activeAppPackage || 'Detecting…' }}

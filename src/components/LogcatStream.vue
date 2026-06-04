@@ -82,7 +82,7 @@ watch(
     <!-- New Logs Badge -->
     <div
       v-if="newEntriesBadge"
-      class="btn-pressable absolute top-2 right-1/2 translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent-emerald/15 border border-accent-emerald/30 text-accent-emerald cursor-pointer hover:bg-accent-emerald/25"
+      class="btn-pressable absolute top-2 right-1/2 translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-accent-15 border border-accent-30 text-accent-emerald cursor-pointer hover:bg-accent-25"
       @click="scrollToBottom"
     >
       <Activity :size="12" /> New logs

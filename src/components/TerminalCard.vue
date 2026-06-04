@@ -126,7 +126,7 @@ async function copyLogs() {
 
     <!-- Input Area -->
     <div
-      class="bg-theme-input backdrop-blur-md border-t border-theme-secondary rounded-b-lg p-2 shrink-0 group focus-within:border-accent-emerald/50"
+      class="bg-theme-input backdrop-blur-md border-t border-theme-secondary rounded-b-lg p-2 shrink-0 group focus-within:border-accent-50"
     >
       <div class="flex items-center gap-3">
         <span class="text-xs font-mono font-bold text-accent-emerald pl-2">$ adb</span>

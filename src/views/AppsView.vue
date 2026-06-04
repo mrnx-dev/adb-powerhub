@@ -47,7 +47,7 @@ watch(
     >
       <div class="text-theme-muted">No device connected. Connect a device to manage apps.</div>
       <button
-        class="px-4 py-2 rounded-lg bg-accent-emerald/15 border border-accent-emerald/30 text-accent-emerald text-sm font-medium hover:bg-accent-emerald/25 transition-all btn-pressable"
+        class="px-4 py-2 rounded-lg bg-accent-15 border border-accent-30 text-accent-emerald text-sm font-medium hover:bg-accent-25 transition-all btn-pressable"
         @click="deviceStore.autoConnect()"
       >
         Reconnect
@@ -72,7 +72,7 @@ watch(
             class="btn-pressable px-2.5 py-1 rounded-md text-xs font-medium border transition-all"
             :class="[
               appsStore.filter === f
-                ? 'bg-accent-emerald/15 border-accent-emerald/30 text-accent-emerald'
+                ? 'bg-accent-15 border-accent-30 text-accent-emerald'
                 : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
             ]"
             @click="
@@ -101,7 +101,7 @@ watch(
         </button>
 
         <button
-          class="btn-pressable px-3 py-1.5 rounded-lg bg-accent-emerald/15 border border-accent-emerald/30 text-accent-emerald text-xs font-medium hover:bg-accent-emerald/25 transition-all"
+          class="btn-pressable px-3 py-1.5 rounded-lg bg-accent-15 border border-accent-30 text-accent-emerald text-xs font-medium hover:bg-accent-25 transition-all"
           :disabled="appsStore.isInstalling"
           @click="appsStore.installApk()"
         >

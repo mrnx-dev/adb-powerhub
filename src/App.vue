@@ -77,7 +77,7 @@ function focusNewView(el: unknown) {
 
 onMounted(async () => {
   await initApkDropZone();
-  themeStore.init();
+  await themeStore.init();
   await settingsStore.init();
   await connectionHistoryStore.init();
   await presetsStore.loadPresets();

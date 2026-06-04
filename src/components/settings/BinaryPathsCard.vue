@@ -44,7 +44,7 @@ async function applyAdbPath() {
         <input
           v-model="store.adbPath"
           type="text"
-          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50"
+          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
           @blur="applyAdbPath"
         />
         <button
@@ -155,7 +155,7 @@ async function applyAdbPath() {
         <input
           v-model="store.scrcpyPath"
           type="text"
-          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50"
+          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
           @blur="
             store.saveSetting('scrcpyPath', store.scrcpyPath);
             store.validateScrcpy();

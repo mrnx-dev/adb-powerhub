@@ -84,7 +84,7 @@ onUnmounted(() => {
         class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'dashboard'
-            ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+            ? 'bg-accent-10 border-accent-25 text-accent-emerald'
             : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
           expanded
             ? 'flex items-center gap-3 px-2 py-2.5'
@@ -101,7 +101,7 @@ onUnmounted(() => {
         class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'logcat'
-            ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+            ? 'bg-accent-10 border-accent-25 text-accent-emerald'
             : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
           !deviceStore.connected ? 'opacity-50 cursor-not-allowed' : '',
           expanded
@@ -120,7 +120,7 @@ onUnmounted(() => {
         class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'apps'
-            ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+            ? 'bg-accent-10 border-accent-25 text-accent-emerald'
             : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
           !deviceStore.connected ? 'opacity-50 cursor-not-allowed' : '',
           expanded
@@ -139,7 +139,7 @@ onUnmounted(() => {
         class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'settings'
-            ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+            ? 'bg-accent-10 border-accent-25 text-accent-emerald'
             : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
           expanded
             ? 'flex items-center gap-3 px-2 py-2.5'

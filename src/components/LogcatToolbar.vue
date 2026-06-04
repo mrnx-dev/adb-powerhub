@@ -33,20 +33,22 @@ async function clearBuffer() {
     <div
       class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
       :class="{
-        'bg-emerald-500/10 border-emerald-500/25 text-emerald-400': store.status === 'LIVE',
-        'bg-amber-500/10 border-amber-500/25 text-amber-400': store.status === 'PAUSED',
-        'bg-red-500/10 border-red-500/25 text-red-400':
+        'bg-color-success-container border-color-success text-color-success':
+          store.status === 'LIVE',
+        'bg-color-warning-container border-color-warning text-color-warning':
+          store.status === 'PAUSED',
+        'bg-color-error-container border-color-error text-color-error':
           store.status === 'DISCONNECTED' || store.status === 'ERROR',
-        'bg-gray-500/10 border-gray-500/25 text-gray-400': store.status === 'IDLE',
+        'bg-theme-btn border-theme-tertiary text-theme-muted': store.status === 'IDLE',
       }"
     >
       <span
         class="w-1.5 h-1.5 rounded-full inline-block"
         :class="{
-          'bg-emerald-400': store.status === 'LIVE',
-          'bg-amber-400': store.status === 'PAUSED',
-          'bg-red-400': store.status === 'DISCONNECTED' || store.status === 'ERROR',
-          'bg-gray-400': store.status === 'IDLE',
+          'bg-[var(--color-success)]': store.status === 'LIVE',
+          'bg-[var(--color-warning)]': store.status === 'PAUSED',
+          'bg-[var(--color-error)]': store.status === 'DISCONNECTED' || store.status === 'ERROR',
+          'bg-theme-muted': store.status === 'IDLE',
         }"
       ></span>
       {{ store.status }}
@@ -68,7 +70,7 @@ async function clearBuffer() {
     <!-- Start (if idle/disconnected) -->
     <button
       v-if="!store.streaming && deviceStore.connected"
-      class="btn-pressable px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-emerald/10 border border-accent-emerald/25 text-accent-emerald hover:bg-accent-emerald/20 flex items-center gap-1.5"
+      class="btn-pressable px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-10 border border-accent-25 text-accent-emerald hover:bg-accent-20 flex items-center gap-1.5"
       @click="store.requestStart()"
     >
       <Play :size="14" /> Start

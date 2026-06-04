@@ -69,7 +69,7 @@ async function confirmDelete(preset: Preset) {
         <div
           v-for="(preset, index) in presetsStore.presets"
           :key="preset.id"
-          class="group flex items-center gap-1 shrink-0 px-2 py-1 bg-theme-btn/60 border border-theme-secondary/60 rounded-md hover:border-accent-emerald/60 transition-all"
+          class="group flex items-center gap-1 shrink-0 px-2 py-1 bg-theme-btn/60 border border-theme-secondary/60 rounded-md hover:border-accent-60 transition-all"
           :class="{ 'opacity-50': !deviceStore.connected }"
         >
           <!-- Run area -->
@@ -113,7 +113,7 @@ async function confirmDelete(preset: Preset) {
 
         <!-- Add Button Chip -->
         <button
-          class="shrink-0 flex items-center justify-center w-6 h-6 bg-theme-btn/60 border border-theme-secondary/60 rounded-md text-[10px] font-bold text-accent-emerald hover:border-accent-emerald/60 transition-colors"
+          class="shrink-0 flex items-center justify-center w-6 h-6 bg-theme-btn/60 border border-theme-secondary/60 rounded-md text-[10px] font-bold text-accent-emerald hover:border-accent-60 transition-colors"
           title="Add new preset"
           @click="startCreate"
         >

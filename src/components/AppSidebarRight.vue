@@ -185,7 +185,7 @@ watch(
         class="btn-pressable p-2.5 rounded-xl transition-all"
         :class="[
           activeSection === 'connectivity'
-            ? 'text-accent-emerald bg-accent-emerald/10'
+            ? 'text-accent-emerald bg-accent-10'
             : 'hover:bg-accent-emerald',
         ]"
         title="Connectivity"
@@ -197,7 +197,7 @@ watch(
         class="btn-pressable p-2.5 rounded-xl transition-all"
         :class="[
           activeSection === 'devTools'
-            ? 'text-accent-emerald bg-accent-emerald/10'
+            ? 'text-accent-emerald bg-accent-10'
             : 'hover:bg-accent-emerald',
         ]"
         title="Dev Tools"
@@ -209,7 +209,7 @@ watch(
         class="btn-pressable p-2.5 rounded-xl transition-all"
         :class="[
           activeSection === 'display'
-            ? 'text-accent-emerald bg-accent-emerald/10'
+            ? 'text-accent-emerald bg-accent-10'
             : 'hover:bg-accent-emerald',
         ]"
         title="Display"
@@ -221,7 +221,7 @@ watch(
         class="btn-pressable p-2.5 rounded-xl transition-all"
         :class="[
           activeSection === 'remote'
-            ? 'text-accent-emerald bg-accent-emerald/10'
+            ? 'text-accent-emerald bg-accent-10'
             : 'hover:bg-accent-emerald',
         ]"
         title="Remote Controls"
@@ -233,7 +233,7 @@ watch(
         class="btn-pressable p-2.5 rounded-xl transition-all"
         :class="[
           activeSection === 'system'
-            ? 'text-accent-emerald bg-accent-emerald/10'
+            ? 'text-accent-emerald bg-accent-10'
             : 'hover:bg-accent-emerald',
         ]"
         title="System"
@@ -264,7 +264,7 @@ watch(
                 @change="store.toggleWifi(store.wifiEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -282,7 +282,7 @@ watch(
                 @change="store.toggleData(store.dataEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -300,7 +300,7 @@ watch(
                 @change="store.toggleAirplane(store.airplaneEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -318,7 +318,7 @@ watch(
                 @change="store.toggleBluetooth(store.bluetoothEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -344,7 +344,7 @@ watch(
                 @change="store.toggleShowTaps(store.showTapsEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -362,7 +362,7 @@ watch(
                 @change="store.toggleLayoutBounds(store.layoutBoundsEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[#06100d] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -517,11 +517,11 @@ watch(
               v-model="store.textInput"
               type="text"
               placeholder="Input text..."
-              class="w-full bg-theme-input border border-theme-secondary rounded-lg px-2 py-1.5 text-xs text-theme-primary focus:outline-none focus:border-accent-emerald/50 placeholder:text-theme-muted"
+              class="w-full bg-theme-input border border-theme-secondary rounded-lg px-2 py-1.5 text-xs text-theme-primary focus:outline-none focus:border-accent-50 placeholder:text-theme-muted"
               @keydown.enter="store.sendText"
             />
             <button
-              class="btn-pressable w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent-emerald/10 border border-accent-emerald/25 hover-accent transition-all text-xs font-medium group"
+              class="btn-pressable w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent-10 border border-accent-25 hover-accent transition-all text-xs font-medium group"
               @click="store.sendText"
             >
               <Send :size="12" class="text-accent-emerald group-hover:text-[var(--text-inverse)]" />

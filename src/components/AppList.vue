@@ -24,7 +24,7 @@ watch(searchInput, (val) => {
         v-model="searchInput"
         type="text"
         placeholder="Search apps..."
-        class="w-full px-3 py-1.5 rounded-md bg-theme-btn border border-theme-tertiary text-sm text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-accent-emerald/50"
+        class="w-full px-3 py-1.5 rounded-md bg-theme-btn border border-theme-tertiary text-sm text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-accent-50"
       />
     </div>
 
@@ -44,7 +44,7 @@ watch(searchInput, (val) => {
           class="btn-pressable w-full flex items-center gap-3 px-3 py-2.5 border-b border-theme-tertiary/50 text-left transition-all hover:bg-theme-hover"
           :class="[
             appsStore.selectedPackage === app.package_name
-              ? 'bg-accent-emerald/10 border-l-2 border-l-accent-emerald'
+              ? 'bg-accent-10 border-l-2 border-l-accent-emerald'
               : '',
           ]"
           @click="appsStore.selectApp(app.package_name)"
@@ -53,9 +53,7 @@ watch(searchInput, (val) => {
           <div
             class="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-xs font-bold"
             :class="[
-              app.is_system
-                ? 'bg-amber-500/10 text-amber-500'
-                : 'bg-accent-emerald/10 text-accent-emerald',
+              app.is_system ? 'bg-amber-500/10 text-amber-500' : 'bg-accent-10 text-accent-emerald',
             ]"
           >
             {{ app.label.charAt(0) }}

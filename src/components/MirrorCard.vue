@@ -101,7 +101,7 @@ function toggleMirror() {
           class="btn-pressable text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
           :class="
             store.mirroring
-              ? 'bg-accent-emerald text-white border border-accent-emerald hover:bg-accent-emerald-hover'
+              ? 'bg-accent-emerald text-theme-inverse border border-accent-emerald hover:bg-accent-emerald-hover'
               : 'btn-primary border border-theme-secondary hover:border-accent-emerald'
           "
           @click="toggleMirror"

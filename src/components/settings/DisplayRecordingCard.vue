@@ -35,7 +35,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
           class="btn-pressable flex flex-col items-center px-3 py-3 rounded-xl border"
           :class="
             store.videoQuality === preset.key
-              ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+              ? 'bg-accent-10 border-accent-25 text-accent-emerald'
               : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent'
           "
           @click="store.setVideoQuality(preset.key)"
@@ -57,7 +57,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
             type="number"
             min="1"
             max="100"
-            class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50"
+            class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
             @change="store.setCustomBitRate(store.customBitRate)"
           />
         </div>
@@ -70,7 +70,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
             type="number"
             min="0"
             max="7680"
-            class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50"
+            class="w-full bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
             @change="store.setCustomMaxSize(store.customMaxSize)"
           />
           <p class="text-[10px] text-theme-muted mt-1">0 = unlimited (native resolution)</p>
@@ -88,7 +88,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
           class="btn-pressable flex items-center justify-center px-4 py-3 rounded-xl border text-sm font-semibold"
           :class="
             store.recordingFormat === fmt.key
-              ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+              ? 'bg-accent-10 border-accent-25 text-accent-emerald'
               : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent'
           "
           @click="store.setRecordingFormat(fmt.key)"
@@ -112,7 +112,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
           v-model="store.screenshotSaveDir"
           type="text"
           placeholder="Default: ~/Pictures/adb-powerhub"
-          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50"
+          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
           @blur="store.saveSetting('screenshotSaveDir', store.screenshotSaveDir)"
         />
         <button
@@ -134,7 +134,7 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
           v-model="store.recordingSaveDir"
           type="text"
           placeholder="Default: ~/Videos/adb-powerhub"
-          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-emerald/50"
+          class="flex-1 bg-theme-input border border-theme-secondary rounded-lg py-2 px-4 text-sm focus:outline-none focus:border-accent-50"
           @blur="store.saveSetting('recordingSaveDir', store.recordingSaveDir)"
         />
         <button
