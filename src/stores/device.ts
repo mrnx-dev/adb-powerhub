@@ -950,76 +950,6 @@ export const useDeviceStore = defineStore('device', () => {
     }
   }
 
-  const isClipboardBusy = ref(false);
-
-  async function clipboardToDevice() {
-    if (isClipboardBusy.value) return;
-    isClipboardBusy.value = true;
-    try {
-      let text: string = '';
-      try {
-        text = (await navigator.clipboard.readText()) as string;
-      } catch {
-        toast.show('Clipboard access denied — click inside the app first, then retry', 'error');
-        return;
-      }
-      if (!text.trim()) {
-        toast.show('PC clipboard is empty', 'error');
-        return;
-      }
-      const result: string = await invoke('adb_clipboard_to_device', { text });
-      const preview = text.length > 30 ? text.slice(0, 30) + '...' : text;
-      if (result.startsWith('clipboard_set:')) {
-        // Clipboard was successfully set on the device
-        addLog(`Clipboard pasted to device: ${preview}`, 'success');
-        toast.show(`Pasted to device clipboard: ${preview}`, 'success');
-      } else if (result.startsWith('clipboard_typed:')) {
-        // Fallback: text was typed into the focused field instead
-        addLog(`Typed to device (clipboard unavailable, used input): ${preview}`, 'info');
-        toast.show(`Typed into focused field: ${preview}`, 'info');
-      } else {
-        addLog(`Pasted to device: ${preview}`, 'success');
-        toast.show(`Pasted to device: ${preview}`, 'success');
-      }
-    } catch (e) {
-      addLog(String(e), 'error');
-      toast.show('Failed to paste to device', 'error');
-    } finally {
-      isClipboardBusy.value = false;
-    }
-  }
-
-  async function clipboardFromDevice() {
-    if (isClipboardBusy.value) return;
-    isClipboardBusy.value = true;
-    try {
-      const text: string = await invoke('adb_clipboard_from_device');
-      if (!text || !text.trim()) {
-        toast.show('Device clipboard is empty or could not be read', 'info');
-        return;
-      }
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        toast.show('Cannot write to PC clipboard — click inside the app first, then retry', 'error');
-        return;
-      }
-      const preview = text.length > 30 ? text.slice(0, 30) + '...' : text;
-      addLog(`Copied from device: ${preview}`, 'success');
-      toast.show(`Copied from device: ${preview}`, 'success');
-    } catch (e) {
-      addLog(String(e), 'error');
-      const msg = String(e);
-      if (msg.includes('could not parse') || msg.includes('Could not parse')) {
-        toast.show('Could not read clipboard — try copying text on device first', 'error');
-      } else {
-        toast.show('Failed to copy from device', 'error');
-      }
-    } finally {
-      isClipboardBusy.value = false;
-    }
-  }
-
   async function rebootRecovery() {
     const confirmed = await ask('Are you sure you want to reboot into recovery mode?', {
       title: 'Reboot to Recovery',
@@ -1266,9 +1196,6 @@ export const useDeviceStore = defineStore('device', () => {
     setBrightness,
     setDensity,
     resetDensity,
-    isClipboardBusy,
-    clipboardToDevice,
-    clipboardFromDevice,
     rebootDevice,
     rebootRecovery,
     rebootBootloader,

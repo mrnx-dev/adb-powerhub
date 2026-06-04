@@ -125,8 +125,6 @@ pub fn run() {
             adb_get_density,
             adb_set_density,
             adb_reset_density,
-            adb_clipboard_to_device,
-            adb_clipboard_from_device,
             adb_list_apps,
             adb_app_detail,
             adb_install_apk,
