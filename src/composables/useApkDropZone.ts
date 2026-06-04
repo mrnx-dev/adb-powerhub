@@ -1,10 +1,10 @@
 import { readonly, ref } from 'vue';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { DragDropEvent } from '@tauri-apps/api/webview';
-import { useAppsStore } from '@/stores/apps';
-import { useDeviceStore } from '@/stores/device';
-import { useToastStore } from '@/stores/toast';
-import { useNavigationStore } from '@/stores/navigation';
+import { useAppsStore } from '../stores/apps';
+import { useDeviceStore } from '../stores/device';
+import { useToastStore } from '../stores/toast';
+import { useNavigationStore } from '../stores/navigation';
 
 const APK_EXTENSIONS = new Set(['apk', 'apks', 'xapk']);
 
