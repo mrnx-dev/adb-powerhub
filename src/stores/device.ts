@@ -927,6 +927,13 @@ export const useDeviceStore = defineStore('device', () => {
   async function setDensity(val: number) {
     const clamped = Math.max(120, Math.min(640, val));
     currentDensity.value = clamped;
+    // Mark as overridden so the reset button appears immediately;
+    // syncToggles() will refine to the exact server-side value later.
+    if (clamped !== physicalDensity.value) {
+      densityOverride.value = clamped;
+    } else {
+      densityOverride.value = null;
+    }
     try {
       await invoke('adb_set_density', { value: clamped });
       addLog(`Density set to ${clamped} dpi`, 'success');

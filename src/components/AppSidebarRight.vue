@@ -374,44 +374,55 @@ watch(
         <h3 class="font-sans text-xs font-semibold tracking-wider mb-4 uppercase text-theme-muted">
           Display
         </h3>
-        <div class="flex items-center gap-2">
-          <Sun :size="14" class="opacity-70 shrink-0" />
-          <input
-            v-model.number="store.brightness"
-            type="range"
-            min="0"
-            max="255"
-            class="flex-1 accent-theme cursor-pointer min-w-0"
-            @change="store.setBrightness(store.brightness)"
-          />
-          <span class="text-[10px] text-theme-muted w-6 text-right">{{ store.brightness }}</span>
+        <div class="flex items-center justify-between mb-1">
+          <div class="flex items-center gap-1.5">
+            <Sun :size="14" class="opacity-70 shrink-0" />
+            <span class="text-xs text-theme-primary">Brightness</span>
+          </div>
+          <span class="text-[10px] text-theme-muted">{{ store.brightness }}</span>
         </div>
+        <input
+          v-model.number="store.brightness"
+          type="range"
+          min="0"
+          max="255"
+          class="w-full accent-theme cursor-pointer"
+          @change="store.setBrightness(store.brightness)"
+        />
 
         <div
-          class="flex items-center gap-2 mt-3"
+          class="mt-3"
           :class="{ 'opacity-40 pointer-events-none': !store.connected || !store.currentDensity }"
         >
-          <Scaling :size="14" class="opacity-70 shrink-0" />
+          <!-- Label row: icon + label + value + reset -->
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-1.5">
+              <Scaling :size="14" class="opacity-70 shrink-0" />
+              <span class="text-xs text-theme-primary">DPI</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] text-theme-muted">{{ store.currentDensity || '—' }}</span>
+              <button
+                v-if="store.densityOverride !== null"
+                class="btn-pressable flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+                title="Reset to factory density ({{ store.physicalDensity }})"
+                @click="store.resetDensity()"
+              >
+                <RotateCcw :size="10" />
+                <span>{{ store.physicalDensity }}</span>
+              </button>
+            </div>
+          </div>
+          <!-- Slider row: full width, same as brightness -->
           <input
             v-model.number="store.currentDensity"
             type="range"
             min="120"
             max="640"
             step="10"
-            class="flex-1 accent-theme cursor-pointer min-w-0"
+            class="w-full accent-theme cursor-pointer"
             @change="store.setDensity(store.currentDensity)"
           />
-          <span class="text-[10px] text-theme-muted w-8 text-right">{{
-            store.currentDensity || '—'
-          }}</span>
-          <button
-            v-if="store.densityOverride !== null"
-            class="btn-pressable text-[10px] px-1.5 py-0.5 rounded bg-theme-btn border border-theme-tertiary hover-accent transition-all whitespace-nowrap"
-            title="Reset to factory density"
-            @click="store.resetDensity()"
-          >
-            Reset
-          </button>
         </div>
       </div>
 
