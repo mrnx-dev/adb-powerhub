@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useSettingsStore } from '../../stores/settings';
 import { invoke } from '@tauri-apps/api/core';
-import { Link, ExternalLink, Download, XCircle, RefreshCw } from '@lucide/vue';
+import { Link, ExternalLink, Download, XCircle, RefreshCw, CircleCheck, CircleAlert, ArrowDown } from '@lucide/vue';
 
 const store = useSettingsStore();
 
@@ -31,13 +31,13 @@ async function applyAdbPath() {
     <div class="mb-6">
       <div class="flex items-center justify-between mb-2">
         <label class="text-xs font-medium text-theme-secondary">ADB Path</label>
-        <span v-if="store.adbValid" class="text-xs text-color-success"
-          >✅ {{ store.adbVersion.split('\n')[0] }}</span
+        <span v-if="store.adbValid" class="text-xs text-color-success flex items-center gap-1"
+          ><CircleCheck :size="12" /> {{ store.adbVersion.split('\n')[0] }}</span
         >
         <span
           v-else-if="store.downloading !== 'adb' && !store.downloadCancelled"
-          class="text-xs text-color-error"
-          >⚠ Not Found</span
+          class="text-xs text-color-error flex items-center gap-1"
+          ><CircleAlert :size="12" /> Not Found</span
         >
       </div>
       <div class="flex items-center gap-3">
@@ -62,7 +62,7 @@ async function applyAdbPath() {
           v-if="store.downloadError"
           class="bg-color-error-container border border-color-error rounded-xl p-3 mb-2"
         >
-          <p class="text-xs text-color-error mb-2">✗ Download failed: {{ store.downloadError }}</p>
+          <p class="text-xs text-color-error mb-2 flex items-center gap-1"><XCircle :size="12" /> Download failed: {{ store.downloadError }}</p>
           <button
             class="btn-pressable flex items-center gap-2 px-4 py-2 rounded-lg btn-primary text-xs font-semibold"
             @click="store.downloadAdb"
@@ -87,7 +87,7 @@ async function applyAdbPath() {
 
         <!-- Download prompt -->
         <div v-else class="bg-color-warning-container border border-color-warning rounded-xl p-3">
-          <p class="text-xs text-color-warning mb-3">⚠ ADB not found on your system</p>
+          <p class="text-xs text-color-warning mb-3 flex items-center gap-1"><CircleAlert :size="12" /> ADB not found on your system</p>
           <button
             class="btn-pressable flex items-center gap-2 px-4 py-2.5 rounded-lg btn-primary text-xs font-semibold"
             @click="store.downloadAdb"
@@ -109,8 +109,8 @@ async function applyAdbPath() {
         class="mt-3 bg-theme-btn border border-theme-tertiary rounded-xl p-3"
       >
         <div class="flex items-center justify-between mb-2">
-          <span class="text-xs text-theme-secondary"
-            >⬇ Downloading ADB... {{ store.downloadProgress.percent }}%</span
+          <span class="text-xs text-theme-secondary flex items-center gap-1"
+            ><ArrowDown :size="12" /> Downloading ADB... {{ store.downloadProgress.percent }}%</span
           >
           <span class="text-[10px] text-theme-muted">
             {{ formatBytes(store.downloadProgress.read) }} /
@@ -146,10 +146,10 @@ async function applyAdbPath() {
     <div>
       <div class="flex items-center justify-between mb-2">
         <label class="text-xs font-medium text-theme-secondary">Scrcpy Path</label>
-        <span v-if="store.scrcpyValid" class="text-xs text-color-success"
-          >✅ {{ store.scrcpyVersion }}</span
+        <span v-if="store.scrcpyValid" class="text-xs text-color-success flex items-center gap-1"
+          ><CircleCheck :size="12" /> {{ store.scrcpyVersion }}</span
         >
-        <span v-else class="text-xs text-color-error">⚠ Not Found</span>
+        <span v-else class="text-xs text-color-error flex items-center gap-1"><CircleAlert :size="12" /> Not Found</span>
       </div>
       <div class="flex items-center gap-3">
         <input
@@ -174,7 +174,7 @@ async function applyAdbPath() {
         v-if="!store.scrcpyValid"
         class="mt-3 bg-color-warning-container border border-color-warning rounded-xl p-3"
       >
-        <p class="text-xs text-color-warning mb-3">⚠ Scrcpy not found</p>
+        <p class="text-xs text-color-warning mb-3 flex items-center gap-1"><CircleAlert :size="12" /> Scrcpy not found</p>
         <button
           class="btn-pressable flex items-center gap-2 px-4 py-2.5 rounded-lg btn-primary text-xs font-semibold"
           @click="store.openScrcpyLink"
