@@ -24,6 +24,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const autoDetectBinaries = ref(true);
   const stayOnTop = ref(false);
   const autoConnectOnLaunch = ref(false);
+  const autoReconnect = ref(true);
   const pollingInterval = ref(3);
   const videoQuality = ref<'low' | 'medium' | 'high' | 'custom'>('medium');
   const customBitRate = ref(4);
@@ -118,6 +119,7 @@ export const useSettingsStore = defineStore('settings', () => {
         ['autoDetectBinaries', autoDetectBinaries],
         ['stayOnTop', stayOnTop],
         ['autoConnectOnLaunch', autoConnectOnLaunch],
+        ['autoReconnect', autoReconnect],
         ['pollingInterval', pollingInterval],
         ['videoQuality', videoQuality],
         ['customBitRate', customBitRate],
@@ -317,6 +319,11 @@ export const useSettingsStore = defineStore('settings', () => {
     await saveSetting('autoConnectOnLaunch', val);
   }
 
+  async function setAutoReconnect(val: boolean) {
+    autoReconnect.value = val;
+    await saveSetting('autoReconnect', val);
+  }
+
   async function setAutoDetectBinaries(val: boolean) {
     autoDetectBinaries.value = val;
     await saveSetting('autoDetectBinaries', val);
@@ -423,6 +430,7 @@ export const useSettingsStore = defineStore('settings', () => {
     autoDetectBinaries,
     stayOnTop,
     autoConnectOnLaunch,
+    autoReconnect,
     pollingInterval,
     videoQuality,
     customBitRate,
@@ -463,6 +471,7 @@ export const useSettingsStore = defineStore('settings', () => {
     copyToClipboard,
     setStayOnTop,
     setAutoConnectOnLaunch,
+    setAutoReconnect,
     setAutoDetectBinaries,
     setPollingInterval,
     setVideoQuality,

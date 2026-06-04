@@ -70,10 +70,22 @@ export const useDeviceStore = defineStore('device', () => {
   const textInput = ref('');
   const showRebootMenu = ref(false);
 
+  // Reconnect watcher state
+  const isReconnecting = ref(false);
+  const reconnectAttempt = ref(0);
+  const lastConnectionMethod = ref<'wifi' | 'usb' | 'pairing' | null>(null);
+  const lastConnectedIp = ref('');
+  const lastConnectedPort = ref(5555);
+
   let pollTimeout: ReturnType<typeof setTimeout> | null = null;
   let pollFailCount = 0;
   let isPolling = false;
   let pollCount = 0;
+  let _manualDisconnect = false;
+  let _reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  const MAX_RECONNECT_ATTEMPTS = 30;
+  const RECONNECT_INTERVAL_MS = 5000;
+  const RECONNECT_DELAY_AFTER_REBOOT_MS = 15000;
 
   const isLoadingStats = ref(false);
   const isInitialLoad = ref(true);
@@ -157,6 +169,16 @@ export const useDeviceStore = defineStore('device', () => {
     connectMethod.value = method;
     autoConnectStatus.value = 'connected';
     pollFailCount = 0;
+    // Store connection method for auto-reconnect
+    const isUsb = deviceIdStr.includes(':') ? false : true;
+    lastConnectionMethod.value = isUsb ? 'usb' : method === 'pairing' ? 'pairing' : 'wifi';
+    if (!isUsb) {
+      const parts = deviceIdStr.split(':');
+      lastConnectedIp.value = parts[0];
+      lastConnectedPort.value = parseInt(parts[1] || '5555');
+    }
+    // Stop reconnect watcher on successful connection
+    stopReconnectWatcher();
     addLog(`Connected to ${deviceIdStr}`, 'success');
     toast.show('Device connected', 'success');
     await pollStats();
@@ -417,6 +439,7 @@ export const useDeviceStore = defineStore('device', () => {
   }
 
   async function disconnect() {
+    _manualDisconnect = true;
     try {
       await invoke('adb_disconnect');
       connected.value = false;
@@ -426,6 +449,8 @@ export const useDeviceStore = defineStore('device', () => {
       addLog('Disconnected', 'info');
       toast.show('Disconnected', 'info');
       autoConnectStatus.value = 'idle';
+      // Stop any reconnect watcher since user explicitly disconnected
+      stopReconnectWatcher();
     } catch (e) {
       addLog(String(e), 'error');
     }
@@ -466,6 +491,14 @@ export const useDeviceStore = defineStore('device', () => {
         await invoke('adb_stop_scrcpy');
       } catch {}
     }
+    // Auto-reconnect: only if NOT a manual disconnect
+    if (!_manualDisconnect) {
+      const settingsStore = useSettingsStore();
+      if (settingsStore.autoReconnect && lastConnectionMethod.value) {
+        startReconnectWatcher();
+      }
+    }
+    _manualDisconnect = false;
   }
 
   async function pollStats() {
@@ -549,6 +582,118 @@ export const useDeviceStore = defineStore('device', () => {
     if (pollTimeout) {
       clearTimeout(pollTimeout);
       pollTimeout = null;
+    }
+  }
+
+  function startReconnectWatcher(afterReboot = false) {
+    stopReconnectWatcher();
+    const settingsStore = useSettingsStore();
+    if (!settingsStore.autoReconnect) return;
+    if (isReconnecting.value) return;
+    isReconnecting.value = true;
+    reconnectAttempt.value = 0;
+    addLog('Auto-reconnect started', 'info');
+
+    const delay = afterReboot ? RECONNECT_DELAY_AFTER_REBOOT_MS : RECONNECT_INTERVAL_MS;
+    _reconnectTimeout = setTimeout(() => reconnectTick(), delay);
+  }
+
+  function stopReconnectWatcher() {
+    if (_reconnectTimeout) {
+      clearTimeout(_reconnectTimeout);
+      _reconnectTimeout = null;
+    }
+    isReconnecting.value = false;
+    reconnectAttempt.value = 0;
+  }
+
+  async function reconnectTick() {
+    if (!isReconnecting.value) return;
+    if (connected.value || connecting.value) {
+      // Another connection is in progress, skip this tick
+      _reconnectTimeout = setTimeout(() => reconnectTick(), RECONNECT_INTERVAL_MS);
+      return;
+    }
+
+    reconnectAttempt.value++;
+
+    if (reconnectAttempt.value > MAX_RECONNECT_ATTEMPTS) {
+      stopReconnectWatcher();
+      addLog('Auto-reconnect gave up after 30 attempts', 'error');
+      toast.show('Could not reconnect. Please connect manually.', 'error');
+      return;
+    }
+
+    addLog(`Auto-reconnect attempt ${reconnectAttempt.value}/${MAX_RECONNECT_ATTEMPTS}`, 'info');
+
+    try {
+      const devices =
+        await invoke<{ id: string; state: string; transport: string; model: string }[]>(
+          'adb_devices'
+        );
+
+      if (lastConnectionMethod.value === 'wifi' || lastConnectionMethod.value === 'pairing') {
+        // WiFi reconnect: look for matching ip:port or any wifi device
+        const targetId = `${lastConnectedIp.value}:${lastConnectedPort.value}`;
+        const match = devices.find((d) => d.id === targetId && d.state === 'device');
+
+        if (match) {
+          try {
+            await invoke('adb_connect_port', {
+              ip: lastConnectedIp.value,
+              port: lastConnectedPort.value,
+            });
+            await onConnected(
+              targetId,
+              lastConnectionMethod.value === 'pairing' ? 'pairing' : 'manual'
+            );
+            addLog('Device reconnected', 'success');
+            toast.show('Device reconnected', 'success');
+            return;
+          } catch {
+            // Connection failed, continue trying
+          }
+        }
+
+        // Also check if device appeared in adb devices (already connected)
+        const existingWifi = devices.find(
+          (d) => d.id === targetId && d.state === 'device' && d.transport === 'wifi'
+        );
+        if (existingWifi) {
+          try {
+            await invoke('adb_set_device', { deviceId: existingWifi.id });
+            await onConnected(existingWifi.id, 'manual');
+            addLog('Device reconnected', 'success');
+            toast.show('Device reconnected', 'success');
+            return;
+          } catch {
+            // Continue trying
+          }
+        }
+      } else if (lastConnectionMethod.value === 'usb') {
+        // USB reconnect: look for any USB device and run autoConnect
+        const usbDevices = devices.filter((d) => d.transport === 'usb' && d.state === 'device');
+        if (usbDevices.length > 0) {
+          stopReconnectWatcher();
+          connecting.value = true;
+          try {
+            await autoConnect();
+            return;
+          } catch {
+            // Failed, restart watcher
+            startReconnectWatcher();
+            return;
+          } finally {
+            connecting.value = false;
+          }
+        }
+      }
+
+      // No matching device found, try next attempt
+      _reconnectTimeout = setTimeout(() => reconnectTick(), RECONNECT_INTERVAL_MS);
+    } catch (e) {
+      addLog(`Reconnect check failed: ${e}`, 'error');
+      _reconnectTimeout = setTimeout(() => reconnectTick(), RECONNECT_INTERVAL_MS);
     }
   }
 
@@ -875,6 +1020,7 @@ export const useDeviceStore = defineStore('device', () => {
       connected.value = false;
       isInitialLoad.value = true;
       stopPolling();
+      startReconnectWatcher(true);
     } catch (e) {
       addLog(String(e), 'error');
     }
@@ -896,6 +1042,7 @@ export const useDeviceStore = defineStore('device', () => {
       connected.value = false;
       isInitialLoad.value = true;
       stopPolling();
+      startReconnectWatcher(true);
     } catch (e) {
       addLog(String(e), 'error');
     }
@@ -936,6 +1083,7 @@ export const useDeviceStore = defineStore('device', () => {
       connected.value = false;
       isInitialLoad.value = true;
       stopPolling();
+      startReconnectWatcher(true);
     } catch (e) {
       addLog(String(e), 'error');
     }
@@ -1064,6 +1212,8 @@ export const useDeviceStore = defineStore('device', () => {
     batteryVoltage,
     textInput,
     showRebootMenu,
+    isReconnecting,
+    reconnectAttempt,
     addLog,
     clearLogs,
     connectWithPort,
@@ -1111,5 +1261,7 @@ export const useDeviceStore = defineStore('device', () => {
     checkScrcpy,
     launchMirror,
     stopMirror,
+    startReconnectWatcher,
+    stopReconnectWatcher,
   };
 });
