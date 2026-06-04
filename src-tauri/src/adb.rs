@@ -1482,6 +1482,24 @@ pub struct AppInfo {
     pub data_dir: String,
 }
 
+/// Derive a fallback label from the last segment of a package name.
+fn derive_label(package_name: &str) -> String {
+    package_name
+        .rsplit('.')
+        .next()
+        .unwrap_or(package_name)
+        .chars()
+        .enumerate()
+        .map(|(i, c)| {
+            if i == 0 {
+                c.to_uppercase().next().unwrap_or(c)
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
 fn parse_pm_list(output: &str, filter: &str) -> Vec<AppInfo> {
     let mut apps = Vec::new();
     for line in output.lines() {
@@ -1510,21 +1528,8 @@ fn parse_pm_list(output: &str, filter: &str) -> Vec<AppInfo> {
             continue;
         }
 
-        // Derive label from last segment of package name
-        let label = package_name
-            .rsplit('.')
-            .next()
-            .unwrap_or(&package_name)
-            .chars()
-            .enumerate()
-            .map(|(i, c)| {
-                if i == 0 {
-                    c.to_uppercase().next().unwrap_or(c)
-                } else {
-                    c
-                }
-            })
-            .collect::<String>();
+        // Derive label from last segment of package name as fallback
+        let label = derive_label(&package_name);
 
         let is_enabled = filter != "disabled";
 
@@ -1541,6 +1546,54 @@ fn parse_pm_list(output: &str, filter: &str) -> Vec<AppInfo> {
         });
     }
     apps
+}
+
+/// Resolve real app labels in batch by running a single `dumpsys package` command.
+/// Parses `Package [name]` and `nonLocalizedLabel=label` pairs from the output.
+fn resolve_labels_batch(
+    adb: &str,
+    serial: &Option<String>,
+) -> std::collections::HashMap<String, String> {
+    let serial_str = serial.as_deref();
+    let output = run_adb_cmd_with_device_timed(
+        adb,
+        serial_str,
+        &["shell", "dumpsys package | grep -E 'Package \\u{5b}|nonLocalizedLabel='"],
+        60,
+    );
+
+    let mut labels = std::collections::HashMap::new();
+    let output = match output {
+        Ok(o) => o,
+        Err(_) => return labels,
+    };
+
+    let mut current_pkg = String::new();
+    for line in output.lines() {
+        let trimmed = line.trim();
+
+        // Match: Package [com.example.app] (hash):
+        if trimmed.starts_with("Package [") {
+            if let Some(end) = trimmed.find(']') {
+                current_pkg = trimmed[9..end].to_string(); // len("Package [") == 9
+            }
+            continue;
+        }
+
+        // Match: nonLocalizedLabel=SomeLabel
+        if let Some(label_val) = trimmed.strip_prefix("nonLocalizedLabel=") {
+            if !current_pkg.is_empty()
+                && !label_val.is_empty()
+                && !label_val
+                    .chars()
+                    .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
+            {
+                labels.insert(current_pkg.clone(), label_val.to_string());
+            }
+        }
+    }
+
+    labels
 }
 
 fn parse_package_names(output: &str) -> Vec<String> {
@@ -1643,20 +1696,7 @@ fn parse_dumpsys_package(output: &str, package: &str) -> Result<AppInfo, String>
 
     // Fallback label from package name
     if label.is_empty() {
-        label = package
-            .rsplit('.')
-            .next()
-            .unwrap_or(package)
-            .chars()
-            .enumerate()
-            .map(|(i, c)| {
-                if i == 0 {
-                    c.to_uppercase().next().unwrap_or(c)
-                } else {
-                    c
-                }
-            })
-            .collect();
+        label = derive_label(package);
     }
 
     Ok(AppInfo {
@@ -1715,6 +1755,14 @@ pub fn adb_list_apps(state: State<AppState>, filter: String) -> Result<Vec<AppIn
     };
 
     let mut apps = parse_pm_list(&output, &filter);
+
+    // Resolve real app labels via dumpsys
+    let real_labels = resolve_labels_batch(&adb, &Some(serial.clone()));
+    for app in &mut apps {
+        if let Some(label) = real_labels.get(&app.package_name) {
+            app.label = label.clone();
+        }
+    }
 
     // Set is_system based on filter logic
     match filter.as_str() {
