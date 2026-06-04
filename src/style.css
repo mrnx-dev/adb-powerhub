@@ -844,6 +844,69 @@ input[type='range']::-moz-range-thumb {
     transition: opacity 100ms linear !important;
     transform: none !important;
   }
+  .drop-zone-enter-active,
+  .drop-zone-leave-active {
+    transition: opacity 100ms linear !important;
+    transform: none !important;
+  }
+  .drop-zone-icon {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   DROP ZONE OVERLAY (APK Drag & Drop)
+   ============================================================ */
+
+.drop-zone-overlay {
+  background: var(--bg-page);
+  opacity: 0.92;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 2px dashed var(--color-primary);
+  border-radius: 1rem;
+  max-width: 340px;
+}
+
+.drop-zone-icon {
+  animation: drop-zone-bounce 1.2s var(--ease-bounce) infinite;
+}
+
+@keyframes drop-zone-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Transition for overlay enter/leave */
+.drop-zone-enter-active {
+  transition:
+    opacity var(--duration-standard) var(--ease-emphasized),
+    transform var(--duration-standard) var(--ease-emphasized);
+}
+.drop-zone-leave-active {
+  transition:
+    opacity 100ms var(--ease-accelerate),
+    transform 100ms var(--ease-accelerate);
+}
+.drop-zone-enter-from {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.drop-zone-leave-to {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+/* Apps page persistent hint — active/highlighted state during drag-over */
+.drop-zone-hint-active {
+  border-color: rgba(16, 185, 129, 0.5);
+  background-color: rgba(16, 185, 129, 0.05);
+  transform: scale(1.01);
 }
 
 /* --- Scrollbar Thin (Horizontal) --- */
