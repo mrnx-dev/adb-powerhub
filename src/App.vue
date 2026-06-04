@@ -12,6 +12,7 @@ import AppSidebarLeft from './components/AppSidebarLeft.vue';
 import AppSidebarRight from './components/AppSidebarRight.vue';
 import DashboardView from './views/DashboardView.vue';
 import LogcatView from './views/LogcatView.vue';
+import AppsView from './views/AppsView.vue';
 import SettingsView from './views/SettingsView.vue';
 import AppToast from './components/AppToast.vue';
 import ConnectPanel from './components/ConnectPanel.vue';
@@ -33,6 +34,8 @@ const currentViewComponent = computed(() => {
   switch (navStore.currentPage) {
     case 'logcat':
       return LogcatView;
+    case 'apps':
+      return AppsView;
     case 'settings':
       return SettingsView;
     case 'dashboard':

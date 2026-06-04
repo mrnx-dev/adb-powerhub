@@ -2,7 +2,14 @@
 import { onUnmounted, ref } from 'vue';
 import { useNavigationStore } from '../stores/navigation';
 import { useDeviceStore } from '../stores/device';
-import { LayoutDashboard, Settings, PanelLeftOpen, PanelLeftClose, ScrollText } from '@lucide/vue';
+import {
+  LayoutDashboard,
+  Settings,
+  PanelLeftOpen,
+  PanelLeftClose,
+  ScrollText,
+  Package,
+} from '@lucide/vue';
 
 const navStore = useNavigationStore();
 const deviceStore = useDeviceStore();
@@ -107,6 +114,25 @@ onUnmounted(() => {
       >
         <ScrollText :size="18" class="shrink-0" />
         <span v-if="expanded" class="text-sm font-medium whitespace-nowrap">Logcat</span>
+      </button>
+
+      <button
+        class="btn-pressable rounded-lg border transition-all"
+        :class="[
+          navStore.currentPage === 'apps'
+            ? 'bg-accent-emerald/10 border-accent-emerald/25 text-accent-emerald'
+            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
+          !deviceStore.connected ? 'opacity-50 cursor-not-allowed' : '',
+          expanded
+            ? 'flex items-center gap-3 px-2 py-2.5'
+            : 'flex items-center justify-center py-2.5',
+        ]"
+        :title="!expanded ? 'Apps' : undefined"
+        :disabled="!deviceStore.connected"
+        @click="navStore.navigateTo('apps')"
+      >
+        <Package :size="18" class="shrink-0" />
+        <span v-if="expanded" class="text-sm font-medium whitespace-nowrap">Apps</span>
       </button>
 
       <button

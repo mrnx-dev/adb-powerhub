@@ -1623,6 +1623,391 @@ pub fn write_text_file(path: String, content: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to write file: {}", e))
 }
 
+// ─── App Manager Commands ──────────────────────────────────
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AppInfo {
+    pub package_name: String,
+    pub label: String,
+    pub version_name: String,
+    pub version_code: i64,
+    pub is_system: bool,
+    pub is_enabled: bool,
+    pub is_updated_system: bool,
+    pub code_path: String,
+    pub data_dir: String,
+}
+
+fn parse_pm_list(output: &str, filter: &str) -> Vec<AppInfo> {
+    let mut apps = Vec::new();
+    for line in output.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        // Strip "package:" prefix
+        let stripped = if let Some(rest) = line.strip_prefix("package:") {
+            rest
+        } else {
+            continue;
+        };
+
+        let (path, package_name) = if let Some(eq_pos) = stripped.rfind('=') {
+            // Format: /path/to/base.apk=com.example.app
+            let pkg = stripped[eq_pos + 1..].to_string();
+            let path = stripped[..eq_pos].to_string();
+            (path, pkg)
+        } else {
+            // Format: com.example.app (no path)
+            (String::new(), stripped.to_string())
+        };
+
+        if package_name.is_empty() {
+            continue;
+        }
+
+        // Derive label from last segment of package name
+        let label = package_name
+            .rsplit('.')
+            .next()
+            .unwrap_or(&package_name)
+            .chars()
+            .enumerate()
+            .map(|(i, c)| {
+                if i == 0 {
+                    c.to_uppercase().next().unwrap_or(c)
+                } else {
+                    c
+                }
+            })
+            .collect::<String>();
+
+        let is_enabled = filter != "disabled";
+
+        apps.push(AppInfo {
+            package_name,
+            label,
+            version_name: String::new(),
+            version_code: 0,
+            is_system: false, // will be set by caller if needed
+            is_enabled,
+            is_updated_system: false,
+            code_path: path,
+            data_dir: String::new(),
+        });
+    }
+    apps
+}
+
+fn parse_package_names(output: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for line in output.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("package:") {
+            // Strip path prefix if present (e.g. "package:/data/app/...=com.foo")
+            let name = if let Some(eq_pos) = rest.rfind('=') {
+                rest[eq_pos + 1..].to_string()
+            } else {
+                rest.to_string()
+            };
+            if !name.is_empty() {
+                names.push(name);
+            }
+        }
+    }
+    names
+}
+
+fn parse_dumpsys_package(output: &str, package: &str) -> Result<AppInfo, String> {
+    let mut version_name = String::new();
+    let mut version_code: i64 = 0;
+    let mut is_system = false;
+    let mut is_enabled = true;
+    let mut is_updated_system = false;
+    let mut code_path = String::new();
+    let mut data_dir = String::new();
+    let mut label = String::new();
+
+    for line in output.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("versionName=") {
+            version_name = trimmed
+                .strip_prefix("versionName=")
+                .unwrap_or("")
+                .to_string();
+        } else if trimmed.starts_with("versionCode=") {
+            // versionCode=123 or versionCode=123 minSdk=...
+            let rest = trimmed.strip_prefix("versionCode=").unwrap_or("");
+            version_code = rest
+                .split_whitespace()
+                .next()
+                .unwrap_or("0")
+                .parse()
+                .unwrap_or(0);
+        } else if trimmed.starts_with("codePath=") {
+            code_path = trimmed
+                .strip_prefix("codePath=")
+                .unwrap_or("")
+                .to_string();
+        } else if trimmed.starts_with("dataDir=") {
+            data_dir = trimmed
+                .strip_prefix("dataDir=")
+                .unwrap_or("")
+                .to_string();
+        } else if trimmed.starts_with("flags=[") || trimmed.starts_with("flags=") {
+            let flags_str = if trimmed.starts_with("flags=[") {
+                // flags=[ SYSTEM ... ]
+                let end = trimmed.find(']').unwrap_or(trimmed.len());
+                &trimmed[7..end]
+            } else {
+                // flags=0x...
+                let hex = trimmed.strip_prefix("flags=").unwrap_or("");
+                let val: i64 = i64::from_str_radix(hex.trim_start_matches("0x"), 16).unwrap_or(0);
+                if val & 0x00000001 != 0 {
+                    is_system = true;
+                }
+                if val & 0x00000080 != 0 {
+                    is_updated_system = true;
+                }
+                if val & 0x00000010 != 0 {
+                    is_enabled = false;
+                }
+                continue;
+            };
+            // Parse text flags like "SYSTEM HAS_CODE"
+            is_system |= flags_str.contains("SYSTEM");
+            is_updated_system |= flags_str.contains("UPDATED_SYSTEM_APP");
+            if flags_str.contains("DISABLED") && !flags_str.contains("ENABLED") {
+                is_enabled = false;
+            }
+        } else if trimmed.starts_with("nonLocalizedLabel=") {
+            let lbl = trimmed
+                .strip_prefix("nonLocalizedLabel=")
+                .unwrap_or("")
+                .to_string();
+            // Only use if non-empty and not numeric placeholder
+            if !lbl.is_empty()
+                && !lbl
+                    .chars()
+                    .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
+            {
+                label = lbl;
+            }
+        }
+    }
+
+    // Fallback label from package name
+    if label.is_empty() {
+        label = package
+            .rsplit('.')
+            .next()
+            .unwrap_or(package)
+            .chars()
+            .enumerate()
+            .map(|(i, c)| {
+                if i == 0 {
+                    c.to_uppercase().next().unwrap_or(c)
+                } else {
+                    c
+                }
+            })
+            .collect();
+    }
+
+    Ok(AppInfo {
+        package_name: package.to_string(),
+        label,
+        version_name,
+        version_code,
+        is_system,
+        is_enabled,
+        is_updated_system,
+        code_path,
+        data_dir,
+    })
+}
+
+#[tauri::command]
+pub fn adb_list_apps(state: State<AppState>, filter: String) -> Result<Vec<AppInfo>, String> {
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state).ok_or("No device connected")?;
+
+    // Build pm list packages args based on filter
+    let mut args: Vec<String> = vec![
+        "shell".into(),
+        "pm".into(),
+        "list".into(),
+        "packages".into(),
+        "-f".into(),
+    ];
+    match filter.as_str() {
+        "third_party" => args.push("-3".into()),
+        "system" => args.push("-s".into()),
+        "disabled" => args.push("-d".into()),
+        _ => {} // "all" — no filter flag
+    }
+
+    let output = run_adb_cmd_with_device_timed(
+        &adb,
+        Some(&serial),
+        &args.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+        30,
+    )?;
+
+    // For "all" filter, also fetch system packages list for cross-referencing
+    let system_packages: std::collections::HashSet<String> = if filter == "all" {
+        let sys_output = run_adb_cmd_with_device_timed(
+            &adb,
+            Some(&serial),
+            &["shell", "pm", "list", "packages", "-s"],
+            30,
+        )?;
+        parse_package_names(&sys_output)
+            .into_iter()
+            .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+
+    let mut apps = parse_pm_list(&output, &filter);
+
+    // Set is_system based on filter logic
+    match filter.as_str() {
+        "system" => {
+            for app in &mut apps {
+                app.is_system = true;
+            }
+        }
+        "third_party" => {
+            for app in &mut apps {
+                app.is_system = false;
+            }
+        }
+        "disabled" => {
+            for app in &mut apps {
+                app.is_system = true; // disabled apps are typically system
+                app.is_enabled = false;
+            }
+        }
+        _ => {
+            // "all" — cross-reference with system list
+            for app in &mut apps {
+                app.is_system = system_packages.contains(&app.package_name);
+            }
+        }
+    }
+
+    Ok(apps)
+}
+
+#[tauri::command]
+pub fn adb_app_detail(state: State<AppState>, package: String) -> Result<AppInfo, String> {
+    let _serial = get_device_serial(&state).ok_or("No device connected")?;
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+
+    let output = run_adb_cmd_with_device(
+        &adb,
+        serial.as_deref(),
+        &["shell", "dumpsys", "package", &package],
+    )?;
+
+    parse_dumpsys_package(&output, &package)
+}
+
+#[tauri::command]
+pub async fn adb_install_apk(state: State<'_, AppState>, path: String) -> Result<String, String> {
+    let _serial = get_device_serial(&state).ok_or("No device connected")?;
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+
+    run_adb_cmd_with_device_timed(
+        &adb,
+        serial.as_deref(),
+        &["install", "-r", &path],
+        120,
+    )
+}
+
+#[tauri::command]
+pub fn adb_uninstall_app(
+    state: State<AppState>,
+    package: String,
+    is_system: bool,
+) -> Result<String, String> {
+    let _serial = get_device_serial(&state).ok_or("No device connected")?;
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+
+    if is_system {
+        // For system apps, uninstall for current user only (can be re-enabled)
+        run_adb_cmd_with_device(
+            &adb,
+            serial.as_deref(),
+            &["shell", "pm", "uninstall", "-k", "--user", "0", &package],
+        )
+    } else {
+        run_adb_cmd_with_device(
+            &adb,
+            serial.as_deref(),
+            &["shell", "pm", "uninstall", &package],
+        )
+    }
+}
+
+#[tauri::command]
+pub fn adb_clear_app(state: State<AppState>, package: String) -> Result<String, String> {
+    let _serial = get_device_serial(&state).ok_or("No device connected")?;
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+
+    run_adb_cmd_with_device(
+        &adb,
+        serial.as_deref(),
+        &["shell", "pm", "clear", &package],
+    )
+}
+
+#[tauri::command]
+pub fn adb_force_stop_app(state: State<AppState>, package: String) -> Result<String, String> {
+    let _serial = get_device_serial(&state).ok_or("No device connected")?;
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+
+    run_adb_cmd_with_device(
+        &adb,
+        serial.as_deref(),
+        &["shell", "am", "force-stop", &package],
+    )
+}
+
+#[tauri::command]
+pub fn adb_enable_app(state: State<AppState>, package: String) -> Result<String, String> {
+    let _serial = get_device_serial(&state).ok_or("No device connected")?;
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+
+    run_adb_cmd_with_device(
+        &adb,
+        serial.as_deref(),
+        &["shell", "pm", "enable", &package],
+    )
+}
+
+#[tauri::command]
+pub fn adb_disable_app(state: State<AppState>, package: String) -> Result<String, String> {
+    let _serial = get_device_serial(&state).ok_or("No device connected")?;
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+
+    run_adb_cmd_with_device(
+        &adb,
+        serial.as_deref(),
+        &["shell", "pm", "disable-user", "--user", "0", &package],
+    )
+}
+
 fn dirs_or_fallback_screenshots() -> String {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
