@@ -17,6 +17,10 @@ interface AppInfo {
   data_dir: string;
 }
 
+function fileNameOf(path: string): string {
+  return path.split(/[\\/]/).pop() ?? path;
+}
+
 export const useAppsStore = defineStore('apps', () => {
   const deviceStore = useDeviceStore();
   const toast = useToastStore();
@@ -67,21 +71,35 @@ export const useAppsStore = defineStore('apps', () => {
     }
   }
 
+  async function installApkFromPath(
+    path: string
+  ): Promise<{ success: boolean; filename: string; error?: string }> {
+    if (!deviceStore.connected) {
+      return { success: false, filename: fileNameOf(path), error: 'No device connected' };
+    }
+    isInstalling.value = true;
+    try {
+      await invoke('adb_install_apk', { path });
+      return { success: true, filename: fileNameOf(path) };
+    } catch (e) {
+      return { success: false, filename: fileNameOf(path), error: String(e) };
+    } finally {
+      isInstalling.value = false;
+    }
+  }
+
   async function installApk() {
     const selected = await dialogOpen({
       multiple: false,
       filters: [{ name: 'APK', extensions: ['apk'] }],
     });
     if (!selected) return;
-    isInstalling.value = true;
-    try {
-      await invoke('adb_install_apk', { path: selected as string });
-      toast.show('APK installed successfully', 'success');
+    const result = await installApkFromPath(selected as string);
+    if (result.success) {
+      toast.show(`Installed ${result.filename}`, 'success');
       await fetchApps();
-    } catch (e) {
-      toast.show(`Install failed: ${e}`, 'error');
-    } finally {
-      isInstalling.value = false;
+    } else {
+      toast.show(`Install failed: ${result.error}`, 'error');
     }
   }
 
@@ -219,6 +237,7 @@ export const useAppsStore = defineStore('apps', () => {
     fetchApps,
     fetchAppDetail,
     installApk,
+    installApkFromPath,
     uninstallApp,
     clearApp,
     forceStopApp,
