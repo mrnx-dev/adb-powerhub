@@ -7,7 +7,7 @@ const toastStore = useToastStore();
 const dismissing = ref<number | null>(null);
 
 const typeStyles: Record<string, string> = {
-  success: 'border-l-accent-emerald bg-color-success-container',
+  success: 'border-l-accent-emerald bg-accent-light',
   error: 'border-l-color-error bg-color-error-container',
   info: 'border-l-color-info bg-color-info-container',
   progress: 'border-l-accent-emerald bg-theme-btn',

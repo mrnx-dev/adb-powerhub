@@ -33,7 +33,7 @@ async function clearBuffer() {
     <div
       class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
       :class="{
-        'bg-color-success-container border-color-success text-color-success':
+        'bg-accent-light border-accent-default text-accent-emerald':
           store.status === 'LIVE',
         'bg-color-warning-container border-color-warning text-color-warning':
           store.status === 'PAUSED',
@@ -45,7 +45,7 @@ async function clearBuffer() {
       <span
         class="w-1.5 h-1.5 rounded-full inline-block"
         :class="{
-          'bg-[var(--color-success)]': store.status === 'LIVE',
+          'bg-accent-emerald': store.status === 'LIVE',
           'bg-[var(--color-warning)]': store.status === 'PAUSED',
           'bg-[var(--color-error)]': store.status === 'DISCONNECTED' || store.status === 'ERROR',
           'bg-theme-muted': store.status === 'IDLE',

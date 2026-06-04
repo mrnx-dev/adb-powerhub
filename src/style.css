@@ -1498,9 +1498,9 @@ input[type='range']::-moz-range-thumb {
 }
 
 .status-badge-active {
-  background-color: var(--color-success-container);
-  color: var(--color-success);
-  border: 1px solid var(--color-success);
+  background-color: var(--color-primary-container);
+  color: var(--color-accent-emerald);
+  border: 1px solid var(--color-accent-emerald);
 }
 
 .status-badge-recording {
@@ -1521,7 +1521,7 @@ input[type='range']::-moz-range-thumb {
 }
 
 .status-dot-active {
-  background-color: var(--color-success);
+  background-color: var(--color-accent-emerald);
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
@@ -1618,9 +1618,9 @@ input[type='range']::-moz-range-thumb {
 }
 
 .toggle-pill-on {
-  background-color: var(--color-success-container);
-  border-color: var(--color-success);
-  color: var(--color-success);
+  background-color: var(--color-primary-container);
+  border-color: var(--color-accent-emerald);
+  color: var(--color-accent-emerald);
 }
 
 .toggle-pill-knob {
@@ -1635,7 +1635,7 @@ input[type='range']::-moz-range-thumb {
 }
 
 .toggle-pill-on .toggle-pill-knob {
-  background-color: var(--color-success);
+  background-color: var(--color-accent-emerald);
 }
 
 /* ============================================================
