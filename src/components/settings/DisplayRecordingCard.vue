@@ -35,8 +35,8 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
           class="btn-pressable flex flex-col items-center px-3 py-3 rounded-xl border"
           :class="
             store.videoQuality === preset.key
-              ? 'bg-accent-10 border-accent-25 text-accent-emerald'
-              : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent'
+              ? 'action-card-active'
+              : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle'
           "
           @click="store.setVideoQuality(preset.key)"
         >
@@ -88,8 +88,8 @@ const formatOptions: { key: 'mp4' | 'mkv'; label: string }[] = [
           class="btn-pressable flex items-center justify-center px-4 py-3 rounded-xl border text-sm font-semibold"
           :class="
             store.recordingFormat === fmt.key
-              ? 'bg-accent-10 border-accent-25 text-accent-emerald'
-              : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent'
+              ? 'action-card-active'
+              : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle'
           "
           @click="store.setRecordingFormat(fmt.key)"
         >

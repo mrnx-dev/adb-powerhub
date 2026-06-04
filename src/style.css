@@ -1174,8 +1174,13 @@ body {
     box-shadow: 0 0 24px var(--glow-center);
   }
   .action-card-active:hover {
-    background-color: var(--color-success-container);
-    border-color: var(--color-success);
+    background-color: var(--color-primary-container);
+    border-color: var(--color-accent-emerald);
+  }
+
+  .hover-subtle:hover {
+    border-color: var(--border-secondary);
+    background-color: var(--bg-hover);
   }
 }
 
@@ -1644,14 +1649,14 @@ input[type='range']::-moz-range-thumb {
 }
 
 .action-card-active {
-  background-color: var(--color-success-container);
+  background-color: var(--color-primary-container);
   border-color: var(--border-primary);
-  color: var(--color-success);
+  color: var(--color-accent-emerald);
 }
 
 .action-card-active:hover {
-  background-color: var(--color-success-container);
-  border-color: var(--color-success);
+  background-color: var(--color-primary-container);
+  border-color: var(--color-accent-emerald);
 }
 
 /* ============================================================

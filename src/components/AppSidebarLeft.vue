@@ -84,8 +84,8 @@ onUnmounted(() => {
         class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'dashboard'
-            ? 'bg-accent-10 border-accent-25 text-accent-emerald'
-            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
+            ? 'action-card-active'
+            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle',
           expanded
             ? 'flex items-center gap-3 px-2 py-2.5'
             : 'flex items-center justify-center py-2.5',
@@ -101,8 +101,8 @@ onUnmounted(() => {
         class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'logcat'
-            ? 'bg-accent-10 border-accent-25 text-accent-emerald'
-            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
+            ? 'action-card-active'
+            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle',
           !deviceStore.connected ? 'opacity-50 cursor-not-allowed' : '',
           expanded
             ? 'flex items-center gap-3 px-2 py-2.5'
@@ -120,8 +120,8 @@ onUnmounted(() => {
         class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'apps'
-            ? 'bg-accent-10 border-accent-25 text-accent-emerald'
-            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
+            ? 'action-card-active'
+            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle',
           !deviceStore.connected ? 'opacity-50 cursor-not-allowed' : '',
           expanded
             ? 'flex items-center gap-3 px-2 py-2.5'
@@ -139,8 +139,8 @@ onUnmounted(() => {
         class="btn-pressable rounded-lg border transition-all"
         :class="[
           navStore.currentPage === 'settings'
-            ? 'bg-accent-10 border-accent-25 text-accent-emerald'
-            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-accent',
+            ? 'action-card-active'
+            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle',
           expanded
             ? 'flex items-center gap-3 px-2 py-2.5'
             : 'flex items-center justify-center py-2.5',

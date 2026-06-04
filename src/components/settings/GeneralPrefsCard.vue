@@ -76,8 +76,8 @@ function handleAutoReconnectChange(val: boolean) {
             class="btn-pressable flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
             :class="
               themeStore.mode === m.value
-                ? 'bg-accent-10 border-accent-25 text-accent-emerald'
-                : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover:border-theme-secondary'
+                ? 'action-card-active'
+                : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle'
             "
             @click="themeStore.setMode(m.value)"
           >
@@ -97,8 +97,8 @@ function handleAutoReconnectChange(val: boolean) {
               class="btn-pressable flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs transition-all"
               :class="
                 theme.id === themeStore.darkThemeId
-                  ? 'bg-accent-10 border-accent-25 text-theme-primary'
-                  : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover:border-theme-secondary'
+                  ? 'action-card-active'
+                  : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle'
               "
               @click="themeStore.setDarkTheme(theme.id)"
             >
@@ -120,8 +120,8 @@ function handleAutoReconnectChange(val: boolean) {
               class="btn-pressable flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs transition-all"
               :class="
                 theme.id === themeStore.lightThemeId
-                  ? 'bg-accent-10 border-accent-25 text-theme-primary'
-                  : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover:border-theme-secondary'
+                  ? 'action-card-active'
+                  : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle'
               "
               @click="themeStore.setLightTheme(theme.id)"
             >
@@ -147,8 +147,8 @@ function handleAutoReconnectChange(val: boolean) {
               class="btn-pressable flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs transition-all"
               :class="
                 isActiveTheme(theme.id)
-                  ? 'bg-accent-10 border-accent-25 text-theme-primary'
-                  : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover:border-theme-secondary'
+                  ? 'action-card-active'
+                  : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle'
               "
               @click="selectTheme(theme.id)"
             >
