@@ -1,15 +1,10 @@
 import { readonly, ref } from 'vue';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import type { DragDropEvent } from '@tauri-apps/api/webview';
 import { useAppsStore } from '@/stores/apps';
 import { useDeviceStore } from '@/stores/device';
 import { useToastStore } from '@/stores/toast';
 import { useNavigationStore } from '@/stores/navigation';
-
-type DragDropEvent =
-  | { type: 'enter'; paths: string[]; position: { x: number; y: number } }
-  | { type: 'over'; position: { x: number; y: number } }
-  | { type: 'drop'; paths: string[]; position: { x: number; y: number } }
-  | { type: 'leave' };
 
 const APK_EXTENSIONS = new Set(['apk', 'apks', 'xapk']);
 
@@ -189,9 +184,7 @@ export async function initApkDropZone() {
   if (initialized) return;
   initialized = true;
   try {
-    unlisten = await getCurrentWebviewWindow().onDragDropEvent(
-      handleDragDropEvent as (event: { payload: DragDropEvent }) => void
-    );
+    unlisten = await getCurrentWebviewWindow().onDragDropEvent(handleDragDropEvent);
   } catch (e) {
     // R4: Non-critical — drag-drop is an enhancement, not core functionality
     console.warn('Failed to register drag-drop listener:', e);

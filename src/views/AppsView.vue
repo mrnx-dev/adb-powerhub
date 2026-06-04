@@ -3,12 +3,15 @@ import { onMounted, watch } from 'vue';
 import { useDeviceStore } from '../stores/device';
 import { useAppsStore } from '../stores/apps';
 import { useNavigationStore } from '../stores/navigation';
+import { Download } from '@lucide/vue';
+import { useApkDropZone } from '../composables/useApkDropZone';
 import AppList from '../components/AppList.vue';
 import AppDetail from '../components/AppDetail.vue';
 
 const deviceStore = useDeviceStore();
 const appsStore = useAppsStore();
 const navStore = useNavigationStore();
+const { isDragOver } = useApkDropZone();
 
 onMounted(() => {
   if (deviceStore.connected) {
@@ -104,6 +107,19 @@ watch(
         >
           {{ appsStore.isInstalling ? 'Installing...' : '+ Install APK' }}
         </button>
+      </div>
+
+      <!-- Drop zone hint (always visible, highlights during drag) -->
+      <div
+        class="rounded-lg border-2 border-dashed p-3 flex items-center justify-center gap-2 transition-all duration-150 ease-out"
+        :class="[
+          isDragOver && deviceStore.connected
+            ? 'drop-zone-hint-active'
+            : 'border-theme-tertiary/50',
+        ]"
+      >
+        <Download :size="16" class="text-theme-muted" />
+        <span class="text-sm text-theme-muted">Drop APK here to install</span>
       </div>
 
       <!-- Error -->
