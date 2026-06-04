@@ -1107,6 +1107,48 @@ export const useDeviceStore = defineStore('device', () => {
     }
   }
 
+  async function toggleRecording() {
+    const wantRecord = !recordingScreen.value;
+    recordingScreen.value = wantRecord;
+
+    if (mirroring.value) {
+      // Restart scrcpy with the new recording state
+      try {
+        await invoke('adb_stop_scrcpy');
+        mirroring.value = false;
+      } catch (e) {
+        addLog(String(e), 'error');
+      }
+      try {
+        const settingsStore = useSettingsStore();
+        const args = settingsStore.getScrcpyArgs();
+        const bitrate = args.includes('--video-bit-rate')
+          ? args[args.indexOf('--video-bit-rate') + 1]
+          : null;
+        const maxSize = args.includes('--max-size') ? args[args.indexOf('--max-size') + 1] : null;
+        const saveDir = settingsStore.recordingSaveDir || null;
+        const recordingFormat = settingsStore.recordingFormat;
+        await invoke('adb_launch_scrcpy', {
+          record: wantRecord,
+          saveDir,
+          videoBitrate: bitrate,
+          maxSize,
+          recordingFormat,
+          showTouches: showTouches.value,
+          turnScreenOff: turnScreenOff.value,
+          alwaysOnTop: alwaysOnTop.value,
+          noControl: noControl.value,
+        });
+        mirroring.value = true;
+        addLog(wantRecord ? 'Recording started' : 'Recording stopped, mirror restarted', 'success');
+        toast.show(wantRecord ? 'Recording started' : 'Recording stopped', 'success');
+      } catch (e) {
+        addLog(`Failed to restart mirror: ${e}`, 'error');
+        toast.show('Failed to restart mirror', 'error');
+      }
+    }
+  }
+
   return {
     connected,
     connecting,
@@ -1210,6 +1252,7 @@ export const useDeviceStore = defineStore('device', () => {
     checkScrcpy,
     launchMirror,
     stopMirror,
+    toggleRecording,
     startReconnectWatcher,
     stopReconnectWatcher,
   };

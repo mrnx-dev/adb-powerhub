@@ -88,8 +88,11 @@ function toggleMirror() {
         <!-- Record Toggle Pill -->
         <div
           class="toggle-pill"
-          :class="{ 'toggle-pill-on': store.recordingScreen }"
-          @click="store.recordingScreen = !store.recordingScreen"
+          :class="{
+            'toggle-pill-on': store.recordingScreen,
+            'opacity-40 cursor-not-allowed': !store.connected,
+          }"
+          @click="store.connected && store.toggleRecording()"
         >
           <span class="toggle-pill-knob"></span>
           <span>{{ store.recordingScreen ? 'Recording' : 'Record' }}</span>
