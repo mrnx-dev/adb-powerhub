@@ -107,10 +107,9 @@ public class AppIcons {
             String name = (String) entry.getClass().getMethod("getName").invoke(entry);
             if (name == null) continue;
 
-            // Only look at PNG files in mipmap or drawable directories
+            // Only look at PNG files in mipmap directories (launcher icons)
             if (!name.endsWith(".png")) continue;
-            String lower = name.toLowerCase();
-            if (!lower.contains("mipmap") && !lower.contains("drawable")) continue;
+            if (!name.toLowerCase().contains("mipmap")) continue;
 
             candidates.add(name);
         }

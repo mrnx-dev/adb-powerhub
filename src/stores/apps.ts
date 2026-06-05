@@ -132,14 +132,8 @@ export const useAppsStore = defineStore('apps', () => {
       extracted: number;
       failed: number;
       duration_secs: number;
-    }>('icons-fetch-complete', (event) => {
-      const { cached, extracted, failed, total } = event.payload;
+    }>('icons-fetch-complete', () => {
       isLoadingIcons.value = false;
-      if (failed > 0 && cached + extracted > 0) {
-        toast.show(`Loaded ${cached + extracted} of ${total} icons`, 'info');
-      } else if (extracted === 0 && cached === 0 && failed > 0) {
-        toast.show('Could not load app icons', 'error');
-      }
     });
   }
 
