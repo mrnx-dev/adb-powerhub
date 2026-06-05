@@ -17,6 +17,13 @@ const ADB_TIMEOUT_SECS: u64 = 15;
 const APP_LABELS_DEX: &[u8] = include_bytes!("../assets/app_labels.dex");
 const DEX_REMOTE_PATH: &str = "/data/local/tmp/adbph_labels.dex";
 
+/// Embedded DEX for on-device icon extraction via ZIP reading.
+/// Generated from AppIcons.java using D8 (r8.jar).
+const APP_ICONS_DEX: &[u8] = include_bytes!("../assets/app_icons.dex");
+const ICONS_DEX_REMOTE: &str = "/data/local/tmp/adbph_icons.dex";
+/// Timeout for on-device DEX execution.
+const ICONS_DEX_TIMEOUT_SECS: u64 = 120;
+
 fn run_adb_cmd(adb_path: &str, args: &[&str]) -> Result<String, String> {
     run_adb_cmd_with_timeout(adb_path, args, ADB_TIMEOUT_SECS)
 }
@@ -1774,6 +1781,87 @@ fn parse_dumpsys_package(output: &str, package: &str) -> Result<AppInfo, String>
 
 static ICONS_FETCH_RUNNING: AtomicBool = AtomicBool::new(false);
 
+/// Run the AppIcons DEX on device to extract icons via ZIP reading.
+/// Returns HashMap<package, Vec<u8>> of PNG bytes.
+fn resolve_icons_via_zip_dex(
+    adb: &str,
+    serial: Option<&str>,
+    packages: &[(&str, &str)], // (pkg, apk_path)
+) -> Result<std::collections::HashMap<String, Vec<u8>>, String> {
+    use std::io::Write;
+
+    if packages.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    // 1. Push DEX to device
+    let temp_dir = std::env::temp_dir();
+    let local_dex = temp_dir.join("adbph_icons_v2.dex");
+    {
+        let mut file = std::fs::File::create(&local_dex)
+            .map_err(|e| format!("Failed to create temp dex: {}", e))?;
+        file.write_all(APP_ICONS_DEX)
+            .map_err(|e| format!("Failed to write temp dex: {}", e))?;
+    }
+    let local_path = local_dex.to_string_lossy();
+    run_adb_cmd_with_device_timed(adb, serial, &["push", &local_path, ICONS_DEX_REMOTE], 30)
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&local_dex);
+            format!("Failed to push icons dex: {}", e)
+        })?;
+
+    // 2. Build argument: "pkg1=apk1,pkg2=apk2,..."
+    let pkg_arg: String = packages
+        .iter()
+        .map(|(pkg, apk)| format!("{}={}", pkg, apk))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let shell_cmd = format!(
+        "CLASSPATH={} app_process / AppIcons {}",
+        ICONS_DEX_REMOTE, pkg_arg
+    );
+
+    // 3. Run DEX
+    eprintln!("[icons] Running DEX for {} packages", packages.len());
+    let output = run_adb_cmd_with_device_timed(adb, serial, &["shell", &shell_cmd], ICONS_DEX_TIMEOUT_SECS)
+        .unwrap_or_default();
+
+    // 4. Parse output: pkg|base64
+    let mut result = std::collections::HashMap::new();
+    for line in output.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with("ERROR:") || line.starts_with("SKIP:") {
+            if line.starts_with("SKIP:") {
+                eprintln!("[icons] DEX skip: {}", line);
+            }
+            continue;
+        }
+        // Split on first '|': pkg|base64
+        if let Some(pipe_idx) = line.find('|') {
+            let pkg = line[..pipe_idx].to_string();
+            let b64 = line[pipe_idx + 1..].to_string();
+            if pkg.is_empty() || b64.is_empty() {
+                continue;
+            }
+            match base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &b64) {
+                Ok(png_bytes) => {
+                    result.insert(pkg, png_bytes);
+                }
+                Err(_) => continue,
+            }
+        }
+    }
+
+    eprintln!("[icons] DEX extracted {} icons", result.len());
+
+    // 5. Cleanup
+    let _ = run_adb_cmd_with_device_timed(adb, serial, &["shell", &format!("rm -f {}", ICONS_DEX_REMOTE)], 5);
+    let _ = std::fs::remove_file(&local_dex);
+
+    Ok(result)
+}
+
 /// Brief package info needed for icon extraction (avoids pulling full AppInfo).
 #[derive(Deserialize)]
 pub struct PackageIconRequest {
@@ -1805,8 +1893,6 @@ pub fn adb_fetch_icons(
             return Err("No device connected".into());
         }
     };
-    let aapt2 = lock_state!(state.aapt2_path).clone();
-    let aapt2_path = aapt2.unwrap_or_else(|| "aapt2".to_string());
 
     let data_dir = app_handle.path().app_data_dir()
         .map_err(|e| format!("Cannot get app data dir: {}", e))?;
@@ -1845,78 +1931,65 @@ pub fn adb_fetch_icons(
             missing.len()
         );
 
-        // 2. Extract missing icons one at a time, emit each as it completes
+        // 2. Extract missing icons via on-device ZIP-reading DEX (single call!)
         let mut success = 0u32;
         let mut failed = 0u32;
 
         if !missing.is_empty() {
-            let aapt2_ok = std::process::Command::new(&aapt2_path)
-                .arg("version")
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false);
+            // Build pkg=apk pairs for the DEX
+            let dex_packages: Vec<(&str, &str)> = missing
+                .iter()
+                .filter(|p| !p.code_path.is_empty())
+                .map(|p| (p.package_name.as_str(), p.code_path.as_str()))
+                .collect();
 
-            if !aapt2_ok {
-                eprintln!(
-                    "[icons] aapt2 not available, skipping {} missing icons",
-                    missing.len()
-                );
-                failed = missing.len() as u32;
-                // Emit failed for each missing package so UI can update
-                for pkg in &missing {
-                    let _ = app.emit("icon-ready", serde_json::json!({
-                        "package": &pkg.package_name,
-                        "base64": null,
-                    }));
+            match resolve_icons_via_zip_dex(&adb, Some(&serial), &dex_packages) {
+                Ok(extracted) => {
+                    for pkg_req in &missing {
+                        if pkg_req.code_path.is_empty() {
+                            failed += 1;
+                            let _ = app.emit("icon-ready", serde_json::json!({
+                                "package": &pkg_req.package_name,
+                                "base64": null,
+                            }));
+                            continue;
+                        }
+                        if let Some(png_data) = extracted.get(&pkg_req.package_name) {
+                            // Save to cache
+                            icons::save_to_cache(
+                                &cache_dir,
+                                &pkg_req.package_name,
+                                pkg_req.version_code,
+                                png_data,
+                                false,
+                            );
+                            let b64 = base64::Engine::encode(
+                                &base64::engine::general_purpose::STANDARD,
+                                png_data,
+                            );
+                            let _ = app.emit("icon-ready", serde_json::json!({
+                                "package": &pkg_req.package_name,
+                                "base64": b64,
+                            }));
+                            success += 1;
+                        } else {
+                            eprintln!("[icons] {} — not in DEX result", pkg_req.package_name);
+                            failed += 1;
+                            let _ = app.emit("icon-ready", serde_json::json!({
+                                "package": &pkg_req.package_name,
+                                "base64": null,
+                            }));
+                        }
+                    }
                 }
-            } else {
-                for pkg in &missing {
-                    if pkg.code_path.is_empty() {
-                        eprintln!("[icons] {} — no APK path, skipping", pkg.package_name);
-                        failed += 1;
+                Err(e) => {
+                    eprintln!("[icons] DEX extraction failed: {}", e);
+                    failed = missing.len() as u32;
+                    for pkg in &missing {
                         let _ = app.emit("icon-ready", serde_json::json!({
                             "package": &pkg.package_name,
                             "base64": null,
                         }));
-                        continue;
-                    }
-
-                    match icons::extract_icon(
-                        &adb,
-                        &aapt2_path,
-                        Some(&serial),
-                        &pkg.code_path,
-                        &pkg.package_name,
-                        pkg.version_code,
-                    ) {
-                        Ok(extracted) => {
-                            icons::save_to_cache(
-                                &cache_dir,
-                                &extracted.package,
-                                extracted.version_code,
-                                &extracted.png_data,
-                                extracted.is_adaptive,
-                            );
-                            let b64 = base64::Engine::encode(
-                                &base64::engine::general_purpose::STANDARD,
-                                &extracted.png_data,
-                            );
-                            let _ = app.emit("icon-ready", serde_json::json!({
-                                "package": &extracted.package,
-                                "base64": b64,
-                            }));
-                            success += 1;
-                        }
-                        Err(e) => {
-                            eprintln!("[icons] {} — FAILED: {}", pkg.package_name, e);
-                            failed += 1;
-                            let _ = app.emit("icon-ready", serde_json::json!({
-                                "package": &pkg.package_name,
-                                "base64": null,
-                            }));
-                        }
                     }
                 }
             }

@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { open as dialogOpen, ask } from '@tauri-apps/plugin-dialog';
 import { useDeviceStore } from './device';
-import { useSettingsStore } from './settings';
 import { useToastStore } from './toast';
 
 interface AppInfo {
@@ -24,7 +24,6 @@ function fileNameOf(path: string): string {
 
 export const useAppsStore = defineStore('apps', () => {
   const deviceStore = useDeviceStore();
-  const settingsStore = useSettingsStore();
   const toast = useToastStore();
 
   const apps = ref<AppInfo[]>([]);
@@ -39,6 +38,8 @@ export const useAppsStore = defineStore('apps', () => {
   const icons = ref<Record<string, string>>({}); // pkg → data:image/png;base64,...
   const iconStates = ref<Record<string, 'loading' | 'loaded' | 'failed'>>({});
   const isLoadingIcons = ref(false);
+  let unlistenIconReady: UnlistenFn | null = null;
+  let unlistenFetchComplete: UnlistenFn | null = null;
 
   const failedIconCount = computed(
     () => Object.values(iconStates.value).filter((s) => s === 'failed').length
@@ -74,21 +75,6 @@ export const useAppsStore = defineStore('apps', () => {
 
   async function fetchIcons() {
     if (!deviceStore.connected || apps.value.length === 0) return;
-
-    // Auto-setup: if aapt2 is missing, download it first
-    if (!settingsStore.aapt2Valid) {
-      console.log('[apps] aapt2 not available, auto-downloading...');
-      const downloaded = await settingsStore.downloadAapt2();
-      if (!downloaded) {
-        console.log('[apps] aapt2 setup failed, skipping icon fetch');
-        const failedStates: Record<string, 'loading' | 'loaded' | 'failed'> = {};
-        for (const a of apps.value) {
-          failedStates[a.package_name] = 'failed';
-        }
-        iconStates.value = failedStates;
-        return;
-      }
-    }
 
     isLoadingIcons.value = true;
 
