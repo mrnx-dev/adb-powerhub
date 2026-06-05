@@ -93,9 +93,92 @@ public class AppIcons {
     }
 
     /**
+     * Quick-scan AndroidManifest.xml (AXML binary) for icon drawable names.
+     * Scans raw bytes for ASCII and UTF-16 strings that look like drawable names.
+     * No full AXML parser needed.
+     */
+    static java.util.List<String> findIconNamesFromManifest(Object zf) throws Exception {
+        Class<?> zfClass = zf.getClass();
+        java.util.List<String> names = new java.util.ArrayList<>();
+
+        Object entry = zfClass.getMethod("getEntry", String.class)
+            .invoke(zf, "AndroidManifest.xml");
+        if (entry == null) return names;
+
+        Object is = zfClass.getMethod("getInputStream",
+            Class.forName("java.util.zip.ZipEntry")).invoke(zf, entry);
+        byte[] bytes = readAllBytes(is);
+        is.getClass().getMethod("close").invoke(is);
+
+        if (bytes == null || bytes.length < 100) return names;
+
+        // Scan for ASCII strings
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < bytes.length; i++) {
+            byte b = bytes[i];
+            if (b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z'
+                || b >= '0' && b <= '9' || b == '_' || b == '.' || b == '/') {
+                sb.append((char) b);
+            } else {
+                if (sb.length() >= 3 && sb.length() <= 60) {
+                    addIfIconName(names, sb.toString());
+                }
+                sb = new StringBuilder();
+            }
+        }
+        if (sb.length() >= 3) addIfIconName(names, sb.toString());
+
+        // Scan for UTF-16 strings (common in AXML string pools)
+        for (int i = 0; i < bytes.length - 3; i += 2) {
+            char c = (char) ((bytes[i] & 0xFF) | ((bytes[i+1] & 0xFF) << 8));
+            if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
+                sb = new StringBuilder();
+                sb.append(c);
+                for (int j = i + 2; j < bytes.length - 1; j += 2) {
+                    char c2 = (char) ((bytes[j] & 0xFF) | ((bytes[j+1] & 0xFF) << 8));
+                    if (c2 >= 'a' && c2 <= 'z' || c2 >= 'A' && c2 <= 'Z'
+                        || c2 >= '0' && c2 <= '9' || c2 == '_' || c2 == '.' || c2 == '/') {
+                        sb.append(c2);
+                    } else {
+                        break;
+                    }
+                }
+                if (sb.length() >= 3 && sb.length() <= 60) {
+                    addIfIconName(names, sb.toString());
+                }
+                i += sb.length() * 2;
+            }
+        }
+
+        return names;
+    }
+
+    static void addIfIconName(java.util.List<String> names, String s) {
+        String lower = s.toLowerCase();
+        // Must be a plausible drawable reference
+        boolean isMipmap = lower.contains("mipmap") || lower.contains("drawable");
+        boolean isIcon = lower.contains("ic_") || lower.contains("icon") || lower.contains("logo");
+        boolean hasUnderscore = lower.contains("_");
+        if (!isMipmap && !isIcon && !hasUnderscore) return;
+
+        // Extract just the base name (strip path and extension)
+        String name = s;
+        int slash = name.lastIndexOf('/');
+        if (slash >= 0) name = name.substring(slash + 1);
+        int dot = name.lastIndexOf('.');
+        if (dot > 0 && dot < name.length() - 1) {
+            name = name.substring(0, dot);
+        }
+        if (!names.contains(name)) {
+            names.add(name);
+        }
+    }
+
+    /**
      * Search the APK ZIP for the best launcher icon.
-     * Scans all PNG entries in mipmap and drawable resource directories,
-     * prefers higher density and filenames containing ic_launcher or icon.
+     * First checks AndroidManifest.xml for icon drawable names (AXML quick-scan),
+     * then scans all PNG entries in mipmap directories, prefers higher density
+     * and filenames matching manifest hints or containing ic_launcher / icon.
      */
     static String findBestIcon(Object zf) throws Exception {
         Class<?> zfClass = zf.getClass();
@@ -120,11 +203,15 @@ public class AppIcons {
 
         if (candidates.isEmpty()) return null;
 
-        // Score each candidate: prefer ic_launcher > icon, prefer higher density
+        // Quick-scan AndroidManifest for icon name hints
+        java.util.List<String> manifestHints = findIconNamesFromManifest(zf);
+
+        // Score each candidate: prefer ic_launcher > icon, prefer higher density,
+        // bonus for matching manifest hints
         String best = null;
         int bestScore = -1;
         for (String c : candidates) {
-            int score = scoreIcon(c);
+            int score = scoreIcon(c, manifestHints);
             if (score > bestScore) {
                 bestScore = score;
                 best = c;
@@ -134,7 +221,7 @@ public class AppIcons {
         return best;
     }
 
-    static int scoreIcon(String path) {
+    static int scoreIcon(String path, java.util.List<String> manifestHints) {
         String lower = path.toLowerCase();
         int score = 0;
 
@@ -149,7 +236,6 @@ public class AppIcons {
         // Name bonus: prefer launcher icons
         if (lower.contains("ic_launcher")) {
             score += 1000;
-            // Prefer non-round, non-foreground (full icon)
             if (!lower.contains("round") && !lower.contains("foreground") && !lower.contains("background")) {
                 score += 500;
             }
@@ -157,11 +243,18 @@ public class AppIcons {
             score += 500;
         }
 
-        // Prefer mipmap over drawable (mipmap is specifically for launcher icons)
-        if (lower.contains("mipmap")) score += 200;
+        // Bonus: filename matches manifest hint — very strong signal!
+        if (manifestHints != null) {
+            for (String hint : manifestHints) {
+                if (lower.contains(hint.toLowerCase())) {
+                    score += 2000; // Manifest says this is the icon!
+                    break;
+                }
+            }
+        }
 
-        // Prefer smaller file sizes (likely the right density)
-        // Can't easily get size without reading entry, skip this heuristic
+        // Prefer mipmap over drawable
+        if (lower.contains("mipmap")) score += 200;
 
         return score;
     }
