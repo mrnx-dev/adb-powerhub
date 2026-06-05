@@ -49,8 +49,14 @@ watch(searchInput, (val) => {
           ]"
           @click="appsStore.selectApp(app.package_name)"
         >
-          <!-- Icon: first letter -->
+          <img
+            v-if="appsStore.icons[app.package_name]"
+            :src="appsStore.icons[app.package_name]"
+            class="w-9 h-9 shrink-0 rounded-lg object-cover"
+            :alt="app.label"
+          />
           <div
+            v-else
             class="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-xs font-bold"
             :class="[
               app.is_system

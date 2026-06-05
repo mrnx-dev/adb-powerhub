@@ -34,6 +34,8 @@ export const useAppsStore = defineStore('apps', () => {
   const filter = ref<'all' | 'third_party' | 'system' | 'disabled'>('all');
   const searchQuery = ref('');
   const error = ref<string | null>(null);
+  const icons = ref<Record<string, string>>({}); // pkg → data:image/png;base64,...
+  const isLoadingIcons = ref(false);
 
   // Debounced search
   const filteredApps = computed(() => {
@@ -60,6 +62,42 @@ export const useAppsStore = defineStore('apps', () => {
       apps.value = [];
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  async function fetchIcons(retry = true) {
+    if (!deviceStore.connected || apps.value.length === 0) return;
+    isLoadingIcons.value = true;
+    try {
+      const pkgNames = apps.value.map((a) => a.package_name);
+      console.log('[apps] Fetching icons for', pkgNames.length, 'apps');
+      const result = await invoke<Record<string, string>>('adb_fetch_icons', {
+        packageNames: pkgNames,
+      });
+      console.log('[apps] Icon fetch returned', Object.keys(result).length, 'icons');
+      const newIcons: Record<string, string> = {};
+      for (const [pkg, b64] of Object.entries(result)) {
+        newIcons[pkg] = `data:image/png;base64,${b64}`;
+      }
+      console.log('[apps] Icons object size:', Object.keys(newIcons).length);
+      icons.value = newIcons;
+    } catch (e) {
+      // Non-fatal — initial letter fallback still works
+      const msg = String(e);
+      if (msg.includes('already in progress')) {
+        // Another fetch is running — don't retry, it will populate icons
+        console.log('[apps] Icon fetch already in progress, skipping');
+      } else {
+        console.warn('[apps] Icon fetch failed:', e);
+        // Retry once if this is the first attempt
+        if (retry) {
+          console.log('[apps] Retrying icon fetch...');
+          await new Promise<void>((r) => setTimeout(r, 2000));
+          return fetchIcons(false);
+        }
+      }
+    } finally {
+      isLoadingIcons.value = false;
     }
   }
 
@@ -241,6 +279,8 @@ export const useAppsStore = defineStore('apps', () => {
     isLoading.value = false;
     isActioning.value = false;
     isInstalling.value = false;
+    icons.value = {};
+    isLoadingIcons.value = false;
   }
 
   return {
@@ -255,7 +295,10 @@ export const useAppsStore = defineStore('apps', () => {
     error,
     filteredApps,
     appCount,
+    icons,
+    isLoadingIcons,
     fetchApps,
+    fetchIcons,
     fetchAppDetail,
     installApk,
     installApkFromPath,

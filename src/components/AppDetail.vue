@@ -49,7 +49,14 @@ function copyPackageName() {
             </div>
           </div>
 
+          <img
+            v-if="appsStore.icons[appsStore.appDetail.package_name]"
+            :src="appsStore.icons[appsStore.appDetail.package_name]"
+            class="w-12 h-12 shrink-0 rounded-xl object-cover"
+            :alt="appsStore.appDetail.label"
+          />
           <div
+            v-else
             class="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-xl font-bold"
             :class="[
               appsStore.appDetail.is_system

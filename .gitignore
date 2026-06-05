@@ -17,3 +17,6 @@ skills/
 # Windows CMD artifacts (e.g. `echo done > nul`)
 nul
 *.lnk
+
+# Build artifacts for DEX compilation
+src-tauri/assets/r8.jar

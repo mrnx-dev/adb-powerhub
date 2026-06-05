@@ -3,7 +3,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -16,6 +16,14 @@ const ADB_TIMEOUT_SECS: u64 = 15;
 /// Generated from `src-tauri/assets/AppLabels.java` using D8.
 const APP_LABELS_DEX: &[u8] = include_bytes!("../assets/app_labels.dex");
 const DEX_REMOTE_PATH: &str = "/data/local/tmp/adbph_labels.dex";
+
+/// Embedded DEX bytecode for on-device icon rendering.
+/// Generated from `src-tauri/assets/AppIcons.java` using D8.
+const APP_ICONS_DEX: &[u8] = include_bytes!("../assets/app_icons.dex");
+const ICONS_DEX_REMOTE: &str = "/data/local/tmp/adbph_icons.dex";
+const ICONS_TXT_REMOTE: &str = "/data/local/tmp/adbph_icons.txt";
+/// Timeout for on-device DEX execution (prevents indefinite hang).
+const ICONS_DEX_TIMEOUT_SECS: u64 = 60;
 
 fn run_adb_cmd(adb_path: &str, args: &[&str]) -> Result<String, String> {
     run_adb_cmd_with_timeout(adb_path, args, ADB_TIMEOUT_SECS)
@@ -1472,6 +1480,220 @@ pub fn write_text_file(path: String, content: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to write file: {}", e))
 }
 
+// ─── Icon Extraction ───────────────────────────────────────────
+
+/// Result of parsing the DEX icon output.
+struct IconParseResult {
+    icons: std::collections::HashMap<String, Vec<u8>>,
+    versions: std::collections::HashMap<String, i64>,
+}
+
+/// Resolve app icons by running an embedded DEX on the device.
+///
+/// Flow:
+///   1. Write embedded DEX to local temp file.
+///   2. `adb push` it to device.
+///   3. Clean up stale output file on device.
+///   4. Execute `CLASSPATH=... app_process / AppIcons [pkgs]`.
+///   5. `adb pull` the output text file.
+///   6. Parse lines as `pkg|versionCode|base64`.
+///   7. Clean up remote and local temp files.
+fn resolve_icons_via_dex(
+    adb: &str,
+    serial: Option<&str>,
+    package_names: Option<&[String]>,
+) -> Result<IconParseResult, String> {
+    use std::io::Write;
+
+    // 1. Write embedded DEX to local temp
+    let temp_dir = std::env::temp_dir();
+    let local_dex = temp_dir.join("adbph_icons.dex");
+    {
+        let mut file = std::fs::File::create(&local_dex)
+            .map_err(|e| format!("Failed to create temp dex: {}", e))?;
+        file.write_all(APP_ICONS_DEX)
+            .map_err(|e| format!("Failed to write temp dex: {}", e))?;
+    }
+
+    // 2. Push DEX to device
+    let local_path = local_dex.to_string_lossy();
+    let push_result = run_adb_cmd_with_device_timed(
+        adb,
+        serial,
+        &["push", &local_path, ICONS_DEX_REMOTE],
+        30,
+    );
+    if let Err(e) = push_result {
+        let _ = std::fs::remove_file(&local_dex);
+        return Err(format!("Failed to push icons dex: {}", e));
+    }
+
+    // 3. Clean up stale output file
+    let _ = run_adb_cmd_with_device_timed(
+        adb,
+        serial,
+        &["shell", &format!("rm -f {}", ICONS_TXT_REMOTE)],
+        5,
+    );
+
+    // 4. Run DEX — batch or incremental mode
+    let shell_cmd = if let Some(pkgs) = package_names {
+        let pkg_arg = pkgs.join(",");
+        format!(
+            "CLASSPATH={} app_process / AppIcons {}",
+            ICONS_DEX_REMOTE, pkg_arg
+        )
+    } else {
+        format!(
+            "CLASSPATH={} app_process / AppIcons",
+            ICONS_DEX_REMOTE
+        )
+    };
+
+    // Use a timeout for the DEX execution
+    eprintln!("[icons] Running DEX: {}", shell_cmd);
+    let run_result = run_adb_cmd_with_device_timed(
+        adb,
+        serial,
+        &["shell", &shell_cmd],
+        ICONS_DEX_TIMEOUT_SECS,
+    );
+    eprintln!("[icons] DEX run result: {}", if run_result.is_ok() { "OK" } else { "FAILED" });
+
+    // 5. Pull output file
+    let local_txt = temp_dir.join("adbph_icons.txt");
+    let local_txt_path = local_txt.to_string_lossy();
+    let pull_result = run_adb_cmd_with_device_timed(
+        adb,
+        serial,
+        &["pull", ICONS_TXT_REMOTE, &local_txt_path],
+        30,
+    );
+    eprintln!("[icons] Pull result: {}", if pull_result.is_ok() { "OK" } else { "FAILED" });
+
+    // 6. Parse output (even if pull had partial success)
+    let mut icons = std::collections::HashMap::new();
+    let mut versions = std::collections::HashMap::new();
+
+    if pull_result.is_ok() {
+        if let Ok(content) = std::fs::read_to_string(&local_txt) {
+            eprintln!("[icons] Output file size: {} bytes", content.len());
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with("ERROR:") {
+                    continue;
+                }
+                // Split on first 2 '|': pkg|versionCode|base64
+                let parts: Vec<&str> = line.splitn(3, '|').collect();
+                if parts.len() != 3 {
+                    continue;
+                }
+                let pkg = parts[0].to_string();
+                let ver_str = parts[1];
+                let b64 = parts[2];
+                if pkg.is_empty() || b64.is_empty() {
+                    continue;
+                }
+                let version_code: i64 = ver_str.parse().unwrap_or(0);
+                match base64::Engine::decode(&base64::engine::general_purpose::STANDARD, b64) {
+                    Ok(png_bytes) => {
+                        icons.insert(pkg.clone(), png_bytes);
+                        versions.insert(pkg, version_code);
+                    }
+                    Err(_) => continue, // skip corrupted base64
+                }
+            }
+        }
+    }
+
+    // 7. Cleanup remote and local files
+    let _ = run_adb_cmd_with_device_timed(
+        adb,
+        serial,
+        &["shell", &format!("rm -f {} {}", ICONS_DEX_REMOTE, ICONS_TXT_REMOTE)],
+        5,
+    );
+    let _ = std::fs::remove_file(&local_dex);
+    let _ = std::fs::remove_file(&local_txt);
+
+    // If DEX run failed and we got no icons, return error
+    if run_result.is_err() && icons.is_empty() {
+        return Err(format!("Icon DEX execution failed: {}", run_result.unwrap_err()));
+    }
+
+    eprintln!("[icons] Parsed {} icons", icons.len());
+    Ok(IconParseResult { icons, versions })
+}
+
+fn read_cached_icons(
+    cache_dir: &std::path::Path,
+    package_names: &[String],
+) -> std::collections::HashMap<String, Vec<u8>> {
+    let mut result = std::collections::HashMap::new();
+    if !cache_dir.exists() {
+        eprintln!("[icons] Cache dir does not exist: {:?}", cache_dir);
+        return result;
+    }
+    for pkg in package_names {
+        let png_path = cache_dir.join(format!("{}.png", pkg));
+        if let Ok(data) = std::fs::read(&png_path) {
+            result.insert(pkg.clone(), data);
+        }
+    }
+    eprintln!("[icons] Read {} cached icons from {:?}", result.len(), cache_dir);
+    result
+}
+
+fn save_icons_to_cache(
+    cache_dir: &std::path::Path,
+    icons: &std::collections::HashMap<String, Vec<u8>>,
+    versions: &std::collections::HashMap<String, i64>,
+) -> Result<(), String> {
+    std::fs::create_dir_all(cache_dir)
+        .map_err(|e| format!("Failed to create cache dir: {}", e))?;
+    for (pkg, png_bytes) in icons {
+        let png_path = cache_dir.join(format!("{}.png", pkg));
+        if let Err(e) = std::fs::write(&png_path, png_bytes) {
+            eprintln!("[icons] Failed to write cache for {}: {}", pkg, e);
+            continue;
+        }
+        let meta_path = cache_dir.join(format!("{}.meta", pkg));
+        let version_code = versions.get(pkg).copied().unwrap_or(0);
+        if let Err(e) = std::fs::write(&meta_path, version_code.to_string()) {
+            eprintln!("[icons] Failed to write meta for {}: {}", pkg, e);
+        }
+    }
+    Ok(())
+}
+
+fn cleanup_stale_cache(
+    cache_dir: &std::path::Path,
+    current_packages: &[String],
+) {
+    if !cache_dir.exists() {
+        return;
+    }
+    let current_set: std::collections::HashSet<&str> =
+        current_packages.iter().map(|s| s.as_str()).collect();
+
+    if let Ok(entries) = std::fs::read_dir(cache_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+
+            if file_name.ends_with(".png") {
+                let pkg_name = file_name.strip_suffix(".png").unwrap_or("");
+                if !current_set.contains(pkg_name) {
+                    let _ = std::fs::remove_file(&path);
+                    // Also remove corresponding .meta
+                    let meta_path = path.with_extension("meta");
+                    let _ = std::fs::remove_file(&meta_path);
+                }
+            }
+        }
+    }
+}
+
 // ─── App Manager Commands ──────────────────────────────────
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1770,6 +1992,85 @@ fn parse_dumpsys_package(output: &str, package: &str) -> Result<AppInfo, String>
         code_path,
         data_dir,
     })
+}
+
+static ICONS_FETCH_RUNNING: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+pub fn adb_fetch_icons(
+    app_handle: tauri::AppHandle,
+    state: State<AppState>,
+    package_names: Vec<String>,
+) -> Result<std::collections::HashMap<String, String>, String> {
+    // Concurrency guard
+    if ICONS_FETCH_RUNNING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+        return Err("Icon fetch already in progress".into());
+    }
+
+    let result = (|| -> Result<std::collections::HashMap<String, String>, String> {
+        let adb = get_adb_path(&state);
+        let serial = get_device_serial(&state).ok_or("No device connected")?;
+
+        // 1. Determine cache dir: <app_data_dir>/adbph_icons/<serial_sanitized>/
+        let data_dir = app_handle.path().app_data_dir()
+            .map_err(|e| format!("Cannot get app data dir: {}", e))?;
+        // Sanitize serial for use as directory name (e.g. replace ':' which is illegal on Windows)
+        let serial_safe = serial.replace(':', "_").replace('/', "_").replace('\\', "_");
+        let cache_dir = data_dir.join("adbph_icons").join(&serial_safe);
+        eprintln!("[icons] Cache dir: {:?}", cache_dir);
+
+        // 2. Read cached icons — just check .png existence
+        let mut icons = read_cached_icons(&cache_dir, &package_names);
+        eprintln!("[icons] Cached: {}, total requested: {}", icons.len(), package_names.len());
+
+        // 3. Determine missing packages
+        let missing: Vec<String> = package_names.iter()
+            .filter(|p| !icons.contains_key(*p))
+            .cloned()
+            .collect();
+        eprintln!("[icons] Missing: {}", missing.len());
+
+        // 4. If all cached → return immediately
+        if !missing.is_empty() {
+            // 5. Fetch from device — INCREMENTAL: only render missing packages
+            let IconParseResult { icons: fetched, versions: fetched_versions } =
+                resolve_icons_via_dex(&adb, Some(&serial), Some(&missing))?;
+
+            // 6. Save fetched icons + version metadata to cache
+            let save_result = save_icons_to_cache(&cache_dir, &fetched, &fetched_versions);
+            if let Err(e) = &save_result {
+                eprintln!("[icons] Failed to save cache: {}", e);
+            } else {
+                eprintln!("[icons] Saved {} icons to cache", fetched.len());
+            }
+
+            // 7. Merge: fetched overrides cache
+            for (pkg, data) in &fetched {
+                icons.insert(pkg.clone(), data.clone());
+            }
+
+            // 8. Cleanup stale cache entries
+            cleanup_stale_cache(&cache_dir, &package_names);
+        }
+
+        // 9. Convert to base64 strings for frontend
+        let result: std::collections::HashMap<String, String> = icons.iter()
+            .filter(|(pkg, _)| package_names.contains(pkg))
+            .map(|(pkg, data)| (pkg.clone(), base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data)))
+            .collect();
+
+        eprintln!("[icons] Returning {} icons to frontend", result.len());
+        if !result.is_empty() {
+            let first_key = result.keys().next().unwrap();
+            eprintln!("[icons] Sample key: '{}', value length: {}", first_key, result.get(first_key).unwrap().len());
+        }
+
+        Ok(result)
+    })();
+
+    // ALWAYS reset concurrency guard
+    ICONS_FETCH_RUNNING.store(false, Ordering::SeqCst);
+    result
 }
 
 #[tauri::command]

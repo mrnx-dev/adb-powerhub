@@ -30,6 +30,7 @@ zip = "2"
 walkdir = "2"
 opener = "0.7"
 regex = "1"
+base64 = "0.22"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

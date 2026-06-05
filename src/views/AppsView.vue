@@ -15,9 +15,15 @@ const { isDragOver } = useApkDropZone();
 
 onMounted(() => {
   if (deviceStore.connected) {
-    appsStore.fetchApps();
+    loadApps();
   }
 });
+
+async function loadApps() {
+  await appsStore.fetchApps();
+  // Don't await — icons load in background (with 1 retry built-in)
+  appsStore.fetchIcons();
+}
 
 watch(
   () => deviceStore.connected,
@@ -32,7 +38,7 @@ watch(
   () => navStore.currentPage,
   (page) => {
     if (page === 'apps' && deviceStore.connected) {
-      appsStore.fetchApps();
+      loadApps();
     }
   }
 );
@@ -77,7 +83,7 @@ watch(
             ]"
             @click="
               appsStore.filter = f;
-              appsStore.fetchApps();
+              loadApps();
             "
           >
             {{
@@ -95,7 +101,7 @@ watch(
         <button
           class="btn-pressable px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-tertiary text-theme-secondary text-xs font-medium hover-accent transition-all"
           :disabled="appsStore.isLoading"
-          @click="appsStore.fetchApps()"
+          @click="loadApps()"
         >
           {{ appsStore.isLoading ? 'Loading...' : 'Refresh' }}
         </button>
@@ -128,10 +134,7 @@ watch(
         class="px-4 py-2 rounded-lg bg-color-error-container border border-color-error text-color-error text-sm"
       >
         {{ appsStore.error }}
-        <button
-          class="btn-pressable ml-2 underline text-color-error"
-          @click="appsStore.fetchApps()"
-        >
+        <button class="btn-pressable ml-2 underline text-color-error" @click="loadApps()">
           Retry
         </button>
       </div>
