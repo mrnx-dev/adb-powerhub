@@ -80,9 +80,18 @@ export const useAppsStore = defineStore('apps', () => {
       console.log('[apps] aapt2 not available, auto-downloading...');
       const downloaded = await settingsStore.downloadAapt2();
       if (!downloaded) {
-        // Download failed or cancelled — proceed with fallback
-        console.log('[apps] aapt2 download failed, icons will use fallback');
+        // Download failed or cancelled — skip icon fetch entirely
+        // (avoids pulling APKs needlessly when aapt2 isn't available)
+        console.log('[apps] aapt2 setup failed, skipping icon fetch');
+        // Mark all as failed so UI shows fallback
+        const failedStates: Record<string, 'loading' | 'loaded' | 'failed'> = {};
+        for (const a of apps.value) {
+          failedStates[a.package_name] = 'failed';
+        }
+        iconStates.value = failedStates;
+        return;
       }
+      // Download succeeded — aapt2Valid is now true
     }
 
     isLoadingIcons.value = true;

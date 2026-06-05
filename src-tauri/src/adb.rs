@@ -1832,40 +1832,57 @@ pub fn adb_fetch_icons(
             missing.len()
         );
 
-        // 3. Extract missing icons (if aapt2 is unavailable, skip with warning)
+        // 3. Extract missing icons — skip entirely if aapt2 is unavailable
         let mut success = 0u32;
         let mut failed = 0u32;
 
-        for pkg in &missing {
-            if pkg.code_path.is_empty() {
-                eprintln!("[icons] {} — no APK path, skipping", pkg.package_name);
-                failed += 1;
-                continue;
-            }
+        if !missing.is_empty() {
+            // Verify aapt2 is usable before pulling any APKs
+            let aapt2_ok = std::process::Command::new(aapt2_path)
+                .arg("version")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
 
-            match icons::extract_icon(
-                &adb,
-                aapt2_path,
-                Some(&serial),
-                &pkg.code_path,
-                &pkg.package_name,
-                pkg.version_code,
-            ) {
-                Ok(extracted) => {
-                    // Cache the result
-                    icons::save_to_cache(
-                        &cache_dir,
-                        &extracted.package,
-                        extracted.version_code,
-                        &extracted.png_data,
-                        extracted.is_adaptive,
-                    );
-                    result_map.insert(extracted.package, extracted.png_data);
-                    success += 1;
-                }
-                Err(e) => {
-                    eprintln!("[icons] {} — FAILED: {}", pkg.package_name, e);
-                    failed += 1;
+            if !aapt2_ok {
+                eprintln!(
+                    "[icons] aapt2 not available, skipping {} missing icons",
+                    missing.len()
+                );
+            } else {
+                for pkg in &missing {
+                    if pkg.code_path.is_empty() {
+                        eprintln!("[icons] {} — no APK path, skipping", pkg.package_name);
+                        failed += 1;
+                        continue;
+                    }
+
+                    match icons::extract_icon(
+                        &adb,
+                        aapt2_path,
+                        Some(&serial),
+                        &pkg.code_path,
+                        &pkg.package_name,
+                        pkg.version_code,
+                    ) {
+                        Ok(extracted) => {
+                            icons::save_to_cache(
+                                &cache_dir,
+                                &extracted.package,
+                                extracted.version_code,
+                                &extracted.png_data,
+                                extracted.is_adaptive,
+                            );
+                            result_map.insert(extracted.package, extracted.png_data);
+                            success += 1;
+                        }
+                        Err(e) => {
+                            eprintln!("[icons] {} — FAILED: {}", pkg.package_name, e);
+                            failed += 1;
+                        }
+                    }
                 }
             }
         }
