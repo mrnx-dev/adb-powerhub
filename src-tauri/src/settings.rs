@@ -366,3 +366,220 @@ pub fn settings_cancel_download(state: State<AppState>) -> Result<(), String> {
     cancel_flag.store(true, Ordering::SeqCst);
     Ok(())
 }
+
+// ─── aapt2 Commands (stubs) ──────────────────────────────────
+
+#[tauri::command]
+pub fn settings_validate_aapt2(path: String) -> Result<ValidationResult, String> {
+    if path.trim().is_empty() {
+        return Err("aapt2 path is empty".to_string());
+    }
+    let output = Command::new(&path)
+        .no_window()
+        .arg("version")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output();
+
+    match output {
+        Ok(out) => {
+            let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+            let version = stdout.lines().next().unwrap_or("Unknown version").to_string();
+            if out.status.success() {
+                Ok(ValidationResult { valid: true, version, path })
+            } else {
+                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+                Err(if stderr.is_empty() { format!("aapt2 exited with status {}", out.status) } else { stderr })
+            }
+        }
+        Err(e) => Err(format!("Cannot execute aapt2: {}", e)),
+    }
+}
+
+#[tauri::command]
+pub fn settings_detect_aapt2() -> Result<Option<String>, String> {
+    let name = if cfg!(windows) { "aapt2.exe" } else { "aapt2" };
+    // Check PATH first
+    if let Ok(p) = which::which(name) {
+        return Ok(Some(p.to_string_lossy().to_string()));
+    }
+    // Check ANDROID_HOME / build-tools
+    if let Ok(android_home) = std::env::var("ANDROID_HOME") {
+        let bt_dir = std::path::PathBuf::from(&android_home).join("build-tools");
+        if let Ok(entries) = std::fs::read_dir(&bt_dir) {
+            let mut versions: Vec<String> = entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_dir())
+                .map(|e| e.file_name().to_string_lossy().to_string())
+                .collect();
+            // Pick latest version (simple string sort works for semver-like versions)
+            versions.sort();
+            for ver in versions.iter().rev() {
+                let candidate = bt_dir.join(ver).join(name);
+                if candidate.exists() {
+                    return Ok(Some(candidate.to_string_lossy().to_string()));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+#[derive(Serialize, Clone)]
+pub struct Aapt2DownloadInfo {
+    pub os: String,
+    pub download_url: String,
+    pub size_mb: String,
+}
+
+#[tauri::command]
+pub fn settings_get_aapt2_download_info() -> Result<Aapt2DownloadInfo, String> {
+    let os = std::env::consts::OS.to_string();
+    // Google's build-tools contain aapt2. We use a specific version.
+    let build_tools_version = "34.0.0";
+    let (url, size) = match os.as_str() {
+        "windows" => (
+            format!("https://dl.google.com/android/repository/build-tools_r{}-windows.zip", build_tools_version),
+            "35",
+        ),
+        "macos" => (
+            format!("https://dl.google.com/android/repository/build-tools_r{}-macosx.zip", build_tools_version),
+            "30",
+        ),
+        _ => (
+            format!("https://dl.google.com/android/repository/build-tools_r{}-linux.zip", build_tools_version),
+            "30",
+        ),
+    };
+    Ok(Aapt2DownloadInfo { os, download_url: url, size_mb: size.to_string() })
+}
+
+#[tauri::command]
+pub async fn settings_download_aapt2(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let cancel_flag = lock_state!(state.cancel_download).clone();
+    cancel_flag.store(false, Ordering::SeqCst);
+
+    let info = settings_get_aapt2_download_info()?;
+
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Cannot get app data dir: {}", e))?;
+
+    let bin_dir = app_data_dir.join("bin");
+    fs::create_dir_all(&bin_dir).map_err(|e| format!("Cannot create bin dir: {}", e))?;
+
+    let zip_path = bin_dir.join("aapt2-download.zip");
+    let tmp_dir = bin_dir.join("aapt2-extract-tmp");
+
+    if tmp_dir.exists() {
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+    fs::create_dir_all(&tmp_dir).map_err(|e| format!("Cannot create temp dir: {}", e))?;
+
+    let mut response = reqwest::get(&info.download_url)
+        .await
+        .map_err(|e| format!("Download request failed: {}", e))?;
+
+    let total_size = response.content_length().unwrap_or(0);
+    let mut downloaded: u64 = 0;
+
+    let mut file = fs::File::create(&zip_path).map_err(|e| format!("Cannot create zip file: {}", e))?;
+
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|e| format!("Download stream error: {}", e))?
+    {
+        if cancel_flag.load(Ordering::SeqCst) {
+            drop(file);
+            let _ = fs::remove_file(&zip_path);
+            let _ = fs::remove_dir_all(&tmp_dir);
+            let _ = app_handle.emit("download-cancelled", serde_json::json!({ "type": "aapt2" }));
+            return Err("Download cancelled".to_string());
+        }
+        file.write_all(&chunk).map_err(|e| format!("Write error: {}", e))?;
+        downloaded += chunk.len() as u64;
+        let _ = app_handle.emit(
+            "download-progress",
+            serde_json::json!({
+                "type": "aapt2",
+                "read": downloaded,
+                "total": total_size,
+            }),
+        );
+    }
+    drop(file);
+
+    // Extract aapt2 from the build-tools ZIP
+    let zip_file = fs::File::open(&zip_path).map_err(|e| format!("Cannot open zip: {}", e))?;
+    let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Cannot read zip: {}", e))?;
+
+    let aapt2_name = if cfg!(windows) { "aapt2.exe" } else { "aapt2" };
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).map_err(|e| format!("Cannot read zip entry {}: {}", i, e))?;
+        let entry_path = entry.name().to_string();
+
+        if cancel_flag.load(Ordering::SeqCst) {
+            let _ = fs::remove_file(&zip_path);
+            let _ = fs::remove_dir_all(&tmp_dir);
+            let _ = app_handle.emit("download-cancelled", serde_json::json!({ "type": "aapt2" }));
+            return Err("Download cancelled".to_string());
+        }
+
+        // Only extract aapt2 binary (skip everything else to save time)
+        if entry_path.ends_with(&format!("/{}", aapt2_name)) {
+            let out_path = tmp_dir.join(aapt2_name);
+            if let Some(parent) = out_path.parent() {
+                fs::create_dir_all(parent).ok();
+            }
+            let mut out_file = fs::File::create(&out_path)
+                .map_err(|e| format!("Cannot extract aapt2: {}", e))?;
+            std::io::copy(&mut entry, &mut out_file)
+                .map_err(|e| format!("Cannot write aapt2: {}", e))?;
+            break;
+        }
+    }
+
+    let aapt2_src = tmp_dir.join(aapt2_name);
+    if !aapt2_src.exists() {
+        let _ = fs::remove_file(&zip_path);
+        let _ = fs::remove_dir_all(&tmp_dir);
+        return Err(format!("aapt2 binary not found in build-tools archive"));
+    }
+
+    let aapt2_dest = bin_dir.join(aapt2_name);
+    fs::copy(&aapt2_src, &aapt2_dest).map_err(|e| format!("Cannot copy aapt2: {}", e))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = fs::Permissions::from_mode(0o755);
+        fs::set_permissions(&aapt2_dest, perms).ok();
+    }
+
+    let _ = fs::remove_file(&zip_path);
+    let _ = fs::remove_dir_all(&tmp_dir);
+
+    let final_path = aapt2_dest.to_string_lossy().to_string();
+    let mut aapt2_path = lock_state!(state.aapt2_path);
+    *aapt2_path = Some(final_path.clone());
+
+    let _ = app_handle.emit(
+        "download-complete",
+        serde_json::json!({ "type": "aapt2", "path": final_path }),
+    );
+
+    Ok(final_path)
+}
+
+#[tauri::command]
+pub fn settings_set_aapt2_path(path: String, state: State<AppState>) -> Result<(), String> {
+    let mut aapt2_path = lock_state!(state.aapt2_path);
+    *aapt2_path = if path.is_empty() { None } else { Some(path) };
+    Ok(())
+}

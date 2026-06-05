@@ -8,6 +8,7 @@ macro_rules! lock_state {
 }
 
 mod adb;
+mod icons;
 mod scrcpy;
 mod settings;
 
@@ -37,6 +38,7 @@ pub struct AppState {
     pub adb_path: Mutex<String>,
     pub connected_device: Mutex<Option<String>>,
     pub scrcpy_path: Mutex<Option<String>>,
+    pub aapt2_path: Mutex<Option<String>>,
     pub scrcpy_process: Mutex<Option<u32>>,
     pub cancel_download: Mutex<Arc<AtomicBool>>,
     pub command_lock: AsyncMutex<()>,
@@ -62,6 +64,7 @@ pub fn run() {
             adb_path: Mutex::new("adb".to_string()),
             connected_device: Mutex::new(None),
             scrcpy_path: Mutex::new(None),
+            aapt2_path: Mutex::new(None),
             scrcpy_process: Mutex::new(None),
             cancel_download: Mutex::new(Arc::new(AtomicBool::new(false))),
             command_lock: AsyncMutex::new(()),
@@ -135,6 +138,11 @@ pub fn run() {
             adb_disable_app,
             adb_fetch_icons,
             write_text_file,
+            settings_validate_aapt2,
+            settings_detect_aapt2,
+            settings_download_aapt2,
+            settings_get_aapt2_download_info,
+            settings_set_aapt2_path,
             settings_set_adb_path,
             settings_set_scrcpy_path,
             settings_validate_adb,
