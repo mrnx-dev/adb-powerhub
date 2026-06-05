@@ -1996,74 +1996,123 @@ fn parse_dumpsys_package(output: &str, package: &str) -> Result<AppInfo, String>
 
 static ICONS_FETCH_RUNNING: AtomicBool = AtomicBool::new(false);
 
+/// Brief package info needed for icon extraction (avoids pulling full AppInfo).
+#[derive(Deserialize)]
+pub struct PackageIconRequest {
+    package_name: String,
+    code_path: String,
+    version_code: i64,
+}
+
 #[tauri::command]
 pub fn adb_fetch_icons(
     app_handle: tauri::AppHandle,
     state: State<AppState>,
-    package_names: Vec<String>,
+    packages: Vec<PackageIconRequest>,
 ) -> Result<std::collections::HashMap<String, String>, String> {
+    use crate::icons;
+    use std::time::Instant;
+
     // Concurrency guard
     if ICONS_FETCH_RUNNING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
         return Err("Icon fetch already in progress".into());
     }
 
     let result = (|| -> Result<std::collections::HashMap<String, String>, String> {
+        let start = Instant::now();
         let adb = get_adb_path(&state);
         let serial = get_device_serial(&state).ok_or("No device connected")?;
 
-        // 1. Determine cache dir: <app_data_dir>/adbph_icons/<serial_sanitized>/
+        // Get aapt2 path (optional — icons work without it, just fewer will load)
+        let aapt2 = lock_state!(state.aapt2_path).clone();
+        let aapt2_path = aapt2.as_deref().unwrap_or("aapt2");
+
+        // 1. Determine cache dir
         let data_dir = app_handle.path().app_data_dir()
             .map_err(|e| format!("Cannot get app data dir: {}", e))?;
-        // Sanitize serial for use as directory name (e.g. replace ':' which is illegal on Windows)
         let serial_safe = serial.replace(':', "_").replace('/', "_").replace('\\', "_");
         let cache_dir = data_dir.join("adbph_icons").join(&serial_safe);
         eprintln!("[icons] Cache dir: {:?}", cache_dir);
 
-        // 2. Read cached icons — just check .png existence
-        let mut icons = read_cached_icons(&cache_dir, &package_names);
-        eprintln!("[icons] Cached: {}, total requested: {}", icons.len(), package_names.len());
+        let package_names: Vec<String> = packages.iter().map(|p| p.package_name.clone()).collect();
 
-        // 3. Determine missing packages
-        let missing: Vec<String> = package_names.iter()
-            .filter(|p| !icons.contains_key(*p))
-            .cloned()
-            .collect();
-        eprintln!("[icons] Missing: {}", missing.len());
+        // 2. Check cache — returns only icons with matching version_code
+        let mut result_map: std::collections::HashMap<String, Vec<u8>> = std::collections::HashMap::new();
+        let mut missing: Vec<&PackageIconRequest> = Vec::new();
 
-        // 4. If all cached → return immediately
-        if !missing.is_empty() {
-            // 5. Fetch from device — INCREMENTAL: only render missing packages
-            let IconParseResult { icons: fetched, versions: fetched_versions } =
-                resolve_icons_via_dex(&adb, Some(&serial), Some(&missing))?;
-
-            // 6. Save fetched icons + version metadata to cache
-            let save_result = save_icons_to_cache(&cache_dir, &fetched, &fetched_versions);
-            if let Err(e) = &save_result {
-                eprintln!("[icons] Failed to save cache: {}", e);
+        for pkg in &packages {
+            if let Some(data) = icons::get_cached(&cache_dir, &pkg.package_name, pkg.version_code) {
+                result_map.insert(pkg.package_name.clone(), data);
             } else {
-                eprintln!("[icons] Saved {} icons to cache", fetched.len());
+                missing.push(pkg);
+            }
+        }
+        eprintln!(
+            "[icons] Fetch started — packages: {}, cached: {}, missing: {}",
+            packages.len(),
+            result_map.len(),
+            missing.len()
+        );
+
+        // 3. Extract missing icons (if aapt2 is unavailable, skip with warning)
+        let mut success = 0u32;
+        let mut failed = 0u32;
+
+        for pkg in &missing {
+            if pkg.code_path.is_empty() {
+                eprintln!("[icons] {} — no APK path, skipping", pkg.package_name);
+                failed += 1;
+                continue;
             }
 
-            // 7. Merge: fetched overrides cache
-            for (pkg, data) in &fetched {
-                icons.insert(pkg.clone(), data.clone());
+            match icons::extract_icon(
+                &adb,
+                aapt2_path,
+                Some(&serial),
+                &pkg.code_path,
+                &pkg.package_name,
+                pkg.version_code,
+            ) {
+                Ok(extracted) => {
+                    // Cache the result
+                    icons::save_to_cache(
+                        &cache_dir,
+                        &extracted.package,
+                        extracted.version_code,
+                        &extracted.png_data,
+                        extracted.is_adaptive,
+                    );
+                    result_map.insert(extracted.package, extracted.png_data);
+                    success += 1;
+                }
+                Err(e) => {
+                    eprintln!("[icons] {} — FAILED: {}", pkg.package_name, e);
+                    failed += 1;
+                }
             }
-
-            // 8. Cleanup stale cache entries
-            cleanup_stale_cache(&cache_dir, &package_names);
         }
 
-        // 9. Convert to base64 strings for frontend
-        let result: std::collections::HashMap<String, String> = icons.iter()
-            .filter(|(pkg, _)| package_names.contains(pkg))
-            .map(|(pkg, data)| (pkg.clone(), base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data)))
+        // 4. Cleanup stale cache + LRU eviction
+        icons::cleanup_stale_cache(&cache_dir, &package_names);
+        icons::evict_lru(&cache_dir, 50 * 1024 * 1024); // 50 MB
+
+        // 5. Convert to base64 for frontend
+        let result: std::collections::HashMap<String, String> = result_map
+            .iter()
+            .map(|(pkg, data)| {
+                (pkg.clone(), base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data))
+            })
             .collect();
 
-        eprintln!("[icons] Returning {} icons to frontend", result.len());
-        if !result.is_empty() {
-            let first_key = result.keys().next().unwrap();
-            eprintln!("[icons] Sample key: '{}', value length: {}", first_key, result.get(first_key).unwrap().len());
-        }
+        let elapsed = start.elapsed();
+        eprintln!(
+            "[icons] Fetch complete — total: {}, cached: {}, extracted: {}, failed: {}, duration: {:.1}s",
+            packages.len(),
+            packages.len() - missing.len(),
+            success,
+            failed,
+            elapsed.as_secs_f32()
+        );
 
         Ok(result)
     })();
