@@ -90,37 +90,78 @@ public class AppIcons {
 
     /**
      * Search the APK ZIP for the best launcher icon.
-     * Priority: highest density first (xxxhdpi, xxhdpi, ...).
+     * Scans all PNG entries in mipmap and drawable resource directories,
+     * prefers higher density and filenames containing ic_launcher or icon.
      */
     static String findBestIcon(Object zf) throws Exception {
         Class<?> zfClass = zf.getClass();
 
-        // Density preference (highest first)
-        String[] densities = {"xxxhdpi", "xxhdpi", "xhdpi", "hdpi", "mdpi"};
-        String[] prefixes = {"mipmap", "drawable"};
+        // Collect all PNG entries in icon directories
+        java.util.List<String> candidates = new java.util.ArrayList<>();
 
-        for (String density : densities) {
-            for (String prefix : prefixes) {
-                // Try with -v4 suffix: res/mipmap-xxxhdpi-v4/ic_launcher.png
-                String dir = "res/" + prefix + "-" + density + "-v4/";
-                String path = dir + "ic_launcher.png";
-                Object entry = zfClass.getMethod("getEntry", String.class).invoke(zf, path);
-                if (entry != null) return path;
+        // Get all entries via reflection: Enumeration<? extends ZipEntry> entries()
+        Object entries = zfClass.getMethod("entries").invoke(zf);
+        Class<?> enumClass = Class.forName("java.util.Enumeration");
+        while ((Boolean) enumClass.getMethod("hasMoreElements").invoke(entries)) {
+            Object entry = enumClass.getMethod("nextElement").invoke(entries);
+            String name = (String) entry.getClass().getMethod("getName").invoke(entry);
+            if (name == null) continue;
 
-                // Try without -v4 suffix
-                dir = "res/" + prefix + "-" + density + "/";
-                path = dir + "ic_launcher.png";
-                entry = zfClass.getMethod("getEntry", String.class).invoke(zf, path);
-                if (entry != null) return path;
+            // Only look at PNG files in mipmap or drawable directories
+            if (!name.endsWith(".png")) continue;
+            String lower = name.toLowerCase();
+            if (!lower.contains("mipmap") && !lower.contains("drawable")) continue;
 
-                // Try ic_launcher_foreground (adaptive icon foreground)
-                path = dir + "ic_launcher_foreground.png";
-                entry = zfClass.getMethod("getEntry", String.class).invoke(zf, path);
-                if (entry != null) return path;
+            candidates.add(name);
+        }
+
+        if (candidates.isEmpty()) return null;
+
+        // Score each candidate: prefer ic_launcher > icon, prefer higher density
+        String best = null;
+        int bestScore = -1;
+        for (String c : candidates) {
+            int score = scoreIcon(c);
+            if (score > bestScore) {
+                bestScore = score;
+                best = c;
             }
         }
 
-        return null;
+        return best;
+    }
+
+    static int scoreIcon(String path) {
+        String lower = path.toLowerCase();
+        int score = 0;
+
+        // Density bonus (higher density = higher score)
+        if (lower.contains("xxxhdpi")) score += 600;
+        else if (lower.contains("xxhdpi")) score += 500;
+        else if (lower.contains("xhdpi")) score += 400;
+        else if (lower.contains("hdpi")) score += 300;
+        else if (lower.contains("mdpi")) score += 200;
+        else if (lower.contains("ldpi")) score += 100;
+        else if (lower.contains("anydpi")) score += 50; // adaptive XML directory, not PNG
+
+        // Name bonus: prefer launcher icons
+        if (lower.contains("ic_launcher")) {
+            score += 1000;
+            // Prefer non-round, non-foreground (full icon)
+            if (!lower.contains("round") && !lower.contains("foreground") && !lower.contains("background")) {
+                score += 500;
+            }
+        } else if (lower.contains("icon")) {
+            score += 500;
+        }
+
+        // Prefer mipmap over drawable (mipmap is specifically for launcher icons)
+        if (lower.contains("mipmap")) score += 200;
+
+        // Prefer smaller file sizes (likely the right density)
+        // Can't easily get size without reading entry, skip this heuristic
+
+        return score;
     }
 
     /**

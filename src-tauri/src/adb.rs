@@ -1824,12 +1824,24 @@ fn resolve_icons_via_zip_dex(
 
     // 3. Run DEX
     eprintln!("[icons] Running DEX for {} packages", packages.len());
-    let output = run_adb_cmd_with_device_timed(adb, serial, &["shell", &shell_cmd], ICONS_DEX_TIMEOUT_SECS)
-        .unwrap_or_default();
+    let shell_cmd_full = format!("shell {}", shell_cmd);
+    let output = run_adb_cmd_with_device_timed(
+        adb, serial,
+        &["shell", &shell_cmd],
+        ICONS_DEX_TIMEOUT_SECS,
+    );
+    // Log errors too — stderr is mixed into the result on failure
+    let dex_output = match &output {
+        Ok(o) => o.clone(),
+        Err(e) => {
+            eprintln!("[icons] DEX stderr/error: {}", e);
+            String::new()
+        }
+    };
 
     // 4. Parse output: pkg|base64
     let mut result = std::collections::HashMap::new();
-    for line in output.lines() {
+    for line in dex_output.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with("ERROR:") || line.starts_with("SKIP:") {
             if line.starts_with("SKIP:") {
