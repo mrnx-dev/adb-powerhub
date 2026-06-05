@@ -33,6 +33,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const screenshotSaveDir = ref('');
   const recordingSaveDir = ref('');
 
+  const aapt2Path = ref('');
+  const aapt2Valid = ref(false);
+  const aapt2Version = ref('');
   const adbValid = ref(false);
   const adbVersion = ref('');
   const scrcpyValid = ref(false);
@@ -64,6 +67,8 @@ export const useSettingsStore = defineStore('settings', () => {
     await autoDetect();
     await validateAdb();
     await validateScrcpy();
+    await detectAapt2();
+    await validateAapt2();
     await syncPathsToRust();
     await syncToDeviceStore();
     await listenListeners();
@@ -89,6 +94,9 @@ export const useSettingsStore = defineStore('settings', () => {
         }
       } catch {}
     }
+    if (!aapt2Path.value) {
+      await detectAapt2();
+    }
   }
 
   async function syncPathsToRust() {
@@ -98,6 +106,9 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       if (scrcpyPath.value) {
         await invoke('settings_set_scrcpy_path', { path: scrcpyPath.value });
+      }
+      if (aapt2Path.value) {
+        await invoke('settings_set_aapt2_path', { path: aapt2Path.value });
       }
     } catch (e) {
       console.error('Failed to sync paths to Rust:', e);
@@ -195,6 +206,38 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch {
       scrcpyValid.value = false;
       scrcpyVersion.value = '';
+    }
+  }
+
+  async function detectAapt2() {
+    try {
+      const detected = await invoke<string | null>('settings_detect_aapt2');
+      if (detected) {
+        aapt2Path.value = detected;
+        await saveSetting('aapt2Path', aapt2Path.value);
+        await invoke('settings_set_aapt2_path', { path: aapt2Path.value });
+      }
+    } catch {
+      console.log('[settings] aapt2 not detected');
+    }
+  }
+
+  async function validateAapt2() {
+    if (!aapt2Path.value) {
+      aapt2Valid.value = false;
+      aapt2Version.value = '';
+      return;
+    }
+    try {
+      const result = await invoke<{ valid: boolean; version: string; path: string }>(
+        'settings_validate_aapt2',
+        { path: aapt2Path.value }
+      );
+      aapt2Valid.value = result.valid;
+      aapt2Version.value = result.version;
+    } catch {
+      aapt2Valid.value = false;
+      aapt2Version.value = '';
     }
   }
 
@@ -425,6 +468,9 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   return {
+    aapt2Path,
+    aapt2Valid,
+    aapt2Version,
     adbPath,
     scrcpyPath,
     autoDetectBinaries,
@@ -458,6 +504,8 @@ export const useSettingsStore = defineStore('settings', () => {
     fetchDownloadInfo,
     validateAdb,
     validateScrcpy,
+    detectAapt2,
+    validateAapt2,
     autoDetect,
     syncPathsToRust,
     syncToDeviceStore,
