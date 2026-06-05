@@ -435,23 +435,20 @@ pub struct Aapt2DownloadInfo {
 #[tauri::command]
 pub fn settings_get_aapt2_download_info() -> Result<Aapt2DownloadInfo, String> {
     let os = std::env::consts::OS.to_string();
-    // Google's build-tools contain aapt2. We use a specific version.
-    let build_tools_version = "34.0.0";
-    let (url, size) = match os.as_str() {
-        "windows" => (
-            format!("https://dl.google.com/android/repository/build-tools_r{}-windows.zip", build_tools_version),
-            "35",
-        ),
-        "macos" => (
-            format!("https://dl.google.com/android/repository/build-tools_r{}-macosx.zip", build_tools_version),
-            "30",
-        ),
-        _ => (
-            format!("https://dl.google.com/android/repository/build-tools_r{}-linux.zip", build_tools_version),
-            "30",
-        ),
+    // Google Maven publishes per-platform aapt2 JARs (~5 MB each).
+    // The JAR contains the native aapt2 binary at its root.
+    // Version: 8.12.28 (bundled with Android Gradle Plugin 8.12.x)
+    let aapt2_version = "8.12.28";
+    let platform = match os.as_str() {
+        "windows" => "windows",
+        "macos" => "macos",
+        _ => "linux",
     };
-    Ok(Aapt2DownloadInfo { os, download_url: url, size_mb: size.to_string() })
+    let url = format!(
+        "https://dl.google.com/dl/android/maven2/com/android/tools/build/aapt2/{0}/aapt2-{0}-{1}.jar",
+        aapt2_version, platform
+    );
+    Ok(Aapt2DownloadInfo { os, download_url: url, size_mb: "5".to_string() })
 }
 
 #[tauri::command]
@@ -472,7 +469,7 @@ pub async fn settings_download_aapt2(
     let bin_dir = app_data_dir.join("bin");
     fs::create_dir_all(&bin_dir).map_err(|e| format!("Cannot create bin dir: {}", e))?;
 
-    let zip_path = bin_dir.join("aapt2-download.zip");
+    let zip_path = bin_dir.join("aapt2-download.jar");
     let tmp_dir = bin_dir.join("aapt2-extract-tmp");
 
     if tmp_dir.exists() {
@@ -514,14 +511,16 @@ pub async fn settings_download_aapt2(
     }
     drop(file);
 
-    // Extract aapt2 from the build-tools ZIP
-    let zip_file = fs::File::open(&zip_path).map_err(|e| format!("Cannot open zip: {}", e))?;
-    let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Cannot read zip: {}", e))?;
+    // Extract aapt2 native binary from the Maven JAR (JAR = ZIP).
+    // The native binary is at the root of the JAR: "aapt2.exe" (Windows) or "aapt2" (others).
+    let zip_file = fs::File::open(&zip_path).map_err(|e| format!("Cannot open jar: {}", e))?;
+    let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Cannot read jar as ZIP: {}", e))?;
 
     let aapt2_name = if cfg!(windows) { "aapt2.exe" } else { "aapt2" };
+    let mut found = false;
 
     for i in 0..archive.len() {
-        let mut entry = archive.by_index(i).map_err(|e| format!("Cannot read zip entry {}: {}", i, e))?;
+        let mut entry = archive.by_index(i).map_err(|e| format!("Cannot read jar entry {}: {}", i, e))?;
         let entry_path = entry.name().to_string();
 
         if cancel_flag.load(Ordering::SeqCst) {
@@ -531,17 +530,37 @@ pub async fn settings_download_aapt2(
             return Err("Download cancelled".to_string());
         }
 
-        // Only extract aapt2 binary (skip everything else to save time)
-        if entry_path.ends_with(&format!("/{}", aapt2_name)) {
+        // The native binary is at the root of the JAR (not in a subdirectory)
+        if entry_path == aapt2_name {
             let out_path = tmp_dir.join(aapt2_name);
-            if let Some(parent) = out_path.parent() {
-                fs::create_dir_all(parent).ok();
-            }
             let mut out_file = fs::File::create(&out_path)
                 .map_err(|e| format!("Cannot extract aapt2: {}", e))?;
             std::io::copy(&mut entry, &mut out_file)
                 .map_err(|e| format!("Cannot write aapt2: {}", e))?;
+            found = true;
             break;
+        }
+    }
+
+    if !found {
+        // Fallback: search for aapt2 binary anywhere in the JAR
+        // Need to close the first archive before opening a new one
+        drop(archive);
+        let jar_file = fs::File::open(&zip_path).map_err(|e| format!("Cannot reopen jar: {}", e))?;
+        let mut archive2 = zip::ZipArchive::new(jar_file)
+            .map_err(|e| format!("Cannot re-read jar: {}", e))?;
+        for i in 0..archive2.len() {
+            let mut entry = archive2.by_index(i)
+                .map_err(|e| format!("Cannot read jar entry {}: {}", i, e))?;
+            let ep = entry.name().to_string();
+            if ep.ends_with(&format!("/{}", aapt2_name)) || ep == aapt2_name {
+                let mut out_file = fs::File::create(tmp_dir.join(aapt2_name))
+                    .map_err(|e| format!("Cannot extract aapt2: {}", e))?;
+                std::io::copy(&mut entry, &mut out_file)
+                    .map_err(|e| format!("Cannot write aapt2: {}", e))?;
+                found = true;
+                break;
+            }
         }
     }
 
@@ -549,7 +568,7 @@ pub async fn settings_download_aapt2(
     if !aapt2_src.exists() {
         let _ = fs::remove_file(&zip_path);
         let _ = fs::remove_dir_all(&tmp_dir);
-        return Err(format!("aapt2 binary not found in build-tools archive"));
+        return Err("aapt2 binary not found in downloaded archive".to_string());
     }
 
     let aapt2_dest = bin_dir.join(aapt2_name);
