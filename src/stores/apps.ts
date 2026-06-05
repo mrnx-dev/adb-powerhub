@@ -35,7 +35,12 @@ export const useAppsStore = defineStore('apps', () => {
   const searchQuery = ref('');
   const error = ref<string | null>(null);
   const icons = ref<Record<string, string>>({}); // pkg → data:image/png;base64,...
+  const iconStates = ref<Record<string, 'loading' | 'loaded' | 'failed'>>({});
   const isLoadingIcons = ref(false);
+
+  const failedIconCount = computed(
+    () => Object.values(iconStates.value).filter((s) => s === 'failed').length
+  );
 
   // Debounced search
   const filteredApps = computed(() => {
@@ -68,28 +73,60 @@ export const useAppsStore = defineStore('apps', () => {
   async function fetchIcons(retry = true) {
     if (!deviceStore.connected || apps.value.length === 0) return;
     isLoadingIcons.value = true;
+
+    // Mark all as loading
+    const newStates: Record<string, 'loading' | 'loaded' | 'failed'> = {};
+    for (const a of apps.value) {
+      newStates[a.package_name] = icons.value[a.package_name] ? 'loaded' : 'loading';
+    }
+    iconStates.value = newStates;
+
     try {
-      const pkgNames = apps.value.map((a) => a.package_name);
-      console.log('[apps] Fetching icons for', pkgNames.length, 'apps');
+      const packages = apps.value.map((a) => ({
+        package_name: a.package_name,
+        code_path: a.code_path,
+        version_code: a.version_code,
+      }));
+      console.log('[apps] Fetching icons for', packages.length, 'apps');
       const result = await invoke<Record<string, string>>('adb_fetch_icons', {
-        packageNames: pkgNames,
+        packages,
       });
       console.log('[apps] Icon fetch returned', Object.keys(result).length, 'icons');
+
       const newIcons: Record<string, string> = {};
       for (const [pkg, b64] of Object.entries(result)) {
         newIcons[pkg] = `data:image/png;base64,${b64}`;
       }
-      console.log('[apps] Icons object size:', Object.keys(newIcons).length);
       icons.value = newIcons;
+
+      // Update states: returned = loaded, missing = failed
+      const updatedStates: Record<string, 'loading' | 'loaded' | 'failed'> = {};
+      for (const a of apps.value) {
+        updatedStates[a.package_name] = result[a.package_name] ? 'loaded' : 'failed';
+      }
+      iconStates.value = updatedStates;
+
+      // Summary toast for partial success
+      const successCount = Object.keys(result).length;
+      const totalCount = packages.length;
+      if (successCount > 0 && successCount < totalCount) {
+        toast.show(`Loaded ${successCount} of ${totalCount} icons`, 'info');
+      } else if (successCount === 0) {
+        toast.show('Could not load app icons. Check aapt2 in Settings.', 'error');
+      }
     } catch (e) {
-      // Non-fatal — initial letter fallback still works
       const msg = String(e);
       if (msg.includes('already in progress')) {
-        // Another fetch is running — don't retry, it will populate icons
         console.log('[apps] Icon fetch already in progress, skipping');
       } else {
         console.warn('[apps] Icon fetch failed:', e);
-        // Retry once if this is the first attempt
+        // Mark all as failed
+        const failedStates: Record<string, 'loading' | 'loaded' | 'failed'> = {};
+        for (const a of apps.value) {
+          failedStates[a.package_name] = 'failed';
+        }
+        iconStates.value = failedStates;
+
         if (retry) {
           console.log('[apps] Retrying icon fetch...');
           await new Promise<void>((r) => setTimeout(r, 2000));
@@ -280,6 +317,7 @@ export const useAppsStore = defineStore('apps', () => {
     isActioning.value = false;
     isInstalling.value = false;
     icons.value = {};
+    iconStates.value = {};
     isLoadingIcons.value = false;
   }
 
@@ -296,7 +334,9 @@ export const useAppsStore = defineStore('apps', () => {
     filteredApps,
     appCount,
     icons,
+    iconStates,
     isLoadingIcons,
+    failedIconCount,
     fetchApps,
     fetchIcons,
     fetchAppDetail,

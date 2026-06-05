@@ -41,7 +41,7 @@ watch(searchInput, (val) => {
         <button
           v-for="app in appsStore.filteredApps"
           :key="app.package_name"
-          class="btn-pressable w-full flex items-center gap-3 px-3 py-2.5 border-b border-theme-tertiary/50 text-left transition-all hover:bg-theme-hover"
+          class="btn-pressable w-full flex items-center gap-3 px-3 py-2.5 border-b border-theme-tertiary/50 text-left transition-all hover:bg-theme-hover group"
           :class="[
             appsStore.selectedPackage === app.package_name
               ? 'bg-accent-light border-l-4 border-l-accent-emerald'
@@ -49,15 +49,32 @@ watch(searchInput, (val) => {
           ]"
           @click="appsStore.selectApp(app.package_name)"
         >
+          <!-- Icon: loaded -->
           <img
             v-if="appsStore.icons[app.package_name]"
             :src="appsStore.icons[app.package_name]"
-            class="w-9 h-9 shrink-0 rounded-lg object-cover"
+            class="w-12 h-12 shrink-0 rounded-xl object-cover transition-all duration-200 ease-out group-hover:scale-105 icon-fade-in"
             :alt="app.label"
           />
+          <!-- Icon: loading skeleton -->
+          <div
+            v-else-if="appsStore.iconStates[app.package_name] === 'loading'"
+            class="w-12 h-12 shrink-0 rounded-xl bg-theme-btn animate-shimmer"
+            role="status"
+            :aria-label="`Loading icon for ${app.label}`"
+          />
+          <!-- Icon: failed -->
+          <div
+            v-else-if="appsStore.iconStates[app.package_name] === 'failed'"
+            class="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-xs font-bold bg-theme-btn text-theme-muted opacity-60"
+            :aria-label="`${app.label} icon not available`"
+          >
+            {{ app.label.charAt(0) }}
+          </div>
+          <!-- Icon: no cache (initial state) -->
           <div
             v-else
-            class="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-xs font-bold"
+            class="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-xs font-bold"
             :class="[
               app.is_system
                 ? 'bg-color-warning-container text-color-warning'

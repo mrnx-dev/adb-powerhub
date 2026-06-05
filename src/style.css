@@ -1804,3 +1804,33 @@ input[type='range']::-moz-range-thumb {
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
 }
+
+/* ─── Icon Loading Animations ─────────────────────────────────── */
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Fade-in for icons when they load (replacing skeleton/fallback) */
+.icon-fade-in {
+  animation: iconFadeIn 200ms ease-out;
+}
+
+@keyframes iconFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
