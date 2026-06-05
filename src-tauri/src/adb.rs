@@ -1818,13 +1818,12 @@ fn resolve_icons_via_zip_dex(
         .join(",");
 
     let shell_cmd = format!(
-        "CLASSPATH={} app_process / AppIcons {}",
+        "CLASSPATH={} app_process / AppIcons {} 2>&1",
         ICONS_DEX_REMOTE, pkg_arg
     );
 
     // 3. Run DEX
     eprintln!("[icons] Running DEX for {} packages", packages.len());
-    let shell_cmd_full = format!("shell {}", shell_cmd);
     let output = run_adb_cmd_with_device_timed(
         adb, serial,
         &["shell", &shell_cmd],
@@ -1914,6 +1913,15 @@ pub fn adb_fetch_icons(
     // Spawn background thread — UI stays responsive, icons arrive via events
     let app = app_handle.clone();
     std::thread::spawn(move || {
+        // Ensure concurrency guard is ALWAYS released, even on panic
+        struct Guard;
+        impl Drop for Guard {
+            fn drop(&mut self) {
+                ICONS_FETCH_RUNNING.store(false, Ordering::SeqCst);
+            }
+        }
+        let _guard = Guard;
+
         let start = Instant::now();
         eprintln!("[icons] Cache dir: {:?}", cache_dir);
 
@@ -2025,8 +2033,7 @@ pub fn adb_fetch_icons(
             "duration_secs": elapsed.as_secs_f32(),
         }));
 
-        // Release concurrency guard
-        ICONS_FETCH_RUNNING.store(false, Ordering::SeqCst);
+        // Guard (_guard) releases ICONS_FETCH_RUNNING on drop
     });
 
     // Return immediately — work continues in background thread

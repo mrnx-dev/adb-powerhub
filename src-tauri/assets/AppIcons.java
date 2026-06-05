@@ -64,18 +64,22 @@ public class AppIcons {
                 // Read entry bytes
                 Object entry = zfClass.getMethod("getEntry", String.class).invoke(zf, bestIcon);
                 if (entry != null) {
-                    Object inputStream = zfClass.getMethod("getInputStream",
-                        Class.forName("java.util.zip.ZipEntry")).invoke(zf, entry);
+                    Object inputStream = null;
+                    try {
+                        inputStream = zfClass.getMethod("getInputStream",
+                            Class.forName("java.util.zip.ZipEntry")).invoke(zf, entry);
 
-                    byte[] iconBytes = readAllBytes(inputStream);
-                    inputStream.getClass().getMethod("close").invoke(inputStream);
-                    zfClass.getMethod("close").invoke(zf);
+                        byte[] iconBytes = readAllBytes(inputStream);
 
-                    if (iconBytes != null && iconBytes.length > 0) {
-                        // Encode to base64 (NO_WRAP = 2)
-                        return (String) Class.forName("android.util.Base64")
-                            .getMethod("encodeToString", byte[].class, int.class)
-                            .invoke(null, iconBytes, 2);
+                        if (iconBytes != null && iconBytes.length > 0) {
+                            return (String) Class.forName("android.util.Base64")
+                                .getMethod("encodeToString", byte[].class, int.class)
+                                .invoke(null, iconBytes, 2);
+                        }
+                    } finally {
+                        if (inputStream != null) {
+                            inputStream.getClass().getMethod("close").invoke(inputStream);
+                        }
                     }
                 }
             }
@@ -141,7 +145,6 @@ public class AppIcons {
         else if (lower.contains("hdpi")) score += 300;
         else if (lower.contains("mdpi")) score += 200;
         else if (lower.contains("ldpi")) score += 100;
-        else if (lower.contains("anydpi")) score += 50; // adaptive XML directory, not PNG
 
         // Name bonus: prefer launcher icons
         if (lower.contains("ic_launcher")) {

@@ -69,6 +69,13 @@ watch(
           <span v-if="appsStore.appCount > 0" class="text-theme-muted text-sm font-normal ml-1">
             ({{ appsStore.appCount }})
           </span>
+          <span
+            v-if="appsStore.failedIconCount > 0 && !appsStore.isLoadingIcons"
+            class="text-color-error text-xs font-normal ml-1"
+          >
+            · {{ appsStore.failedIconCount }} icon{{ appsStore.failedIconCount > 1 ? 's' : '' }}
+            unavailable
+          </span>
         </h2>
 
         <div class="flex gap-1 ml-2">
