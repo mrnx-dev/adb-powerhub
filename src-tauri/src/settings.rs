@@ -437,11 +437,12 @@ pub fn settings_get_aapt2_download_info() -> Result<Aapt2DownloadInfo, String> {
     let os = std::env::consts::OS.to_string();
     // Google Maven publishes per-platform aapt2 JARs (~5 MB each).
     // The JAR contains the native aapt2 binary at its root.
-    // Version: 8.12.28 (bundled with Android Gradle Plugin 8.12.x)
-    let aapt2_version = "8.12.28";
+    // Platform classifiers: windows, linux, osx (not macos!)
+    // See: https://developer.android.com/tools/aapt2
+    let aapt2_version = "7.4.2-8841542";
     let platform = match os.as_str() {
         "windows" => "windows",
-        "macos" => "macos",
+        "macos" => "osx",
         _ => "linux",
     };
     let url = format!(
