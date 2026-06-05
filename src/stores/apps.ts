@@ -72,7 +72,7 @@ export const useAppsStore = defineStore('apps', () => {
     }
   }
 
-  async function fetchIcons(retry = true) {
+  async function fetchIcons() {
     if (!deviceStore.connected || apps.value.length === 0) return;
 
     // Auto-setup: if aapt2 is missing, download it first
@@ -80,10 +80,7 @@ export const useAppsStore = defineStore('apps', () => {
       console.log('[apps] aapt2 not available, auto-downloading...');
       const downloaded = await settingsStore.downloadAapt2();
       if (!downloaded) {
-        // Download failed or cancelled — skip icon fetch entirely
-        // (avoids pulling APKs needlessly when aapt2 isn't available)
         console.log('[apps] aapt2 setup failed, skipping icon fetch');
-        // Mark all as failed so UI shows fallback
         const failedStates: Record<string, 'loading' | 'loaded' | 'failed'> = {};
         for (const a of apps.value) {
           failedStates[a.package_name] = 'failed';
@@ -91,75 +88,73 @@ export const useAppsStore = defineStore('apps', () => {
         iconStates.value = failedStates;
         return;
       }
-      // Download succeeded — aapt2Valid is now true
     }
 
     isLoadingIcons.value = true;
 
-    // Mark all as loading
+    // Mark all as loading — UI shows skeleton immediately
     const newStates: Record<string, 'loading' | 'loaded' | 'failed'> = {};
     for (const a of apps.value) {
       newStates[a.package_name] = icons.value[a.package_name] ? 'loaded' : 'loading';
     }
     iconStates.value = newStates;
 
+    // Set up event listeners for progressive icon delivery
+    await setupIconListeners();
+
+    // Fire and forget — backend spawns a background thread, icons arrive via events
+    const packages = apps.value.map((a) => ({
+      package_name: a.package_name,
+      code_path: a.code_path,
+      version_code: a.version_code,
+    }));
+    console.log('[apps] Starting background icon fetch for', packages.length, 'apps');
+
     try {
-      const packages = apps.value.map((a) => ({
-        package_name: a.package_name,
-        code_path: a.code_path,
-        version_code: a.version_code,
-      }));
-      console.log('[apps] Fetching icons for', packages.length, 'apps');
-      const result = await invoke<Record<string, string>>('adb_fetch_icons', {
-        packages,
-      });
-      console.log('[apps] Icon fetch returned', Object.keys(result).length, 'icons');
-
-      const newIcons: Record<string, string> = {};
-      for (const [pkg, b64] of Object.entries(result)) {
-        newIcons[pkg] = `data:image/png;base64,${b64}`;
-      }
-      icons.value = newIcons;
-
-      // Update states: returned = loaded, missing = failed
-      const updatedStates: Record<string, 'loading' | 'loaded' | 'failed'> = {};
-      for (const a of apps.value) {
-        updatedStates[a.package_name] = result[a.package_name] ? 'loaded' : 'failed';
-      }
-      iconStates.value = updatedStates;
-
-      // Summary toast for partial success
-      const successCount = Object.keys(result).length;
-      const totalCount = packages.length;
-      if (successCount > 0 && successCount < totalCount) {
-        toast.show(`Loaded ${successCount} of ${totalCount} icons`, 'info');
-      } else if (successCount === 0 && !settingsStore.aapt2Valid) {
-        // No icons + no aapt2 = download already failed, don't spam
-      } else if (successCount === 0) {
-        toast.show('Could not load app icons', 'error');
-      }
+      await invoke('adb_fetch_icons', { packages });
     } catch (e) {
       const msg = String(e);
       if (msg.includes('already in progress')) {
         console.log('[apps] Icon fetch already in progress, skipping');
       } else {
         console.warn('[apps] Icon fetch failed:', e);
-        // Mark all as failed
-        const failedStates: Record<string, 'loading' | 'loaded' | 'failed'> = {};
-        for (const a of apps.value) {
-          failedStates[a.package_name] = 'failed';
-        }
-        iconStates.value = failedStates;
+        isLoadingIcons.value = false;
+      }
+    }
+  }
 
-        if (retry) {
-          console.log('[apps] Retrying icon fetch...');
-          await new Promise<void>((r) => setTimeout(r, 2000));
-          return fetchIcons(false);
+  async function setupIconListeners() {
+    if (unlistenIconReady) unlistenIconReady();
+    if (unlistenFetchComplete) unlistenFetchComplete();
+
+    unlistenIconReady = await listen<{ package: string; base64: string | null }>(
+      'icon-ready',
+      (event) => {
+        const { package: pkg, base64 } = event.payload;
+        if (base64) {
+          icons.value = { ...icons.value, [pkg]: `data:image/png;base64,${base64}` };
+          iconStates.value = { ...iconStates.value, [pkg]: 'loaded' };
+        } else {
+          iconStates.value = { ...iconStates.value, [pkg]: 'failed' };
         }
       }
-    } finally {
+    );
+
+    unlistenFetchComplete = await listen<{
+      total: number;
+      cached: number;
+      extracted: number;
+      failed: number;
+      duration_secs: number;
+    }>('icons-fetch-complete', (event) => {
+      const { cached, extracted, failed, total } = event.payload;
       isLoadingIcons.value = false;
-    }
+      if (failed > 0 && cached + extracted > 0) {
+        toast.show(`Loaded ${cached + extracted} of ${total} icons`, 'info');
+      } else if (extracted === 0 && cached === 0 && failed > 0) {
+        toast.show('Could not load app icons', 'error');
+      }
+    });
   }
 
   let detailGeneration = 0;
@@ -343,6 +338,14 @@ export const useAppsStore = defineStore('apps', () => {
     icons.value = {};
     iconStates.value = {};
     isLoadingIcons.value = false;
+    if (unlistenIconReady) {
+      unlistenIconReady();
+      unlistenIconReady = null;
+    }
+    if (unlistenFetchComplete) {
+      unlistenFetchComplete();
+      unlistenFetchComplete = null;
+    }
   }
 
   return {

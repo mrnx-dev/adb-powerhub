@@ -1787,7 +1787,7 @@ pub fn adb_fetch_icons(
     app_handle: tauri::AppHandle,
     state: State<AppState>,
     packages: Vec<PackageIconRequest>,
-) -> Result<std::collections::HashMap<String, String>, String> {
+) -> Result<(), String> {
     use crate::icons;
     use std::time::Instant;
 
@@ -1796,49 +1796,61 @@ pub fn adb_fetch_icons(
         return Err("Icon fetch already in progress".into());
     }
 
-    let result = (|| -> Result<std::collections::HashMap<String, String>, String> {
+    // Clone everything the background thread needs
+    let adb = get_adb_path(&state);
+    let serial = match get_device_serial(&state) {
+        Some(s) => s,
+        None => {
+            ICONS_FETCH_RUNNING.store(false, Ordering::SeqCst);
+            return Err("No device connected".into());
+        }
+    };
+    let aapt2 = lock_state!(state.aapt2_path).clone();
+    let aapt2_path = aapt2.unwrap_or_else(|| "aapt2".to_string());
+
+    let data_dir = app_handle.path().app_data_dir()
+        .map_err(|e| format!("Cannot get app data dir: {}", e))?;
+    let serial_safe = serial.replace(':', "_").replace('/', "_").replace('\\', "_");
+    let cache_dir = data_dir.join("adbph_icons").join(&serial_safe);
+
+    // Spawn background thread — UI stays responsive, icons arrive via events
+    let app = app_handle.clone();
+    std::thread::spawn(move || {
         let start = Instant::now();
-        let adb = get_adb_path(&state);
-        let serial = get_device_serial(&state).ok_or("No device connected")?;
-
-        // Get aapt2 path (optional — icons work without it, just fewer will load)
-        let aapt2 = lock_state!(state.aapt2_path).clone();
-        let aapt2_path = aapt2.as_deref().unwrap_or("aapt2");
-
-        // 1. Determine cache dir
-        let data_dir = app_handle.path().app_data_dir()
-            .map_err(|e| format!("Cannot get app data dir: {}", e))?;
-        let serial_safe = serial.replace(':', "_").replace('/', "_").replace('\\', "_");
-        let cache_dir = data_dir.join("adbph_icons").join(&serial_safe);
         eprintln!("[icons] Cache dir: {:?}", cache_dir);
 
         let package_names: Vec<String> = packages.iter().map(|p| p.package_name.clone()).collect();
 
-        // 2. Check cache — returns only icons with matching version_code
-        let mut result_map: std::collections::HashMap<String, Vec<u8>> = std::collections::HashMap::new();
+        // 1. Emit cached icons immediately
         let mut missing: Vec<&PackageIconRequest> = Vec::new();
+        let mut cached_count = 0u32;
 
         for pkg in &packages {
             if let Some(data) = icons::get_cached(&cache_dir, &pkg.package_name, pkg.version_code) {
-                result_map.insert(pkg.package_name.clone(), data);
+                let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data);
+                let _ = app.emit("icon-ready", serde_json::json!({
+                    "package": &pkg.package_name,
+                    "base64": b64,
+                }));
+                cached_count += 1;
             } else {
                 missing.push(pkg);
             }
         }
+
         eprintln!(
             "[icons] Fetch started — packages: {}, cached: {}, missing: {}",
             packages.len(),
-            result_map.len(),
+            cached_count,
             missing.len()
         );
 
-        // 3. Extract missing icons — skip entirely if aapt2 is unavailable
+        // 2. Extract missing icons one at a time, emit each as it completes
         let mut success = 0u32;
         let mut failed = 0u32;
 
         if !missing.is_empty() {
-            // Verify aapt2 is usable before pulling any APKs
-            let aapt2_ok = std::process::Command::new(aapt2_path)
+            let aapt2_ok = std::process::Command::new(&aapt2_path)
                 .arg("version")
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
@@ -1851,17 +1863,29 @@ pub fn adb_fetch_icons(
                     "[icons] aapt2 not available, skipping {} missing icons",
                     missing.len()
                 );
+                failed = missing.len() as u32;
+                // Emit failed for each missing package so UI can update
+                for pkg in &missing {
+                    let _ = app.emit("icon-ready", serde_json::json!({
+                        "package": &pkg.package_name,
+                        "base64": null,
+                    }));
+                }
             } else {
                 for pkg in &missing {
                     if pkg.code_path.is_empty() {
                         eprintln!("[icons] {} — no APK path, skipping", pkg.package_name);
                         failed += 1;
+                        let _ = app.emit("icon-ready", serde_json::json!({
+                            "package": &pkg.package_name,
+                            "base64": null,
+                        }));
                         continue;
                     }
 
                     match icons::extract_icon(
                         &adb,
-                        aapt2_path,
+                        &aapt2_path,
                         Some(&serial),
                         &pkg.code_path,
                         &pkg.package_name,
@@ -1875,46 +1899,53 @@ pub fn adb_fetch_icons(
                                 &extracted.png_data,
                                 extracted.is_adaptive,
                             );
-                            result_map.insert(extracted.package, extracted.png_data);
+                            let b64 = base64::Engine::encode(
+                                &base64::engine::general_purpose::STANDARD,
+                                &extracted.png_data,
+                            );
+                            let _ = app.emit("icon-ready", serde_json::json!({
+                                "package": &extracted.package,
+                                "base64": b64,
+                            }));
                             success += 1;
                         }
                         Err(e) => {
                             eprintln!("[icons] {} — FAILED: {}", pkg.package_name, e);
                             failed += 1;
+                            let _ = app.emit("icon-ready", serde_json::json!({
+                                "package": &pkg.package_name,
+                                "base64": null,
+                            }));
                         }
                     }
                 }
             }
         }
 
-        // 4. Cleanup stale cache + LRU eviction
+        // 3. Cleanup
         icons::cleanup_stale_cache(&cache_dir, &package_names);
-        icons::evict_lru(&cache_dir, 50 * 1024 * 1024); // 50 MB
+        icons::evict_lru(&cache_dir, 50 * 1024 * 1024);
 
-        // 5. Convert to base64 for frontend
-        let result: std::collections::HashMap<String, String> = result_map
-            .iter()
-            .map(|(pkg, data)| {
-                (pkg.clone(), base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data))
-            })
-            .collect();
-
+        // 4. Emit completion event
         let elapsed = start.elapsed();
         eprintln!(
             "[icons] Fetch complete — total: {}, cached: {}, extracted: {}, failed: {}, duration: {:.1}s",
-            packages.len(),
-            packages.len() - missing.len(),
-            success,
-            failed,
-            elapsed.as_secs_f32()
+            packages.len(), cached_count, success, failed, elapsed.as_secs_f32()
         );
+        let _ = app.emit("icons-fetch-complete", serde_json::json!({
+            "total": packages.len(),
+            "cached": cached_count,
+            "extracted": success,
+            "failed": failed,
+            "duration_secs": elapsed.as_secs_f32(),
+        }));
 
-        Ok(result)
-    })();
+        // Release concurrency guard
+        ICONS_FETCH_RUNNING.store(false, Ordering::SeqCst);
+    });
 
-    // ALWAYS reset concurrency guard
-    ICONS_FETCH_RUNNING.store(false, Ordering::SeqCst);
-    result
+    // Return immediately — work continues in background thread
+    Ok(())
 }
 
 #[tauri::command]
