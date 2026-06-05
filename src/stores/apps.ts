@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { open as dialogOpen, ask } from '@tauri-apps/plugin-dialog';
 import { useDeviceStore } from './device';
+import { useSettingsStore } from './settings';
 import { useToastStore } from './toast';
 
 interface AppInfo {
@@ -23,6 +24,7 @@ function fileNameOf(path: string): string {
 
 export const useAppsStore = defineStore('apps', () => {
   const deviceStore = useDeviceStore();
+  const settingsStore = useSettingsStore();
   const toast = useToastStore();
 
   const apps = ref<AppInfo[]>([]);
@@ -72,6 +74,17 @@ export const useAppsStore = defineStore('apps', () => {
 
   async function fetchIcons(retry = true) {
     if (!deviceStore.connected || apps.value.length === 0) return;
+
+    // Auto-setup: if aapt2 is missing, download it first
+    if (!settingsStore.aapt2Valid) {
+      console.log('[apps] aapt2 not available, auto-downloading...');
+      const downloaded = await settingsStore.downloadAapt2();
+      if (!downloaded) {
+        // Download failed or cancelled — proceed with fallback
+        console.log('[apps] aapt2 download failed, icons will use fallback');
+      }
+    }
+
     isLoadingIcons.value = true;
 
     // Mark all as loading
@@ -111,8 +124,10 @@ export const useAppsStore = defineStore('apps', () => {
       const totalCount = packages.length;
       if (successCount > 0 && successCount < totalCount) {
         toast.show(`Loaded ${successCount} of ${totalCount} icons`, 'info');
+      } else if (successCount === 0 && !settingsStore.aapt2Valid) {
+        // No icons + no aapt2 = download already failed, don't spam
       } else if (successCount === 0) {
-        toast.show('Could not load app icons. Check aapt2 in Settings.', 'error');
+        toast.show('Could not load app icons', 'error');
       }
     } catch (e) {
       const msg = String(e);

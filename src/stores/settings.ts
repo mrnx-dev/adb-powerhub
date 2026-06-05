@@ -40,7 +40,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const adbVersion = ref('');
   const scrcpyValid = ref(false);
   const scrcpyVersion = ref('');
-  const downloading = ref<'adb' | null>(null);
+  const downloading = ref<'adb' | 'aapt2' | null>(null);
   const downloadProgress = ref({ read: 0, total: 0, percent: 0 });
   const downloadError = ref<string | null>(null);
   const downloadCancelled = ref(false);
@@ -320,6 +320,46 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function downloadAapt2(): Promise<boolean> {
+    const toastStore = useToastStore();
+    // User-friendly message — don't mention "aapt2" or "SDK"
+    downloadToastId = toastStore.show('Setting up icon support...', 'progress');
+    downloading.value = 'aapt2';
+    downloadError.value = null;
+    downloadCancelled.value = false;
+    downloadProgress.value = { read: 0, total: 0, percent: 0 };
+
+    try {
+      const path = await invoke<string>('settings_download_aapt2');
+      aapt2Path.value = path;
+      await saveSetting('aapt2Path', aapt2Path.value);
+      await invoke('settings_set_aapt2_path', { path: aapt2Path.value });
+      await validateAapt2();
+      if (downloadToastId !== null) {
+        toastStore.remove(downloadToastId);
+        downloadToastId = null;
+      }
+      toastStore.show('Icon support ready', 'success', 3000);
+      downloading.value = null;
+      return true;
+    } catch (e) {
+      const msg = String(e);
+      if (downloadToastId !== null) {
+        toastStore.remove(downloadToastId);
+        downloadToastId = null;
+      }
+      if (msg.includes('cancelled')) {
+        downloadCancelled.value = true;
+        toastStore.show('Setup cancelled', 'info', 3000);
+      } else {
+        downloadError.value = msg;
+        toastStore.show('Failed to set up icon support', 'error', 5000);
+      }
+      downloading.value = null;
+      return false;
+    }
+  }
+
   async function cancelDownload() {
     try {
       await invoke('settings_cancel_download');
@@ -427,7 +467,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const toastStore = useToastStore();
 
     await listen<{ type: string; read: number; total: number }>('download-progress', (event) => {
-      if (event.payload.type === 'adb') {
+      if (event.payload.type === 'adb' || event.payload.type === 'aapt2') {
         const pct =
           event.payload.total > 0
             ? Math.round((event.payload.read / event.payload.total) * 100)
@@ -453,17 +493,27 @@ export const useSettingsStore = defineStore('settings', () => {
         }
         toastStore.show('ADB downloaded successfully', 'success', 3000);
         validateAdb();
+      } else if (event.payload.type === 'aapt2') {
+        aapt2Path.value = event.payload.path;
+        downloading.value = null;
+        if (downloadToastId !== null) {
+          toastStore.remove(downloadToastId);
+          downloadToastId = null;
+        }
+        toastStore.show('Icon support ready', 'success', 3000);
+        validateAapt2();
       }
     });
 
-    await listen<{ type: string }>('download-cancelled', () => {
+    await listen<{ type: string }>('download-cancelled', (event) => {
       downloading.value = null;
       downloadCancelled.value = true;
       if (downloadToastId !== null) {
         toastStore.remove(downloadToastId);
         downloadToastId = null;
       }
-      toastStore.show('Download cancelled', 'info', 3000);
+      const label = event.payload.type === 'aapt2' ? 'Icon setup' : 'Download';
+      toastStore.show(`${label} cancelled`, 'info', 3000);
     });
   }
 
@@ -514,6 +564,7 @@ export const useSettingsStore = defineStore('settings', () => {
     browseScreenshotDir,
     browseRecordingDir,
     downloadAdb,
+    downloadAapt2,
     cancelDownload,
     openScrcpyLink,
     copyToClipboard,
