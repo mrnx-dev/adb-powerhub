@@ -63,7 +63,11 @@ export const useAppsStore = defineStore('apps', () => {
     }
   }
 
+  let detailGeneration = 0;
+
   async function fetchAppDetail(packageName: string) {
+    const gen = ++detailGeneration;
+
     // 1. Pre-populate instantly from list data (already has real label)
     const fromList = apps.value.find((a) => a.package_name === packageName);
     if (fromList) {
@@ -73,12 +77,14 @@ export const useAppsStore = defineStore('apps', () => {
     // 2. Background fetch for technical fields (version, paths, flags)
     try {
       const detail = await invoke<AppInfo>('adb_app_detail', { package: packageName });
-      // Merge: keep real label from list, overwrite other fields from detail
+      // Discard stale result if a newer fetch was triggered while awaiting
+      if (gen !== detailGeneration) return;
       appDetail.value = {
         ...detail,
         label: fromList?.label ?? detail.label,
       };
     } catch (e) {
+      if (gen !== detailGeneration) return;
       toast.show(`Failed to load detail: ${e}`, 'error');
       if (!appDetail.value) {
         appDetail.value = null;

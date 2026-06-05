@@ -1873,16 +1873,7 @@ pub fn adb_app_detail(state: State<AppState>, package: String) -> Result<AppInfo
         &["shell", "dumpsys", "package", &package],
     )?;
 
-    let mut app = parse_dumpsys_package(&output, &package)?;
-
-    // Override label with real resolved name via on-device DEX if possible
-    if let Ok(labels) = resolve_labels_via_dex(&adb, serial.as_deref(), Some(&package)) {
-        if let Some(label) = labels.get(&package) {
-            app.label = label.clone();
-        }
-    }
-
-    Ok(app)
+    parse_dumpsys_package(&output, &package)
 }
 
 #[tauri::command]
