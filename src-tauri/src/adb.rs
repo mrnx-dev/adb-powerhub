@@ -1566,6 +1566,7 @@ fn parse_pm_list(output: &str, filter: &str) -> Vec<AppInfo> {
 fn resolve_labels_via_dex(
     adb: &str,
     serial: Option<&str>,
+    package_filter: Option<&str>,
 ) -> Result<std::collections::HashMap<String, String>, String> {
     use std::io::Write;
 
@@ -1592,11 +1593,18 @@ fn resolve_labels_via_dex(
         return Err(format!("Failed to push dex: {}", e));
     }
 
-    // 3. Run label resolver
-    let shell_cmd = format!(
-        "CLASSPATH={} app_process / AppLabels",
-        DEX_REMOTE_PATH
-    );
+    // 3. Run label resolver (batch or single-package)
+    let shell_cmd = if let Some(pkg) = package_filter {
+        format!(
+            "CLASSPATH={} app_process / AppLabels {}",
+            DEX_REMOTE_PATH, pkg
+        )
+    } else {
+        format!(
+            "CLASSPATH={} app_process / AppLabels",
+            DEX_REMOTE_PATH
+        )
+    };
     let run_result = run_adb_cmd_with_device_timed(
         adb,
         serial,
@@ -1812,6 +1820,7 @@ pub fn adb_list_apps(state: State<AppState>, filter: String) -> Result<Vec<AppIn
     let real_labels = resolve_labels_via_dex(
         &adb,
         Some(&serial),
+        None,
     )
     .unwrap_or_else(|e| {
         eprintln!("[adb] resolve_labels_via_dex failed: {}, using fallback", e);
@@ -1864,7 +1873,16 @@ pub fn adb_app_detail(state: State<AppState>, package: String) -> Result<AppInfo
         &["shell", "dumpsys", "package", &package],
     )?;
 
-    parse_dumpsys_package(&output, &package)
+    let mut app = parse_dumpsys_package(&output, &package)?;
+
+    // Override label with real resolved name via on-device DEX if possible
+    if let Ok(labels) = resolve_labels_via_dex(&adb, serial.as_deref(), Some(&package)) {
+        if let Some(label) = labels.get(&package) {
+            app.label = label.clone();
+        }
+    }
+
+    Ok(app)
 }
 
 #[tauri::command]
