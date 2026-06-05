@@ -12,6 +12,11 @@ use crate::AppState;
 
 const ADB_TIMEOUT_SECS: u64 = 15;
 
+/// Embedded DEX bytecode for on-device label resolution.
+/// Generated from `src-tauri/assets/AppLabels.java` using D8.
+const APP_LABELS_DEX: &[u8] = include_bytes!("../assets/app_labels.dex");
+const DEX_REMOTE_PATH: &str = "/data/local/tmp/adbph_labels.dex";
+
 fn run_adb_cmd(adb_path: &str, args: &[&str]) -> Result<String, String> {
     run_adb_cmd_with_timeout(adb_path, args, ADB_TIMEOUT_SECS)
 }
@@ -1548,52 +1553,98 @@ fn parse_pm_list(output: &str, filter: &str) -> Vec<AppInfo> {
     apps
 }
 
-/// Resolve real app labels in batch by running a single `dumpsys package` command.
-/// Parses `Package [name]` and `nonLocalizedLabel=label` pairs from the output.
-fn resolve_labels_batch(
+/// Resolve real app labels by running an embedded DEX on the device via
+/// `app_process`. Uses reflection to call `PackageManager.getApplicationLabel()`
+/// which correctly resolves `@string/app_name` resources.
+///
+/// Flow:
+///   1. Write embedded DEX bytes to a local temp file.
+///   2. `adb push` it to `/data/local/tmp/adbph_labels.dex`.
+///   3. Execute `CLASSPATH=... app_process / AppLabels`.
+///   4. Parse stdout lines as `package_name|label`.
+///   5. Best-effort cleanup of remote and local temp files.
+fn resolve_labels_via_dex(
     adb: &str,
-    serial: &Option<String>,
-) -> std::collections::HashMap<String, String> {
-    let serial_str = serial.as_deref();
-    let output = run_adb_cmd_with_device_timed(
+    serial: Option<&str>,
+) -> Result<std::collections::HashMap<String, String>, String> {
+    use std::io::Write;
+
+    // 1. Write embedded DEX to local temp
+    let temp_dir = std::env::temp_dir();
+    let local_dex = temp_dir.join("adbph_labels.dex");
+    {
+        let mut file = std::fs::File::create(&local_dex)
+            .map_err(|e| format!("Failed to create temp dex: {}", e))?;
+        file.write_all(APP_LABELS_DEX)
+            .map_err(|e| format!("Failed to write temp dex: {}", e))?;
+    }
+
+    // 2. Push to device
+    let local_path = local_dex.to_string_lossy();
+    let push_result = run_adb_cmd_with_device_timed(
         adb,
-        serial_str,
-        &["shell", "dumpsys package | grep -E 'Package \\u{5b}|nonLocalizedLabel='"],
+        serial,
+        &["push", &local_path, DEX_REMOTE_PATH],
+        30,
+    );
+    if let Err(e) = push_result {
+        let _ = std::fs::remove_file(&local_dex);
+        return Err(format!("Failed to push dex: {}", e));
+    }
+
+    // 3. Run label resolver
+    let shell_cmd = format!(
+        "CLASSPATH={} app_process / AppLabels",
+        DEX_REMOTE_PATH
+    );
+    let run_result = run_adb_cmd_with_device_timed(
+        adb,
+        serial,
+        &["shell", &shell_cmd],
         60,
     );
 
+    // 4. Parse output
     let mut labels = std::collections::HashMap::new();
-    let output = match output {
-        Ok(o) => o,
-        Err(_) => return labels,
-    };
-
-    let mut current_pkg = String::new();
-    for line in output.lines() {
-        let trimmed = line.trim();
-
-        // Match: Package [com.example.app] (hash):
-        if trimmed.starts_with("Package [") {
-            if let Some(end) = trimmed.find(']') {
-                current_pkg = trimmed[9..end].to_string(); // len("Package [") == 9
+    match run_result {
+        Ok(output) => {
+            for line in output.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with("ERROR:") {
+                    continue;
+                }
+                if let Some(pipe_idx) = line.find('|') {
+                    let pkg = line[..pipe_idx].to_string();
+                    let label = line[pipe_idx + 1..].to_string();
+                    if !pkg.is_empty() && !label.is_empty() {
+                        labels.insert(pkg, label);
+                    }
+                }
             }
-            continue;
         }
-
-        // Match: nonLocalizedLabel=SomeLabel
-        if let Some(label_val) = trimmed.strip_prefix("nonLocalizedLabel=") {
-            if !current_pkg.is_empty()
-                && !label_val.is_empty()
-                && !label_val
-                    .chars()
-                    .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
-            {
-                labels.insert(current_pkg.clone(), label_val.to_string());
-            }
+        Err(e) => {
+            // Even on run failure, attempt cleanup then return error
+            let _ = run_adb_cmd_with_device_timed(
+                adb,
+                serial,
+                &["shell", &format!("rm -f {}", DEX_REMOTE_PATH)],
+                5,
+            );
+            let _ = std::fs::remove_file(&local_dex);
+            return Err(format!("Label resolver failed: {}", e));
         }
     }
 
-    labels
+    // 5. Best-effort cleanup
+    let _ = run_adb_cmd_with_device_timed(
+        adb,
+        serial,
+        &["shell", &format!("rm -f {}", DEX_REMOTE_PATH)],
+        5,
+    );
+    let _ = std::fs::remove_file(&local_dex);
+
+    Ok(labels)
 }
 
 fn parse_package_names(output: &str) -> Vec<String> {
@@ -1683,8 +1734,9 @@ fn parse_dumpsys_package(output: &str, package: &str) -> Result<AppInfo, String>
                 .strip_prefix("nonLocalizedLabel=")
                 .unwrap_or("")
                 .to_string();
-            // Only use if non-empty and not numeric placeholder
+            // Only use if non-empty, not "null", and not numeric placeholder
             if !lbl.is_empty()
+                && lbl != "null"
                 && !lbl
                     .chars()
                     .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
@@ -1756,8 +1808,15 @@ pub fn adb_list_apps(state: State<AppState>, filter: String) -> Result<Vec<AppIn
 
     let mut apps = parse_pm_list(&output, &filter);
 
-    // Resolve real app labels via dumpsys
-    let real_labels = resolve_labels_batch(&adb, &Some(serial.clone()));
+    // Resolve real app labels via on-device DEX (PackageManager.getApplicationLabel)
+    let real_labels = resolve_labels_via_dex(
+        &adb,
+        Some(&serial),
+    )
+    .unwrap_or_else(|e| {
+        eprintln!("[adb] resolve_labels_via_dex failed: {}, using fallback", e);
+        std::collections::HashMap::new()
+    });
     for app in &mut apps {
         if let Some(label) = real_labels.get(&app.package_name) {
             app.label = label.clone();
