@@ -33,8 +33,7 @@ async function clearBuffer() {
     <div
       class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
       :class="{
-        'bg-accent-light border-accent-default text-accent-emerald':
-          store.status === 'LIVE',
+        'bg-accent-light border-accent-default text-accent-emerald': store.status === 'LIVE',
         'bg-color-warning-container border-color-warning text-color-warning':
           store.status === 'PAUSED',
         'bg-color-error-container border-color-error text-color-error':

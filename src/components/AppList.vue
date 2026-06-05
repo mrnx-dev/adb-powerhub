@@ -53,7 +53,9 @@ watch(searchInput, (val) => {
           <div
             class="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-xs font-bold"
             :class="[
-              app.is_system ? 'bg-color-warning-container text-color-warning' : 'bg-accent-light text-accent-emerald',
+              app.is_system
+                ? 'bg-color-warning-container text-color-warning'
+                : 'bg-accent-light text-accent-emerald',
             ]"
           >
             {{ app.label.charAt(0) }}
