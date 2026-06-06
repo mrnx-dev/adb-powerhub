@@ -1308,6 +1308,43 @@ body {
 }
 
 /* ============================================================
+   APP PREVIEW TRANSITION (AppPreview hover <-> content)
+   Enter: 200ms slide-right + fade | Exit: 100ms fade
+   ============================================================ */
+
+.preview-switch-enter-active {
+  transition:
+    opacity var(--duration-standard) var(--ease-out),
+    transform var(--duration-standard) var(--ease-out);
+}
+.preview-switch-leave-active {
+  transition: opacity 100ms var(--ease-accelerate);
+}
+.preview-switch-enter-from {
+  opacity: 0;
+  transform: translateX(6px);
+}
+.preview-switch-leave-to {
+  opacity: 0;
+}
+
+/* ============================================================
+   APPS LAYOUT — Responsive 3-panel -> stack below 900px
+   ============================================================ */
+
+@media (max-width: 900px) {
+  .apps-layout {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .apps-layout > * {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-height: 50%;
+  }
+}
+
+/* ============================================================
    CARD STAGGER (FR-5) — DashboardView children
    Per-child delay via --stagger-index inline style
    Total budget: 120ms delay + 250ms duration = 370ms

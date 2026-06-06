@@ -194,7 +194,7 @@ watch(
       </div>
 
       <!-- Main content: 3-panel -->
-      <div v-else class="flex-1 min-h-0 flex gap-0 overflow-hidden">
+      <div v-else class="apps-layout flex-1 min-h-0 flex gap-0 overflow-hidden">
         <AppList class="w-[35%] min-w-[240px] rounded-l-lg" />
         <AppPreview class="w-[35%] min-w-[240px]" />
         <AppActions class="w-[30%] min-w-[200px]" />
