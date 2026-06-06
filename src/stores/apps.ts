@@ -16,6 +16,7 @@ interface AppInfo {
   is_updated_system: boolean;
   code_path: string;
   data_dir: string;
+  apk_size?: number;
 }
 
 function fileNameOf(path: string): string {
@@ -38,6 +39,16 @@ export const useAppsStore = defineStore('apps', () => {
   const icons = ref<Record<string, string>>({}); // pkg → data:image/png;base64,...
   const iconStates = ref<Record<string, 'loading' | 'loaded' | 'failed'>>({});
   const isLoadingIcons = ref(false);
+
+  // Grid mode + sort
+  const viewMode = ref<'list' | 'grid'>('list');
+  const sortBy = ref<'name' | 'size'>('name');
+  const allAppsCache = ref<AppInfo[]>([]);
+
+  // Hover/peek + pin (Phase 2 prep)
+  const hoveredPackage = ref<string | null>(null);
+  const pinnedPackage = ref<string | null>(null);
+
   let unlistenIconReady: UnlistenFn | null = null;
   let unlistenFetchComplete: UnlistenFn | null = null;
 
@@ -45,7 +56,7 @@ export const useAppsStore = defineStore('apps', () => {
     () => Object.values(iconStates.value).filter((s) => s === 'failed').length
   );
 
-  // Debounced search
+  // Debounced search + sort
   const filteredApps = computed(() => {
     let result = apps.value;
     const q = searchQuery.value.toLowerCase().trim();
@@ -54,10 +65,27 @@ export const useAppsStore = defineStore('apps', () => {
         (a) => a.package_name.toLowerCase().includes(q) || a.label.toLowerCase().includes(q)
       );
     }
+    // Client-side sort
+    if (sortBy.value === 'size') {
+      result = [...result].sort((a, b) => (b.apk_size ?? -1) - (a.apk_size ?? -1));
+    } else {
+      result = [...result].sort((a, b) => a.label.localeCompare(b.label));
+    }
     return result;
   });
 
   const appCount = computed(() => apps.value.length);
+
+  // Filter counts from cached full list (accurate only after 'all' fetch)
+  const filterCounts = computed(() => {
+    const source = filter.value === 'all' ? apps.value : allAppsCache.value;
+    return {
+      all: source.length,
+      third_party: source.filter((a) => !a.is_system).length,
+      system: source.filter((a) => a.is_system).length,
+      disabled: source.filter((a) => !a.is_enabled).length,
+    };
+  });
 
   async function fetchApps() {
     if (!deviceStore.connected) return;
@@ -65,6 +93,10 @@ export const useAppsStore = defineStore('apps', () => {
     error.value = null;
     try {
       apps.value = await invoke<AppInfo[]>('adb_list_apps', { filter: filter.value });
+      // Cache full list for filter counts
+      if (filter.value === 'all') {
+        allAppsCache.value = apps.value;
+      }
     } catch (e) {
       error.value = String(e);
       apps.value = [];
@@ -309,6 +341,7 @@ export const useAppsStore = defineStore('apps', () => {
 
   function reset() {
     apps.value = [];
+    allAppsCache.value = [];
     selectedPackage.value = null;
     appDetail.value = null;
     error.value = null;
@@ -344,6 +377,11 @@ export const useAppsStore = defineStore('apps', () => {
     iconStates,
     isLoadingIcons,
     failedIconCount,
+    viewMode,
+    sortBy,
+    filterCounts,
+    hoveredPackage,
+    pinnedPackage,
     fetchApps,
     fetchIcons,
     fetchAppDetail,

@@ -1,10 +1,22 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted } from 'vue';
 import { useAppsStore } from '../stores/apps';
+import { ArrowUpDown } from '@lucide/vue';
 
 const appsStore = useAppsStore();
 const searchInput = ref('');
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function formatSizeBytes(bytes: number | undefined): string {
+  if (bytes == null) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+const hasBadges = (app: { is_system: boolean; is_enabled: boolean; is_updated_system: boolean }) =>
+  app.is_system || !app.is_enabled || app.is_updated_system;
 
 watch(searchInput, (val) => {
   if (searchTimeout) clearTimeout(searchTimeout);
@@ -21,19 +33,28 @@ onUnmounted(() => {
 <template>
   <div
     class="flex flex-col h-full overflow-hidden rounded-lg border border-theme-tertiary bg-theme-surface"
+    :class="{ 'app-grid-mode': appsStore.viewMode === 'grid' }"
   >
-    <!-- Search -->
-    <div class="px-3 py-2 border-b border-theme-tertiary">
+    <!-- Search + sort header -->
+    <div class="px-3 py-2 border-b border-theme-tertiary flex items-center gap-2">
       <input
         v-model="searchInput"
         type="text"
         placeholder="Search apps..."
-        class="w-full px-3 py-1.5 rounded-md bg-theme-btn border border-theme-tertiary text-sm text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-accent-focus"
+        class="flex-1 min-w-0 px-3 py-1.5 rounded-md bg-theme-btn border border-theme-tertiary text-sm text-theme-primary placeholder:text-theme-muted focus:outline-none focus:border-accent-focus"
       />
+      <button
+        class="btn-pressable shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-md text-[11px] text-theme-muted hover:text-theme-primary bg-theme-btn border border-theme-tertiary"
+        title="Sort by {{ appsStore.sortBy === 'name' ? 'Size' : 'Name' }}"
+        @click="appsStore.sortBy = appsStore.sortBy === 'name' ? 'size' : 'name'"
+      >
+        <ArrowUpDown :size="12" />
+        <span class="hidden sm:inline">{{ appsStore.sortBy === 'name' ? 'Name' : 'Size' }}</span>
+      </button>
     </div>
 
     <!-- App list -->
-    <div class="flex-1 overflow-y-auto">
+    <div class="app-list-scroll flex-1 overflow-y-auto">
       <div
         v-if="appsStore.filteredApps.length === 0 && !appsStore.isLoading"
         class="flex flex-col items-center justify-center py-12 text-theme-muted text-sm"
@@ -85,26 +106,31 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Badges -->
-          <div class="flex flex-wrap gap-1 shrink-0">
-            <span
-              v-if="app.is_system"
-              class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-color-warning-container text-color-warning"
-            >
-              SYS
+          <!-- Meta: size + badges -->
+          <div class="app-meta flex flex-col items-end gap-0.5 shrink-0">
+            <span class="text-[10px] text-theme-muted leading-none">
+              {{ formatSizeBytes(app.apk_size) }}
             </span>
-            <span
-              v-if="!app.is_enabled"
-              class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-color-error-container text-color-error"
-            >
-              DIS
-            </span>
-            <span
-              v-if="app.is_updated_system"
-              class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-color-info-container text-color-info"
-            >
-              UPD
-            </span>
+            <div v-if="hasBadges(app)" class="flex flex-wrap gap-1 justify-end">
+              <span
+                v-if="app.is_system"
+                class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-color-warning-container text-color-warning"
+              >
+                SYS
+              </span>
+              <span
+                v-if="!app.is_enabled"
+                class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-color-error-container text-color-error"
+              >
+                DIS
+              </span>
+              <span
+                v-if="app.is_updated_system"
+                class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-color-info-container text-color-info"
+              >
+                UPD
+              </span>
+            </div>
           </div>
         </button>
       </TransitionGroup>

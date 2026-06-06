@@ -3,7 +3,7 @@ import { onMounted, watch } from 'vue';
 import { useDeviceStore } from '../stores/device';
 import { useAppsStore } from '../stores/apps';
 import { useNavigationStore } from '../stores/navigation';
-import { Download } from '@lucide/vue';
+import { Download, LayoutList, LayoutGrid } from '@lucide/vue';
 import { useApkDropZone } from '../composables/useApkDropZone';
 import AppList from '../components/AppList.vue';
 import AppDetail from '../components/AppDetail.vue';
@@ -14,6 +14,8 @@ const FILTER_LABELS: Record<string, string> = {
   system: 'System',
   disabled: 'Disabled',
 };
+
+const FILTER_KEYS = ['all', 'third_party', 'system', 'disabled'] as const;
 
 const deviceStore = useDeviceStore();
 const appsStore = useAppsStore();
@@ -80,7 +82,7 @@ watch(
 
         <div class="flex gap-1 ml-2">
           <button
-            v-for="f in ['all', 'third_party', 'system', 'disabled'] as const"
+            v-for="f in FILTER_KEYS"
             :key="f"
             class="btn-pressable px-2.5 py-1 rounded-md text-xs font-medium border"
             :class="[
@@ -94,6 +96,35 @@ watch(
             "
           >
             {{ FILTER_LABELS[f] }}
+            <span class="ml-1 opacity-60">({{ appsStore.filterCounts[f] }})</span>
+          </button>
+        </div>
+
+        <!-- View toggle (list/grid) -->
+        <div class="flex rounded-md border border-theme-tertiary overflow-hidden">
+          <button
+            class="btn-pressable px-2 py-1 text-xs"
+            :class="[
+              appsStore.viewMode === 'list'
+                ? 'bg-accent-light text-accent-emerald'
+                : 'bg-theme-btn text-theme-muted hover:text-theme-primary',
+            ]"
+            title="List view"
+            @click="appsStore.viewMode = 'list'"
+          >
+            <LayoutList :size="14" />
+          </button>
+          <button
+            class="btn-pressable px-2 py-1 text-xs"
+            :class="[
+              appsStore.viewMode === 'grid'
+                ? 'bg-accent-light text-accent-emerald'
+                : 'bg-theme-btn text-theme-muted hover:text-theme-primary',
+            ]"
+            title="Grid view"
+            @click="appsStore.viewMode = 'grid'"
+          >
+            <LayoutGrid :size="14" />
           </button>
         </div>
 
