@@ -14,6 +14,17 @@
  * Lines starting with "ERROR:" should be skipped by the host parser.
  */
 public class AppIcons {
+    private static boolean looperPrepared = false;
+
+    static synchronized void ensureLooper() throws Exception {
+        if (!looperPrepared) {
+            Class.forName("android.os.Looper")
+                .getMethod("prepareMainLooper")
+                .invoke(null);
+            looperPrepared = true;
+        }
+    }
+
     public static void main(String[] args) {
         if (args.length == 0) {
             System.err.println("ERROR:Usage: AppIcons pkg1=apk1,pkg2=apk2,...");
@@ -49,47 +60,335 @@ public class AppIcons {
 
     /**
      * Open an APK as a ZIP, find the best launcher icon, return as base64 PNG.
-     * Falls back to PackageManager if ZIP reading fails.
+     *
+     * Strategy (tried in order):
+     *   1. PackageManager.getPackageArchiveInfo → resource ID
+     *   2. Parse resources.arsc → resolve ID to drawable name
+     *   3. Search ZIP for matching PNG
+     *   4. Fallback: ZIP scan + AXML hints + scoring
+     *   5. Last resort: PackageManager.getApplicationIcon via app_process
      */
     static String extractIconFromApk(String apkPath) throws Exception {
-        // Try ZIP-based extraction first (fast, reliable, no permission issues)
-        try {
-            // java.util.zip.ZipFile
-            Class<?> zfClass = Class.forName("java.util.zip.ZipFile");
-            Object zf = zfClass.getConstructor(String.class).newInstance(apkPath);
+        Class<?> zfClass = Class.forName("java.util.zip.ZipFile");
+        Object zf = zfClass.getConstructor(String.class).newInstance(apkPath);
 
-            // Find the best icon entry
+        try {
+            // ── Method 1: Resource ID via PackageManager + resources.arsc ──
+            String iconName = resolveIconNameFromArsc(zf, apkPath);
+            if (iconName != null && !iconName.isEmpty()) {
+                String result = findAndReadIcon(zf, iconName);
+                if (result != null) return result;
+            }
+
+            // ── Method 2: ZIP scan + AXML hints + scoring ──
             String bestIcon = findBestIcon(zf);
             if (bestIcon != null) {
-                // Read entry bytes
                 Object entry = zfClass.getMethod("getEntry", String.class).invoke(zf, bestIcon);
                 if (entry != null) {
-                    Object inputStream = null;
-                    try {
-                        inputStream = zfClass.getMethod("getInputStream",
-                            Class.forName("java.util.zip.ZipEntry")).invoke(zf, entry);
-
-                        byte[] iconBytes = readAllBytes(inputStream);
-
-                        if (iconBytes != null && iconBytes.length > 0) {
-                            return (String) Class.forName("android.util.Base64")
-                                .getMethod("encodeToString", byte[].class, int.class)
-                                .invoke(null, iconBytes, 2);
-                        }
-                    } finally {
-                        if (inputStream != null) {
-                            inputStream.getClass().getMethod("close").invoke(inputStream);
-                        }
+                    Object is = zfClass.getMethod("getInputStream",
+                        Class.forName("java.util.zip.ZipEntry")).invoke(zf, entry);
+                    byte[] bytes = readAllBytes(is);
+                    is.getClass().getMethod("close").invoke(is);
+                    if (bytes != null && bytes.length > 0) {
+                        return (String) Class.forName("android.util.Base64")
+                            .getMethod("encodeToString", byte[].class, int.class)
+                            .invoke(null, bytes, 2);
                     }
                 }
             }
-            zfClass.getMethod("close").invoke(zf);
         } catch (Exception e) {
             System.err.println("ZIP:" + apkPath + ":" + e.getMessage());
+        } finally {
+            zfClass.getMethod("close").invoke(zf);
         }
 
-        // Fallback: try PackageManager (works for system apps)
+        // ── Method 3: PackageManager fallback ──
         return extractViaPackageManager(apkPath);
+    }
+
+    /**
+     * Resolve the icon drawable name using PackageManager + resources.arsc.
+     * This is the most accurate method: gets the resource ID from PM,
+     * resolves it to a name via ARSC parsing, then searches the ZIP.
+     */
+    static String resolveIconNameFromArsc(Object zf, String apkPath) {
+        try {
+            // Step 1: Get resource ID via PackageManager.getPackageArchiveInfo
+            int iconResId = getIconResourceId(apkPath);
+            if (iconResId == 0) return null;
+
+            // Step 2: Read resources.arsc from the APK
+            Class<?> zfClass = zf.getClass();
+            Object arscEntry = zfClass.getMethod("getEntry", String.class)
+                .invoke(zf, "resources.arsc");
+            if (arscEntry == null) return null;
+
+            Object is = zfClass.getMethod("getInputStream",
+                Class.forName("java.util.zip.ZipEntry")).invoke(zf, arscEntry);
+            byte[] arsc = readAllBytes(is);
+            is.getClass().getMethod("close").invoke(is);
+
+            if (arsc == null || arsc.length < 20) return null;
+
+            // Step 3: Resolve resource ID → type name + entry name
+            return resolveArsc(arsc, iconResId);
+        } catch (Exception e) {
+            System.err.println("ARSC:" + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get the icon resource ID from the APK using PackageManager.
+     * Uses getPackageArchiveInfo which reads the manifest directly — no permission issues.
+     */
+    static int getIconResourceId(String apkPath) throws Exception {
+        ensureLooper();
+        Class<?> atClass = Class.forName("android.app.ActivityThread");
+        Object thread = atClass.getMethod("systemMain").invoke(null);
+        Object ctx = atClass.getMethod("getSystemContext").invoke(thread);
+        Object pm = ctx.getClass().getMethod("getPackageManager").invoke(ctx);
+
+        Object pkgInfo = pm.getClass()
+            .getMethod("getPackageArchiveInfo", String.class, int.class)
+            .invoke(pm, apkPath, 0);
+        if (pkgInfo == null) return 0;
+
+        Object appInfo = pkgInfo.getClass().getField("applicationInfo").get(pkgInfo);
+        // Set source dir so resources can be found
+        appInfo.getClass().getField("sourceDir").set(appInfo, apkPath);
+        appInfo.getClass().getField("publicSourceDir").set(appInfo, apkPath);
+
+        return ((Integer) appInfo.getClass().getField("icon").get(appInfo)).intValue();
+    }
+
+    /**
+     * Parse resources.arsc binary to resolve a resource ID to a drawable name.
+     *
+     * Resource ID breakdown: 0xPPTTEEEE
+     *   PP = package ID (0x7F for app's own resources)
+     *   TT = type ID (index into type strings pool)
+     *   EEEE = entry index (index into key strings pool)
+     *
+     * resources.arsc structure (simplified):
+     *   [Header 12B] [Global StringPool] [Package...]
+     *   Package: [Header] [TypeStrings] [KeyStrings] [TypeSpecs...]
+     */
+    static String resolveArsc(byte[] data, int resId) {
+        int packageId = (resId >> 24) & 0xFF;
+        int typeId = (resId >> 16) & 0xFF;
+        int entryIndex = resId & 0xFFFF;
+
+        int pos = 0;
+
+        // Read header
+        if (data.length < 12) return null;
+        int packageCount = readInt32(data, 8);
+        pos = readInt32(data, 4); // header size
+
+        // Skip global string pool
+        pos = skipStringPool(data, pos);
+        if (pos <= 0 || pos >= data.length) return null;
+
+        // Find matching package
+        for (int p = 0; p < packageCount; p++) {
+            if (pos + 12 > data.length) return null;
+            int pkgType = readInt32(data, pos);
+            int pkgHeaderSize = readInt32(data, pos + 4);
+            int pkgId = readInt32(data, pos + 8);
+
+            if (pkgId == packageId) {
+                return resolveInPackage(data, pos, pkgHeaderSize, typeId, entryIndex);
+            }
+            pos += pkgHeaderSize;
+        }
+
+        return null; // package not found
+    }
+
+    static int skipStringPool(byte[] data, int pos) {
+        if (pos + 4 > data.length) return -1;
+        int type = readInt32(data, pos);
+        if (type != 0x001C0001) return pos; // not a string pool
+        return pos + readInt32(data, pos + 8); // skip total_size bytes
+    }
+
+    static String resolveInPackage(byte[] data, int pkgStart, int pkgHeaderSize,
+                                   int typeId, int entryIndex) {
+        // Package header fields at fixed offsets
+        int typeStringsOff = readInt32(data, pkgStart + 268); // offset from pkgStart
+        int keyStringsOff  = readInt32(data, pkgStart + 276); // offset from pkgStart
+
+        // Read type strings pool → get type name for typeId
+        int typePoolPos = pkgStart + typeStringsOff;
+        String typeName = readStringFromPool(data, typePoolPos, typeId);
+        if (typeName == null || typeName.isEmpty()) return null;
+
+        // Read key strings pool → get entry name for entryIndex
+        int keyPoolPos = pkgStart + keyStringsOff;
+        String entryName = readStringFromPool(data, keyPoolPos, entryIndex);
+        if (entryName == null || entryName.isEmpty()) return null;
+
+        return entryName;
+    }
+
+    /**
+     * Read a string from a ResStringPool at a given index.
+     */
+    static String readStringFromPool(byte[] data, int poolStart, int index) {
+        if (poolStart + 28 > data.length) return null;
+
+        int stringCount = readInt32(data, poolStart + 12);
+        if (index < 0 || index >= stringCount) return null;
+
+        int flags = readInt32(data, poolStart + 20);
+        int stringsStart = readInt32(data, poolStart + 24);
+        int headerSize = readInt32(data, poolStart + 4);
+
+        // String offset table starts at poolStart + headerSize
+        int offsetTablePos = poolStart + headerSize;
+        int strOffset = readInt32(data, offsetTablePos + index * 4);
+
+        // String data starts at poolStart + stringsStart
+        int strPos = poolStart + stringsStart + strOffset;
+
+        boolean isUtf8 = (flags & 0x100) != 0;
+
+        if (isUtf8) {
+            return readUtf8String(data, strPos);
+        } else {
+            return readUtf16String(data, strPos);
+        }
+    }
+
+    static String readUtf8String(byte[] data, int pos) {
+        if (pos >= data.length) return null;
+        int len = data[pos] & 0xFF;
+        int charLen;
+        if ((len & 0x80) != 0) {
+            // 2-byte length
+            if (pos + 1 >= data.length) return null;
+            len = ((len & 0x7F) << 8) | (data[pos + 1] & 0xFF);
+            charLen = 2;
+        } else {
+            charLen = 1;
+        }
+        int dataStart = pos + charLen;
+        int dataEnd = dataStart + len;
+        if (dataEnd > data.length) return null;
+
+        // Find actual end (null terminator or end of readable data)
+        int end = dataStart;
+        while (end < dataEnd && data[end] != 0) end++;
+
+        try {
+            return new String(data, dataStart, end - dataStart, "UTF-8");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    static String readUtf16String(byte[] data, int pos) {
+        if (pos + 1 >= data.length) return null;
+        int len = ((data[pos] & 0xFF) | ((data[pos + 1] & 0xFF) << 8));
+        int charLen;
+        if ((len & 0x8000) != 0) {
+            // 4-byte length (2 uint16)
+            if (pos + 3 >= data.length) return null;
+            len = ((len & 0x7FFF) << 16)
+                | ((data[pos + 2] & 0xFF) | ((data[pos + 3] & 0xFF) << 8));
+            charLen = 4;
+        } else {
+            charLen = 2;
+        }
+
+        int dataStart = pos + charLen;
+        int dataEnd = dataStart + len * 2; // len is in uint16 units
+        if (dataEnd > data.length) return null;
+
+        // Decode UTF-16LE manually
+        StringBuilder sb = new StringBuilder();
+        for (int i = dataStart; i < dataEnd - 1; i += 2) {
+            char c = (char) ((data[i] & 0xFF) | ((data[i + 1] & 0xFF) << 8));
+            if (c == 0) break; // null terminator
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Read a little-endian 32-bit integer from a byte array.
+     */
+    static int readInt32(byte[] data, int offset) {
+        return (data[offset] & 0xFF)
+            | ((data[offset + 1] & 0xFF) << 8)
+            | ((data[offset + 2] & 0xFF) << 16)
+            | ((data[offset + 3] & 0xFF) << 24);
+    }
+
+    /**
+     * Search ZIP for a PNG matching the resolved drawable name.
+     * Tries the name in all mipmap density directories.
+     */
+    static String findAndReadIcon(Object zf, String drawableName) throws Exception {
+        Class<?> zfClass = zf.getClass();
+        String[] densities = {"xxxhdpi", "xxhdpi", "xhdpi", "hdpi", "mdpi"};
+
+        for (String density : densities) {
+            // Try with -v4 suffix
+            String path = "res/mipmap-" + density + "-v4/" + drawableName + ".png";
+            Object entry = zfClass.getMethod("getEntry", String.class).invoke(zf, path);
+            if (entry != null) {
+                Object is = zfClass.getMethod("getInputStream",
+                    Class.forName("java.util.zip.ZipEntry")).invoke(zf, entry);
+                byte[] bytes = readAllBytes(is);
+                is.getClass().getMethod("close").invoke(is);
+                if (bytes != null && bytes.length > 0) {
+                    return (String) Class.forName("android.util.Base64")
+                        .getMethod("encodeToString", byte[].class, int.class)
+                        .invoke(null, bytes, 2);
+                }
+            }
+            // Try without -v4 suffix
+            path = "res/mipmap-" + density + "/" + drawableName + ".png";
+            entry = zfClass.getMethod("getEntry", String.class).invoke(zf, path);
+            if (entry != null) {
+                Object is = zfClass.getMethod("getInputStream",
+                    Class.forName("java.util.zip.ZipEntry")).invoke(zf, entry);
+                byte[] bytes = readAllBytes(is);
+                is.getClass().getMethod("close").invoke(is);
+                if (bytes != null && bytes.length > 0) {
+                    return (String) Class.forName("android.util.Base64")
+                        .getMethod("encodeToString", byte[].class, int.class)
+                        .invoke(null, bytes, 2);
+                }
+            }
+        }
+
+        // Also try anydpi-v26 (contains adaptive icon XML)
+        String path = "res/mipmap-anydpi-v26/" + drawableName + ".xml";
+        Object entry = zfClass.getMethod("getEntry", String.class).invoke(zf, path);
+        if (entry != null) {
+            // Adaptive icon → extract foreground from nearest density
+            // For now, fall back to foreground PNG
+            for (String density : densities) {
+                String fgPath = "res/mipmap-" + density + "-v4/" + drawableName + "_foreground.png";
+                entry = zfClass.getMethod("getEntry", String.class).invoke(zf, fgPath);
+                if (entry != null) {
+                    Object is = zfClass.getMethod("getInputStream",
+                        Class.forName("java.util.zip.ZipEntry")).invoke(zf, entry);
+                    byte[] bytes = readAllBytes(is);
+                    is.getClass().getMethod("close").invoke(is);
+                    if (bytes != null && bytes.length > 0) {
+                        return (String) Class.forName("android.util.Base64")
+                            .getMethod("encodeToString", byte[].class, int.class)
+                            .invoke(null, bytes, 2);
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -284,10 +583,7 @@ public class AppIcons {
      */
     static String extractViaPackageManager(String apkPath) {
         try {
-            // Initialize Android context
-            Class.forName("android.os.Looper")
-                .getMethod("prepareMainLooper")
-                .invoke(null);
+            ensureLooper();
             Class<?> atClass = Class.forName("android.app.ActivityThread");
             Object thread = atClass.getMethod("systemMain").invoke(null);
             Object ctx = atClass.getMethod("getSystemContext").invoke(thread);
