@@ -3,6 +3,14 @@ import { useAppsStore } from '../stores/apps';
 import { Package, Pin } from '@lucide/vue';
 
 const appsStore = useAppsStore();
+
+function formatSizeBytes(bytes: number | undefined): string {
+  if (bytes == null) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
 </script>
 
 <template>
@@ -107,6 +115,12 @@ const appsStore = useAppsStore();
           <div v-if="appsStore.previewApp.version_code" class="flex justify-between">
             <span class="text-theme-muted">Version Code</span>
             <span class="text-theme-primary">{{ appsStore.previewApp.version_code }}</span>
+          </div>
+          <div v-if="appsStore.previewApp.apk_size" class="flex justify-between">
+            <span class="text-theme-muted">APK Size</span>
+            <span class="text-theme-primary">{{
+              formatSizeBytes(appsStore.previewApp.apk_size)
+            }}</span>
           </div>
         </div>
       </div>

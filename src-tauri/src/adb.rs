@@ -1492,6 +1492,7 @@ pub struct AppInfo {
     pub is_updated_system: bool,
     pub code_path: String,
     pub data_dir: String,
+    pub apk_size: Option<i64>,
 }
 
 /// Derive a fallback label from the last segment of a package name.
@@ -1555,6 +1556,7 @@ fn parse_pm_list(output: &str, filter: &str) -> Vec<AppInfo> {
             is_updated_system: false,
             code_path: path,
             data_dir: String::new(),
+            apk_size: None,
         });
     }
     apps
@@ -1776,6 +1778,7 @@ fn parse_dumpsys_package(output: &str, package: &str) -> Result<AppInfo, String>
         is_updated_system,
         code_path,
         data_dir,
+        apk_size: None,
     })
 }
 
@@ -2126,7 +2129,20 @@ pub fn adb_app_detail(state: State<AppState>, package: String) -> Result<AppInfo
         &["shell", "dumpsys", "package", &package],
     )?;
 
-    parse_dumpsys_package(&output, &package)
+    let mut info = parse_dumpsys_package(&output, &package)?;
+
+    // Get APK size via stat (non-fatal if it fails)
+    if !info.code_path.is_empty() {
+        if let Ok(size_output) = run_adb_cmd_with_device(
+            &adb,
+            serial.as_deref(),
+            &["shell", "stat", "-c", "%s", &info.code_path],
+        ) {
+            info.apk_size = size_output.trim().parse().ok();
+        }
+    }
+
+    Ok(info)
 }
 
 #[tauri::command]
