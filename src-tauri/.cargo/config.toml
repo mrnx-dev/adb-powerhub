@@ -1,0 +1,10 @@
+# NOTE: On Windows, you may see "hard linking files in the incremental
+# compilation cache failed" warnings. This is a known rustc issue on Windows
+# with the \\?\ UNC path prefix — it falls back to copying, which is slightly
+# slower but functionally identical. No action needed.
+#
+# If you want to suppress it and speed up incremental builds, you can set
+# a shorter target directory by uncommenting the line below:
+#
+# [build]
+# target-dir = "D:\\adbph-target"

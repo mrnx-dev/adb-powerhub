@@ -518,9 +518,8 @@ pub async fn settings_download_aapt2(
     let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Cannot read jar as ZIP: {}", e))?;
 
     let aapt2_name = if cfg!(windows) { "aapt2.exe" } else { "aapt2" };
-    let mut found = false;
 
-    for i in 0..archive.len() {
+    'extract: for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(|e| format!("Cannot read jar entry {}: {}", i, e))?;
         let entry_path = entry.name().to_string();
 
@@ -538,12 +537,11 @@ pub async fn settings_download_aapt2(
                 .map_err(|e| format!("Cannot extract aapt2: {}", e))?;
             std::io::copy(&mut entry, &mut out_file)
                 .map_err(|e| format!("Cannot write aapt2: {}", e))?;
-            found = true;
-            break;
+            break 'extract;
         }
     }
 
-    if !found {
+    if !tmp_dir.join(aapt2_name).exists() {
         // Fallback: search for aapt2 binary anywhere in the JAR
         // Need to close the first archive before opening a new one
         drop(archive);
@@ -559,7 +557,6 @@ pub async fn settings_download_aapt2(
                     .map_err(|e| format!("Cannot extract aapt2: {}", e))?;
                 std::io::copy(&mut entry, &mut out_file)
                     .map_err(|e| format!("Cannot write aapt2: {}", e))?;
-                found = true;
                 break;
             }
         }

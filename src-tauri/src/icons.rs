@@ -8,6 +8,11 @@
 //   4. If adaptive XML: parse foreground/background, composite to PNG
 //   5. Cache with version-based invalidation + LRU eviction
 
+// NOTE: Icon extraction functions below are used for full icon resolution.
+// They are currently dead code but will be wired into adb_fetch_icons
+// once adaptive icon support is enabled. Suppress warnings until then.
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -618,7 +623,7 @@ fn compose_adaptive_icon(
 
     let mut png_bytes = Vec::new();
     {
-        let mut encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+        let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
         encoder
             .write_image(output.as_raw(), target_size, target_size, image::ExtendedColorType::Rgba8.into())
             .map_err(|e| format!("Cannot encode PNG: {}", e))?;
