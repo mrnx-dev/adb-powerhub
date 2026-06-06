@@ -95,9 +95,7 @@ const deviceStore = useDeviceStore();
       <div
         class="mt-auto pt-3 border-t border-theme-tertiary text-[10px] text-theme-muted space-y-1"
       >
-        <div v-if="deviceStore.connected">
-          📱 {{ deviceStore.model || 'Connected device' }}
-        </div>
+        <div v-if="deviceStore.connected">📱 {{ deviceStore.model || 'Connected device' }}</div>
       </div>
     </div>
   </div>

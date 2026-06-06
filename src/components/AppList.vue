@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref, watch, onUnmounted } from 'vue';
+import { ref, watch, onUnmounted, nextTick } from 'vue';
 import { useAppsStore } from '../stores/apps';
 import { ArrowUpDown } from '@lucide/vue';
 
 const appsStore = useAppsStore();
 const searchInput = ref('');
+const searchInputRef = ref<HTMLInputElement | null>(null);
+const listScrollRef = ref<HTMLElement | null>(null);
+const keyboardIndex = ref(-1);
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function formatSizeBytes(bytes: number | undefined): string {
@@ -28,16 +31,87 @@ watch(searchInput, (val) => {
 onUnmounted(() => {
   if (searchTimeout) clearTimeout(searchTimeout);
 });
+
+function scrollToItem(index: number) {
+  nextTick(() => {
+    const items = listScrollRef.value?.querySelectorAll('button');
+    items?.[index]?.scrollIntoView({ block: 'nearest' });
+  });
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  const filtered = appsStore.filteredApps;
+  if (filtered.length === 0) return;
+
+  const isSearchInput = e.target instanceof HTMLInputElement;
+
+  switch (e.key) {
+    case 'ArrowDown':
+      if (!isSearchInput) {
+        e.preventDefault();
+        keyboardIndex.value = Math.min(keyboardIndex.value + 1, filtered.length - 1);
+        const app = filtered[keyboardIndex.value];
+        appsStore.hoverApp(app.package_name);
+        scrollToItem(keyboardIndex.value);
+      }
+      break;
+    case 'ArrowUp':
+      if (!isSearchInput) {
+        e.preventDefault();
+        keyboardIndex.value = Math.max(keyboardIndex.value - 1, 0);
+        const app = filtered[keyboardIndex.value];
+        appsStore.hoverApp(app.package_name);
+        scrollToItem(keyboardIndex.value);
+      }
+      break;
+    case 'Enter':
+      if (!isSearchInput) {
+        e.preventDefault();
+        if (keyboardIndex.value >= 0) {
+          const app = filtered[keyboardIndex.value];
+          appsStore.selectApp(app.package_name);
+        }
+      }
+      break;
+    case ' ':
+      if (!isSearchInput) {
+        e.preventDefault();
+        if (keyboardIndex.value >= 0) {
+          appsStore.hoverApp(filtered[keyboardIndex.value].package_name);
+        }
+      }
+      break;
+    case 'Escape':
+      e.preventDefault();
+      if (isSearchInput) {
+        searchInput.value = '';
+        appsStore.searchQuery = '';
+      }
+      appsStore.clearPin();
+      appsStore.unhoverApp();
+      keyboardIndex.value = -1;
+      break;
+    case '/':
+      if (!isSearchInput) {
+        e.preventDefault();
+        searchInputRef.value?.focus();
+      }
+      break;
+  }
+}
 </script>
 
 <template>
   <div
-    class="flex flex-col h-full overflow-hidden rounded-lg border border-theme-tertiary bg-theme-surface"
+    class="flex flex-col h-full overflow-hidden rounded-lg border border-theme-tertiary bg-theme-surface outline-none"
     :class="{ 'app-grid-mode': appsStore.viewMode === 'grid' }"
+    tabindex="0"
+    @keydown="handleKeydown"
   >
     <!-- Search + sort header -->
     <div class="px-3 py-2 border-b border-theme-tertiary flex items-center gap-2">
       <input
+        ref="searchInputRef"
         v-model="searchInput"
         type="text"
         placeholder="Search apps..."
@@ -54,7 +128,7 @@ onUnmounted(() => {
     </div>
 
     <!-- App list -->
-    <div class="app-list-scroll flex-1 overflow-y-auto">
+    <div ref="listScrollRef" class="app-list-scroll flex-1 overflow-y-auto">
       <div
         v-if="appsStore.filteredApps.length === 0 && !appsStore.isLoading"
         class="flex flex-col items-center justify-center py-12 text-theme-muted text-sm"
