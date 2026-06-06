@@ -1988,7 +1988,7 @@ pub fn adb_fetch_icons(
                         }
                     }
                 }
-                Err(e) => {
+                Err(_e) => {
                     failed = missing.len() as u32;
                     for pkg in &missing {
                         let _ = app.emit("icon-ready", serde_json::json!({
