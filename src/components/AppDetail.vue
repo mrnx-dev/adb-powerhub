@@ -1,16 +1,28 @@
 <script setup lang="ts">
+import { ref, onUnmounted } from 'vue';
 import { useAppsStore } from '../stores/apps';
 import { useToastStore } from '../stores/toast';
-import { Package, Trash2, Eraser, Power, ToggleLeft, ToggleRight, Copy } from '@lucide/vue';
+import { Package, Trash2, Eraser, Power, ToggleLeft, ToggleRight, Copy, Check } from '@lucide/vue';
 
 const appsStore = useAppsStore();
 const toast = useToastStore();
+const copied = ref(false);
+let copyTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function copyPackageName() {
   if (!appsStore.appDetail) return;
   navigator.clipboard.writeText(appsStore.appDetail.package_name);
+  copied.value = true;
   toast.show('Copied to clipboard', 'success');
+  if (copyTimeout) clearTimeout(copyTimeout);
+  copyTimeout = setTimeout(() => {
+    copied.value = false;
+  }, 1500);
 }
+
+onUnmounted(() => {
+  if (copyTimeout) clearTimeout(copyTimeout);
+});
 </script>
 
 <template>
@@ -44,19 +56,21 @@ function copyPackageName() {
                 title="Copy package name"
                 @click="copyPackageName()"
               >
-                <Copy :size="12" />
+                <Copy v-if="!copied" :size="12" />
+                <Check v-else :size="12" class="text-color-success" />
               </button>
             </div>
           </div>
 
-          <div class="relative w-16 h-16 shrink-0">
+          <div class="w-16 h-16 shrink-0">
             <img
               v-if="appsStore.icons[appsStore.appDetail.package_name]"
               :src="appsStore.icons[appsStore.appDetail.package_name]"
-              class="absolute inset-0 w-16 h-16 rounded-2xl object-cover icon-fade-in"
+              class="w-16 h-16 rounded-2xl object-cover icon-fade-in"
               :alt="appsStore.appDetail.label"
             />
             <div
+              v-else
               class="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold"
               :class="[
                 appsStore.appDetail.is_system
@@ -111,7 +125,7 @@ function copyPackageName() {
 
           <div class="grid grid-cols-2 gap-2">
             <button
-              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm text-theme-secondary hover-accent transition-all"
+              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm text-theme-secondary hover-accent"
               :disabled="appsStore.isActioning"
               @click="appsStore.forceStopApp(appsStore.appDetail!.package_name)"
             >
@@ -121,7 +135,7 @@ function copyPackageName() {
 
             <button
               v-if="!appsStore.appDetail.is_enabled"
-              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent-light border border-accent-strong text-sm text-accent-emerald hover:bg-accent-default transition-all"
+              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent-light border border-accent-strong text-sm text-accent-emerald hover:bg-accent-default"
               :disabled="appsStore.isActioning"
               @click="appsStore.enableApp(appsStore.appDetail!.package_name)"
             >
@@ -131,7 +145,7 @@ function copyPackageName() {
 
             <button
               v-else
-              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm text-theme-secondary hover-accent transition-all"
+              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm text-theme-secondary hover-accent"
               :disabled="appsStore.isActioning"
               @click="appsStore.disableApp(appsStore.appDetail!.package_name)"
             >
@@ -140,7 +154,7 @@ function copyPackageName() {
             </button>
 
             <button
-              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm text-theme-secondary hover-accent transition-all"
+              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm text-theme-secondary hover-accent"
               :disabled="appsStore.isActioning"
               @click="appsStore.clearApp(appsStore.appDetail!.package_name)"
             >
@@ -149,7 +163,7 @@ function copyPackageName() {
             </button>
 
             <button
-              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-color-error-container border border-color-error text-sm text-color-error hover:bg-color-error-container transition-all"
+              class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-color-error-container border border-color-error text-sm text-color-error hover:bg-color-error-container"
               :disabled="appsStore.isActioning"
               @click="
                 appsStore.uninstallApp(
@@ -165,7 +179,7 @@ function copyPackageName() {
         </div>
 
         <!-- Technical Info -->
-        <details class="mt-6">
+        <details class="mt-6 animate-details">
           <summary
             class="text-xs font-semibold text-theme-muted uppercase tracking-wider cursor-pointer hover:text-theme-primary transition-colors"
           >

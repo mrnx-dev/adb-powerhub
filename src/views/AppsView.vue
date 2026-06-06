@@ -8,6 +8,13 @@ import { useApkDropZone } from '../composables/useApkDropZone';
 import AppList from '../components/AppList.vue';
 import AppDetail from '../components/AppDetail.vue';
 
+const FILTER_LABELS: Record<string, string> = {
+  all: 'All',
+  third_party: 'Third-Party',
+  system: 'System',
+  disabled: 'Disabled',
+};
+
 const deviceStore = useDeviceStore();
 const appsStore = useAppsStore();
 const navStore = useNavigationStore();
@@ -53,7 +60,7 @@ watch(
     >
       <div class="text-theme-muted">No device connected. Connect a device to manage apps.</div>
       <button
-        class="px-4 py-2 rounded-lg bg-accent-light border border-accent-strong text-accent-emerald text-sm font-medium hover:bg-accent-medium transition-all btn-pressable"
+        class="px-4 py-2 rounded-lg bg-accent-light border border-accent-strong text-accent-emerald text-sm font-medium hover:bg-accent-medium btn-pressable"
         @click="deviceStore.autoConnect()"
       >
         Reconnect
@@ -75,7 +82,7 @@ watch(
           <button
             v-for="f in ['all', 'third_party', 'system', 'disabled'] as const"
             :key="f"
-            class="btn-pressable px-2.5 py-1 rounded-md text-xs font-medium border transition-all"
+            class="btn-pressable px-2.5 py-1 rounded-md text-xs font-medium border"
             :class="[
               appsStore.filter === f
                 ? 'bg-accent-light border-accent-strong text-accent-emerald'
@@ -86,20 +93,14 @@ watch(
               loadApps();
             "
           >
-            {{
-              f === 'third_party'
-                ? 'Third-Party'
-                : f === 'all'
-                  ? 'All'
-                  : f.charAt(0).toUpperCase() + f.slice(1)
-            }}
+            {{ FILTER_LABELS[f] }}
           </button>
         </div>
 
         <div class="flex-1" />
 
         <button
-          class="btn-pressable px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-tertiary text-theme-secondary text-xs font-medium hover-accent transition-all"
+          class="btn-pressable px-3 py-1.5 rounded-lg bg-theme-btn border border-theme-tertiary text-theme-secondary text-xs font-medium hover-accent"
           :disabled="appsStore.isLoading"
           @click="loadApps()"
         >
@@ -107,7 +108,7 @@ watch(
         </button>
 
         <button
-          class="btn-pressable px-3 py-1.5 rounded-lg bg-accent-light border border-accent-strong text-accent-emerald text-xs font-medium hover:bg-accent-medium transition-all"
+          class="btn-pressable px-3 py-1.5 rounded-lg bg-accent-light border border-accent-strong text-accent-emerald text-xs font-medium hover:bg-accent-medium"
           :disabled="appsStore.isInstalling"
           @click="appsStore.installApk()"
         >
@@ -117,7 +118,7 @@ watch(
 
       <!-- Drop zone hint (always visible, highlights during drag) -->
       <div
-        class="rounded-lg border-2 border-dashed p-3 flex items-center justify-center gap-2 transition-all duration-150 ease-out"
+        class="rounded-lg border-2 border-dashed p-3 flex items-center justify-center gap-2 transition-colors duration-150 ease-out"
         :class="[
           isDragOver && deviceStore.connected
             ? 'drop-zone-hint-active'
@@ -144,7 +145,20 @@ watch(
         v-if="appsStore.isLoading && appsStore.apps.length === 0"
         class="flex-1 flex items-center justify-center"
       >
-        <div class="text-theme-muted text-sm animate-pulse">Loading apps...</div>
+        <div class="flex flex-col items-center gap-3">
+          <div class="flex gap-2">
+            <div class="w-2 h-2 rounded-full bg-theme-hover animate-pulse" />
+            <div
+              class="w-2 h-2 rounded-full bg-theme-hover animate-pulse"
+              style="animation-delay: 150ms"
+            />
+            <div
+              class="w-2 h-2 rounded-full bg-theme-hover animate-pulse"
+              style="animation-delay: 300ms"
+            />
+          </div>
+          <div class="text-theme-muted text-sm">Loading apps...</div>
+        </div>
       </div>
 
       <!-- Main content -->

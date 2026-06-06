@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onUnmounted } from 'vue';
 import { useAppsStore } from '../stores/apps';
 
 const appsStore = useAppsStore();
@@ -11,6 +11,10 @@ watch(searchInput, (val) => {
   searchTimeout = setTimeout(() => {
     appsStore.searchQuery = val;
   }, 300);
+});
+
+onUnmounted(() => {
+  if (searchTimeout) clearTimeout(searchTimeout);
 });
 </script>
 
@@ -39,25 +43,28 @@ watch(searchInput, (val) => {
 
       <TransitionGroup name="card-stagger" tag="div">
         <button
-          v-for="app in appsStore.filteredApps"
+          v-for="(app, index) in appsStore.filteredApps"
           :key="app.package_name"
-          class="btn-pressable w-full flex items-center gap-3 px-3 py-2.5 border-b border-theme-tertiary/50 text-left transition-all hover:bg-theme-hover group"
-          :class="[
+          :style="[
+            { '--stagger-index': index },
             appsStore.selectedPackage === app.package_name
-              ? 'bg-accent-light border-l-4 border-l-accent-emerald'
-              : '',
+              ? { boxShadow: 'inset 4px 0 0 var(--color-accent-emerald)' }
+              : {},
           ]"
+          class="btn-pressable w-full flex items-center gap-3 px-3 py-2.5 border-b border-theme-tertiary/50 text-left hover-subtle group"
+          :class="[appsStore.selectedPackage === app.package_name ? 'bg-accent-light' : '']"
           @click="appsStore.selectApp(app.package_name)"
         >
           <!-- Icon: real when available, fallback otherwise -->
-          <div class="relative w-12 h-12 shrink-0">
+          <div class="w-12 h-12 shrink-0">
             <img
               v-if="appsStore.icons[app.package_name]"
               :src="appsStore.icons[app.package_name]"
-              class="absolute inset-0 w-12 h-12 rounded-xl object-cover transition-all duration-200 ease-out group-hover:scale-105 icon-fade-in"
+              class="w-12 h-12 rounded-xl object-cover transition-transform duration-200 ease-out group-hover:scale-105 icon-fade-in"
               :alt="app.label"
             />
             <div
+              v-else
               class="w-12 h-12 rounded-xl flex items-center justify-center text-xs font-bold"
               :class="[
                 app.is_system
