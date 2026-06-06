@@ -1822,8 +1822,7 @@ fn resolve_icons_via_zip_dex(
         ICONS_DEX_REMOTE, pkg_arg
     );
 
-    // 3. Run DEX
-    eprintln!("[icons] Running DEX for {} packages", packages.len());
+    // 3. Run DEX (quiet)
     let output = run_adb_cmd_with_device_timed(
         adb, serial,
         &["shell", &shell_cmd],
@@ -1832,10 +1831,7 @@ fn resolve_icons_via_zip_dex(
     // Log errors too — stderr is mixed into the result on failure
     let dex_output = match &output {
         Ok(o) => o.clone(),
-        Err(e) => {
-            eprintln!("[icons] DEX stderr/error: {}", e);
-            String::new()
-        }
+        Err(_) => String::new()
     };
 
     // 4. Parse output: pkg|base64
@@ -1843,9 +1839,6 @@ fn resolve_icons_via_zip_dex(
     for line in dex_output.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with("ERROR:") || line.starts_with("SKIP:") {
-            if line.starts_with("SKIP:") {
-                eprintln!("[icons] DEX skip: {}", line);
-            }
             continue;
         }
         // Split on first '|': pkg|base64
@@ -1863,8 +1856,6 @@ fn resolve_icons_via_zip_dex(
             }
         }
     }
-
-    eprintln!("[icons] DEX extracted {} icons", result.len());
 
     // 5. Cleanup
     let _ = run_adb_cmd_with_device_timed(adb, serial, &["shell", &format!("rm -f {}", ICONS_DEX_REMOTE)], 5);
@@ -1923,8 +1914,6 @@ pub fn adb_fetch_icons(
         let _guard = Guard;
 
         let start = Instant::now();
-        eprintln!("[icons] Cache dir: {:?}", cache_dir);
-
         let package_names: Vec<String> = packages.iter().map(|p| p.package_name.clone()).collect();
 
         // 1. Emit cached icons immediately
@@ -1945,10 +1934,8 @@ pub fn adb_fetch_icons(
         }
 
         eprintln!(
-            "[icons] Fetch started — packages: {}, cached: {}, missing: {}",
-            packages.len(),
-            cached_count,
-            missing.len()
+            "[icons] Fetch — total: {}, cached: {}",
+            packages.len(), cached_count
         );
 
         // 2. Extract missing icons via on-device ZIP-reading DEX (single call!)
@@ -1993,7 +1980,6 @@ pub fn adb_fetch_icons(
                             }));
                             success += 1;
                         } else {
-                            eprintln!("[icons] {} — not in DEX result", pkg_req.package_name);
                             failed += 1;
                             let _ = app.emit("icon-ready", serde_json::json!({
                                 "package": &pkg_req.package_name,
@@ -2003,7 +1989,6 @@ pub fn adb_fetch_icons(
                     }
                 }
                 Err(e) => {
-                    eprintln!("[icons] DEX extraction failed: {}", e);
                     failed = missing.len() as u32;
                     for pkg in &missing {
                         let _ = app.emit("icon-ready", serde_json::json!({

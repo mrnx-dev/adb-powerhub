@@ -49,26 +49,23 @@ function copyPackageName() {
             </div>
           </div>
 
-          <img
-            v-if="appsStore.icons[appsStore.appDetail.package_name]"
-            :src="appsStore.icons[appsStore.appDetail.package_name]"
-            class="w-16 h-16 shrink-0 rounded-2xl object-cover icon-fade-in"
-            :alt="appsStore.appDetail.label"
-          />
-          <div
-            v-else-if="appsStore.iconStates[appsStore.appDetail.package_name] === 'loading'"
-            class="w-16 h-16 shrink-0 rounded-2xl bg-theme-btn animate-shimmer"
-          />
-          <div
-            v-else
-            class="w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center text-xl font-bold"
-            :class="[
-              appsStore.appDetail.is_system
-                ? 'bg-color-warning-container text-color-warning'
-                : 'bg-accent-light text-accent-emerald',
-            ]"
-          >
-            {{ appsStore.appDetail.label.charAt(0) }}
+          <div class="relative w-16 h-16 shrink-0">
+            <img
+              v-if="appsStore.icons[appsStore.appDetail.package_name]"
+              :src="appsStore.icons[appsStore.appDetail.package_name]"
+              class="absolute inset-0 w-16 h-16 rounded-2xl object-cover icon-fade-in"
+              :alt="appsStore.appDetail.label"
+            />
+            <div
+              class="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold"
+              :class="[
+                appsStore.appDetail.is_system
+                  ? 'bg-color-warning-container text-color-warning'
+                  : 'bg-accent-light text-accent-emerald',
+              ]"
+            >
+              {{ appsStore.appDetail.label.charAt(0) }}
+            </div>
           </div>
         </div>
 
