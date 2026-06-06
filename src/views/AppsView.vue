@@ -6,7 +6,8 @@ import { useNavigationStore } from '../stores/navigation';
 import { Download, LayoutList, LayoutGrid } from '@lucide/vue';
 import { useApkDropZone } from '../composables/useApkDropZone';
 import AppList from '../components/AppList.vue';
-import AppDetail from '../components/AppDetail.vue';
+import AppPreview from '../components/AppPreview.vue';
+import AppActions from '../components/AppActions.vue';
 
 const FILTER_LABELS: Record<string, string> = {
   all: 'All',
@@ -192,10 +193,11 @@ watch(
         </div>
       </div>
 
-      <!-- Main content -->
-      <div v-else class="flex-1 min-h-0 flex gap-4 overflow-hidden">
-        <AppList class="w-[45%] min-w-[280px]" />
-        <AppDetail class="flex-1 min-w-0" />
+      <!-- Main content: 3-panel -->
+      <div v-else class="flex-1 min-h-0 flex gap-0 overflow-hidden">
+        <AppList class="w-[35%] min-w-[240px] rounded-l-lg" />
+        <AppPreview class="w-[35%] min-w-[240px]" />
+        <AppActions class="w-[30%] min-w-[200px]" />
       </div>
     </template>
   </div>

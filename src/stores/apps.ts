@@ -330,14 +330,45 @@ export const useAppsStore = defineStore('apps', () => {
   }
 
   function selectApp(packageName: string) {
-    selectedPackage.value = packageName;
-    fetchAppDetail(packageName);
+    if (pinnedPackage.value === packageName) {
+      // Unpin
+      clearPin();
+    } else {
+      pinnedPackage.value = packageName;
+      hoveredPackage.value = null;
+      selectedPackage.value = packageName;
+      fetchAppDetail(packageName);
+    }
   }
 
-  function clearSelection() {
+  function clearPin() {
+    pinnedPackage.value = null;
     selectedPackage.value = null;
     appDetail.value = null;
   }
+
+  function hoverApp(packageName: string) {
+    if (pinnedPackage.value) return;
+    hoveredPackage.value = packageName;
+  }
+
+  function unhoverApp() {
+    if (pinnedPackage.value) return;
+    hoveredPackage.value = null;
+  }
+
+  function clearSelection() {
+    clearPin();
+    hoveredPackage.value = null;
+  }
+
+  // Preview data: detail when pinned, list data when hovering
+  const previewApp = computed(() => {
+    const pkg = pinnedPackage.value ?? hoveredPackage.value;
+    if (!pkg) return null;
+    if (pinnedPackage.value && appDetail.value) return appDetail.value;
+    return apps.value.find((a) => a.package_name === pkg) ?? null;
+  });
 
   function reset() {
     apps.value = [];
@@ -382,6 +413,10 @@ export const useAppsStore = defineStore('apps', () => {
     filterCounts,
     hoveredPackage,
     pinnedPackage,
+    previewApp,
+    hoverApp,
+    unhoverApp,
+    clearPin,
     fetchApps,
     fetchIcons,
     fetchAppDetail,

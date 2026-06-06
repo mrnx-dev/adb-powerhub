@@ -68,13 +68,15 @@ onUnmounted(() => {
           :key="app.package_name"
           :style="[
             { '--stagger-index': index },
-            appsStore.selectedPackage === app.package_name
+            appsStore.pinnedPackage === app.package_name
               ? { boxShadow: 'inset 4px 0 0 var(--color-accent-emerald)' }
               : {},
           ]"
           class="btn-pressable w-full flex items-center gap-3 px-3 py-2.5 border-b border-theme-tertiary/50 text-left hover-subtle group"
-          :class="[appsStore.selectedPackage === app.package_name ? 'bg-accent-light' : '']"
+          :class="[appsStore.pinnedPackage === app.package_name ? 'bg-accent-light' : '']"
           @click="appsStore.selectApp(app.package_name)"
+          @mouseenter="appsStore.hoverApp(app.package_name)"
+          @mouseleave="appsStore.unhoverApp()"
         >
           <!-- Icon: real when available, fallback otherwise -->
           <div class="w-12 h-12 shrink-0">
