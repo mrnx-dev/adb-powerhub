@@ -3,14 +3,6 @@ import { useAppsStore } from '../stores/apps';
 import { Package, Pin } from '@lucide/vue';
 
 const appsStore = useAppsStore();
-
-function formatSizeBytes(bytes: number | undefined): string {
-  if (bytes == null) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
 </script>
 
 <template>
@@ -36,12 +28,7 @@ function formatSizeBytes(bytes: number | undefined): string {
             class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-theme-btn border border-theme-tertiary font-semibold"
             >Enter</kbd
           >
-          select &nbsp;·&nbsp;
-          <kbd
-            class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-theme-btn border border-theme-tertiary font-semibold"
-            >Space</kbd
-          >
-          peek
+          select
         </p>
       </div>
 
@@ -116,13 +103,29 @@ function formatSizeBytes(bytes: number | undefined): string {
             <span class="text-theme-muted">Version Code</span>
             <span class="text-theme-primary">{{ appsStore.previewApp.version_code }}</span>
           </div>
-          <div v-if="appsStore.previewApp.apk_size" class="flex justify-between">
-            <span class="text-theme-muted">APK Size</span>
-            <span class="text-theme-primary">{{
-              formatSizeBytes(appsStore.previewApp.apk_size)
-            }}</span>
-          </div>
         </div>
+
+        <!-- Timeline (only when pinned + detail fetched) -->
+        <template
+          v-if="
+            appsStore.pinnedPackage &&
+            (appsStore.previewApp.first_install_time || appsStore.previewApp.last_update_time)
+          "
+        >
+          <h4 class="text-[10px] font-semibold uppercase tracking-wider text-theme-muted mt-4 mb-2">
+            Timeline
+          </h4>
+          <div class="space-y-2 text-sm">
+            <div v-if="appsStore.previewApp.first_install_time" class="flex justify-between">
+              <span class="text-theme-muted">Installed</span>
+              <span class="text-theme-primary">{{ appsStore.previewApp.first_install_time }}</span>
+            </div>
+            <div v-if="appsStore.previewApp.last_update_time" class="flex justify-between">
+              <span class="text-theme-muted">Updated</span>
+              <span class="text-theme-primary">{{ appsStore.previewApp.last_update_time }}</span>
+            </div>
+          </div>
+        </template>
       </div>
     </Transition>
   </div>

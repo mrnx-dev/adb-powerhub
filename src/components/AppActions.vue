@@ -29,7 +29,8 @@ const deviceStore = useDeviceStore();
       <button
         class="btn-pressable flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-accent-light border border-accent-strong text-sm text-accent-emerald hover:bg-accent-default font-medium"
         :disabled="appsStore.isActioning"
-        @click="appsStore.forceStopApp(appsStore.pinnedPackage!)"
+        aria-label="Open app"
+        @click="appsStore.openApp(appsStore.pinnedPackage!)"
       >
         <Play :size="14" />
         Open App
@@ -39,6 +40,7 @@ const deviceStore = useDeviceStore();
         <button
           class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm text-theme-secondary hover-accent"
           :disabled="appsStore.isActioning"
+          aria-label="Force stop app"
           @click="appsStore.forceStopApp(appsStore.pinnedPackage!)"
         >
           <Power :size="14" />
@@ -49,6 +51,7 @@ const deviceStore = useDeviceStore();
           v-if="appsStore.previewApp && !appsStore.previewApp.is_enabled"
           class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent-light border border-accent-strong text-sm text-accent-emerald hover:bg-accent-default"
           :disabled="appsStore.isActioning"
+          aria-label="Enable app"
           @click="appsStore.enableApp(appsStore.pinnedPackage!)"
         >
           <ToggleRight :size="14" />
@@ -59,6 +62,7 @@ const deviceStore = useDeviceStore();
           v-else
           class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm text-theme-secondary hover-accent"
           :disabled="appsStore.isActioning"
+          aria-label="Disable app"
           @click="appsStore.disableApp(appsStore.pinnedPackage!)"
         >
           <ToggleLeft :size="14" />
@@ -69,6 +73,7 @@ const deviceStore = useDeviceStore();
       <button
         class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm text-theme-secondary hover-accent mt-2 w-full"
         :disabled="appsStore.isActioning"
+        aria-label="Clear app data"
         @click="appsStore.clearApp(appsStore.pinnedPackage!)"
       >
         <Eraser :size="14" />
@@ -83,6 +88,7 @@ const deviceStore = useDeviceStore();
       <button
         class="btn-pressable flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-color-error-container border border-color-error text-sm text-color-error hover:bg-color-error-container w-full"
         :disabled="appsStore.isActioning"
+        :aria-label="appsStore.previewApp?.is_system ? 'Disable system app' : 'Uninstall app'"
         @click="
           appsStore.uninstallApp(appsStore.pinnedPackage!, appsStore.previewApp?.is_system ?? false)
         "

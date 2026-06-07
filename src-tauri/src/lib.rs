@@ -136,6 +136,7 @@ pub fn run() {
             adb_force_stop_app,
             adb_enable_app,
             adb_disable_app,
+            adb_open_app,
             adb_fetch_icons,
             write_text_file,
             settings_validate_aapt2,

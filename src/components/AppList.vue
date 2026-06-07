@@ -25,12 +25,21 @@ watch(searchInput, (val) => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
     appsStore.searchQuery = val;
+    keyboardIndex.value = -1;
   }, 300);
 });
 
 onUnmounted(() => {
   if (searchTimeout) clearTimeout(searchTimeout);
 });
+
+// Reset keyboard index when list changes (filter, sort, new data)
+watch(
+  () => appsStore.filteredApps.length,
+  () => {
+    keyboardIndex.value = -1;
+  }
+);
 
 function scrollToItem(index: number) {
   nextTick(() => {
@@ -73,14 +82,6 @@ function handleKeydown(e: KeyboardEvent) {
         }
       }
       break;
-    case ' ':
-      if (!isSearchInput) {
-        e.preventDefault();
-        if (keyboardIndex.value >= 0) {
-          appsStore.hoverApp(filtered[keyboardIndex.value].package_name);
-        }
-      }
-      break;
     case 'Escape':
       e.preventDefault();
       if (isSearchInput) {
@@ -104,7 +105,6 @@ function handleKeydown(e: KeyboardEvent) {
 <template>
   <div
     class="flex flex-col h-full overflow-hidden rounded-lg border border-theme-tertiary bg-theme-surface outline-none"
-    :class="{ 'app-grid-mode': appsStore.viewMode === 'grid' }"
     tabindex="0"
     @keydown="handleKeydown"
   >
@@ -119,7 +119,7 @@ function handleKeydown(e: KeyboardEvent) {
       />
       <button
         class="btn-pressable shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-md text-[11px] text-theme-muted hover:text-theme-primary bg-theme-btn border border-theme-tertiary"
-        title="Sort by {{ appsStore.sortBy === 'name' ? 'Size' : 'Name' }}"
+        :aria-label="`Sort by ${appsStore.sortBy === 'name' ? 'name' : 'size'}`"
         @click="appsStore.sortBy = appsStore.sortBy === 'name' ? 'size' : 'name'"
       >
         <ArrowUpDown :size="12" />
@@ -146,8 +146,12 @@ function handleKeydown(e: KeyboardEvent) {
               ? { boxShadow: 'inset 4px 0 0 var(--color-accent-emerald)' }
               : {},
           ]"
-          class="btn-pressable w-full flex items-center gap-3 px-3 py-2.5 border-b border-theme-tertiary/50 text-left hover-subtle group"
-          :class="[appsStore.pinnedPackage === app.package_name ? 'bg-accent-light' : '']"
+          class="btn-pressable w-full flex items-center gap-3 px-3 py-2.5 text-left hover-subtle group"
+          :class="[
+            appsStore.pinnedPackage === app.package_name ? 'bg-accent-light' : '',
+            keyboardIndex === index ? 'keyboard-focus' : '',
+          ]"
+          :aria-label="`${app.label} - ${app.package_name}`"
           @click="appsStore.selectApp(app.package_name)"
           @mouseenter="appsStore.hoverApp(app.package_name)"
           @mouseleave="appsStore.unhoverApp()"

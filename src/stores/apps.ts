@@ -17,6 +17,8 @@ interface AppInfo {
   code_path: string;
   data_dir: string;
   apk_size?: number;
+  first_install_time?: string;
+  last_update_time?: string;
 }
 
 function fileNameOf(path: string): string {
@@ -40,8 +42,7 @@ export const useAppsStore = defineStore('apps', () => {
   const iconStates = ref<Record<string, 'loading' | 'loaded' | 'failed'>>({});
   const isLoadingIcons = ref(false);
 
-  // Grid mode + sort
-  const viewMode = ref<'list' | 'grid'>('list');
+  // Sort
   const sortBy = ref<'name' | 'size'>('name');
   const allAppsCache = ref<AppInfo[]>([]);
 
@@ -370,6 +371,20 @@ export const useAppsStore = defineStore('apps', () => {
     return apps.value.find((a) => a.package_name === pkg) ?? null;
   });
 
+  async function openApp(packageName: string) {
+    isActioning.value = true;
+    try {
+      await invoke('adb_open_app', { package: packageName });
+      toast.show(`Opened ${packageName}`, 'success');
+      deviceStore.addLog(`Opened app: ${packageName}`, 'info');
+    } catch (e) {
+      toast.show(`Failed to open: ${e}`, 'error');
+      deviceStore.addLog(`Open app failed: ${e}`, 'error');
+    } finally {
+      isActioning.value = false;
+    }
+  }
+
   function reset() {
     apps.value = [];
     allAppsCache.value = [];
@@ -408,7 +423,6 @@ export const useAppsStore = defineStore('apps', () => {
     iconStates,
     isLoadingIcons,
     failedIconCount,
-    viewMode,
     sortBy,
     filterCounts,
     hoveredPackage,
@@ -427,6 +441,7 @@ export const useAppsStore = defineStore('apps', () => {
     forceStopApp,
     enableApp,
     disableApp,
+    openApp,
     selectApp,
     clearSelection,
     reset,

@@ -1493,6 +1493,8 @@ pub struct AppInfo {
     pub code_path: String,
     pub data_dir: String,
     pub apk_size: Option<i64>,
+    pub first_install_time: Option<String>,
+    pub last_update_time: Option<String>,
 }
 
 /// Derive a fallback label from the last segment of a package name.
@@ -1557,6 +1559,8 @@ fn parse_pm_list(output: &str, filter: &str) -> Vec<AppInfo> {
             code_path: path,
             data_dir: String::new(),
             apk_size: None,
+            first_install_time: None,
+            last_update_time: None,
         });
     }
     apps
@@ -1692,6 +1696,8 @@ fn parse_dumpsys_package(output: &str, package: &str) -> Result<AppInfo, String>
     let mut code_path = String::new();
     let mut data_dir = String::new();
     let mut label = String::new();
+    let mut first_install_time: Option<String> = None;
+    let mut last_update_time: Option<String> = None;
 
     for line in output.lines() {
         let trimmed = line.trim();
@@ -1760,6 +1766,27 @@ fn parse_dumpsys_package(output: &str, package: &str) -> Result<AppInfo, String>
             {
                 label = lbl;
             }
+        } else if trimmed.starts_with("firstInstallTime=") {
+            // firstInstallTime=2024-03-15 10:30:00
+            let raw = trimmed
+                .strip_prefix("firstInstallTime=")
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if !raw.is_empty() && raw != "0" {
+                // Keep only the date portion (YYYY-MM-DD)
+                first_install_time = Some(raw.split_whitespace().next().unwrap_or(&raw).to_string());
+            }
+        } else if trimmed.starts_with("lastUpdateTime=") {
+            // lastUpdateTime=2026-06-01 14:22:33
+            let raw = trimmed
+                .strip_prefix("lastUpdateTime=")
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if !raw.is_empty() && raw != "0" {
+                last_update_time = Some(raw.split_whitespace().next().unwrap_or(&raw).to_string());
+            }
         }
     }
 
@@ -1779,6 +1806,8 @@ fn parse_dumpsys_package(output: &str, package: &str) -> Result<AppInfo, String>
         code_path,
         data_dir,
         apk_size: None,
+        first_install_time,
+        last_update_time,
     })
 }
 
@@ -2234,6 +2263,22 @@ pub fn adb_disable_app(state: State<AppState>, package: String) -> Result<String
         &adb,
         serial.as_deref(),
         &["shell", "pm", "disable-user", "--user", "0", &package],
+    )
+}
+
+#[tauri::command]
+pub fn adb_open_app(state: State<AppState>, package: String) -> Result<String, String> {
+    let _serial = get_device_serial(&state).ok_or("No device connected")?;
+    let adb = get_adb_path(&state);
+    let serial = get_device_serial(&state);
+
+    // Use monkey command — simplest way to launch an app's main activity
+    // without needing to resolve the launchable activity explicitly.
+    // Non-fatal if the app has no launcher intent.
+    run_adb_cmd_with_device(
+        &adb,
+        serial.as_deref(),
+        &["shell", "monkey", "-p", &package, "-c", "android.intent.category.LAUNCHER", "1"],
     )
 }
 
