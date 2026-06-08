@@ -161,7 +161,7 @@ function handleKeydown(e: KeyboardEvent) {
             <img
               v-if="appsStore.icons[app.package_name]"
               :src="appsStore.icons[app.package_name]"
-              class="w-12 h-12 rounded-xl object-cover transition-transform duration-200 ease-out group-hover:scale-105 icon-fade-in"
+              class="w-12 h-12 rounded-xl object-cover app-list-icon-hover icon-fade-in"
               :alt="app.label"
             />
             <div
@@ -217,3 +217,14 @@ function handleKeydown(e: KeyboardEvent) {
     </div>
   </div>
 </template>
+
+<style scoped>
+@media (hover: hover) and (pointer: fine) {
+  .app-list-icon-hover {
+    transition: transform 200ms ease-out;
+  }
+  .btn-pressable:hover .app-list-icon-hover {
+    transform: scale(1.05);
+  }
+}
+</style>

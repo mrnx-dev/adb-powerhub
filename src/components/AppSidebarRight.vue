@@ -170,7 +170,7 @@ watch(
       :class="collapsed ? 'justify-center p-3' : 'justify-end p-2'"
     >
       <button
-        class="btn-pressable p-1.5 rounded-lg hover:bg-theme-hover transition-all"
+        class="btn-pressable p-1.5 rounded-lg hover:bg-theme-hover"
         :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         @click="toggleSidebar"
       >
@@ -182,7 +182,7 @@ watch(
     <!-- Collapsed: section icons -->
     <div v-if="collapsed" class="flex flex-col items-center gap-1 px-2 mt-1">
       <button
-        class="btn-pressable p-2.5 rounded-xl transition-all"
+        class="btn-pressable p-2.5 rounded-xl"
         :class="[
           activeSection === 'connectivity'
             ? 'text-accent-emerald bg-accent-light'
@@ -194,7 +194,7 @@ watch(
         <Wifi :size="16" :class="activeSection === 'connectivity' ? '' : 'opacity-70'" />
       </button>
       <button
-        class="btn-pressable p-2.5 rounded-xl transition-all"
+        class="btn-pressable p-2.5 rounded-xl"
         :class="[
           activeSection === 'devTools'
             ? 'text-accent-emerald bg-accent-light'
@@ -206,7 +206,7 @@ watch(
         <Pointer :size="16" :class="activeSection === 'devTools' ? '' : 'opacity-70'" />
       </button>
       <button
-        class="btn-pressable p-2.5 rounded-xl transition-all"
+        class="btn-pressable p-2.5 rounded-xl"
         :class="[
           activeSection === 'display'
             ? 'text-accent-emerald bg-accent-light'
@@ -218,7 +218,7 @@ watch(
         <Sun :size="16" :class="activeSection === 'display' ? '' : 'opacity-70'" />
       </button>
       <button
-        class="btn-pressable p-2.5 rounded-xl transition-all"
+        class="btn-pressable p-2.5 rounded-xl"
         :class="[
           activeSection === 'remote'
             ? 'text-accent-emerald bg-accent-light'
@@ -230,7 +230,7 @@ watch(
         <Smartphone :size="16" :class="activeSection === 'remote' ? '' : 'opacity-70'" />
       </button>
       <button
-        class="btn-pressable p-2.5 rounded-xl transition-all"
+        class="btn-pressable p-2.5 rounded-xl"
         :class="[
           activeSection === 'system'
             ? 'text-accent-emerald bg-accent-light'
@@ -264,7 +264,7 @@ watch(
                 @change="store.toggleWifi(store.wifiEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-[transform,background-color,width] after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -282,7 +282,7 @@ watch(
                 @change="store.toggleData(store.dataEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-[transform,background-color,width] after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -300,7 +300,7 @@ watch(
                 @change="store.toggleAirplane(store.airplaneEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-[transform,background-color,width] after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -318,7 +318,7 @@ watch(
                 @change="store.toggleBluetooth(store.bluetoothEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-[transform,background-color,width] after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -344,7 +344,7 @@ watch(
                 @change="store.toggleShowTaps(store.showTapsEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-[transform,background-color,width] after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -362,7 +362,7 @@ watch(
                 @change="store.toggleLayoutBounds(store.layoutBoundsEnabled)"
               />
               <div
-                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
+                class="w-8 h-[18px] bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-3.5 after:w-3.5 after:shadow-md after:transition-[transform,background-color,width] after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[12px] rtl:peer-checked:after:-translate-x-[12px] peer-checked:after:bg-accent-emerald peer-active:after:w-[18px]"
               ></div>
             </label>
           </div>
@@ -404,7 +404,7 @@ watch(
               <span class="text-[10px] text-theme-muted">{{ store.currentDensity || '—' }}</span>
               <button
                 v-if="store.densityOverride !== null"
-                class="btn-pressable flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+                class="btn-pressable flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-theme-btn border border-theme-tertiary hover-accent"
                 title="Reset to factory density ({{ store.physicalDensity }})"
                 @click="store.resetDensity()"
               >
@@ -434,21 +434,21 @@ watch(
         <div class="space-y-2">
           <div class="grid grid-cols-3 gap-1.5">
             <button
-              class="btn-pressable flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              class="btn-pressable flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
               @click="store.pressHome"
             >
               <Home :size="16" class="opacity-70" />
               <span class="text-[9px] font-medium">Home</span>
             </button>
             <button
-              class="btn-pressable flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              class="btn-pressable flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
               @click="store.pressBack"
             >
               <ArrowLeft :size="16" class="opacity-70" />
               <span class="text-[9px] font-medium">Back</span>
             </button>
             <button
-              class="btn-pressable flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              class="btn-pressable flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
               @click="store.pressRecent"
             >
               <History :size="16" class="opacity-70" />
@@ -458,21 +458,21 @@ watch(
 
           <div class="grid grid-cols-3 gap-1.5">
             <button
-              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
               title="Volume Down"
               @click="store.pressVolDown"
             >
               <Volume1 :size="14" class="opacity-70" />
             </button>
             <button
-              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
               title="Mute"
               @click="store.pressMute"
             >
               <VolumeX :size="14" class="opacity-70" />
             </button>
             <button
-              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
               title="Volume Up"
               @click="store.pressVolUp"
             >
@@ -482,21 +482,21 @@ watch(
 
           <div class="grid grid-cols-3 gap-1.5">
             <button
-              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
               title="Previous"
               @click="store.pressPrev"
             >
               <SkipBack :size="14" class="opacity-70" />
             </button>
             <button
-              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
               title="Play/Pause"
               @click="store.pressPlayPause"
             >
               <Play :size="14" class="opacity-70" />
             </button>
             <button
-              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              class="btn-pressable flex items-center justify-center py-2 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
               title="Next"
               @click="store.pressNext"
             >
@@ -505,7 +505,7 @@ watch(
           </div>
 
           <button
-            class="btn-pressable w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+            class="btn-pressable w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
             @click="store.pressPower"
           >
             <Power :size="16" class="opacity-70" />
@@ -521,7 +521,7 @@ watch(
               @keydown.enter="store.sendText"
             />
             <button
-              class="btn-pressable w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent-light border border-accent-default hover-accent transition-all text-xs font-medium group"
+              class="btn-pressable w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent-light border border-accent-default hover-accent text-xs font-medium group"
               @click="store.sendText"
             >
               <Send :size="12" class="text-accent-emerald group-hover:text-[var(--text-inverse)]" />
@@ -538,7 +538,7 @@ watch(
         </h3>
         <div class="space-y-1.5">
           <button
-            class="btn-pressable w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+            class="btn-pressable w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
             @click="store.takeScreenshot"
           >
             <Image :size="16" class="opacity-70" />
@@ -547,7 +547,7 @@ watch(
 
           <div class="relative reboot-menu-container">
             <button
-              class="btn-pressable w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent transition-all"
+              class="btn-pressable w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-theme-btn border border-theme-tertiary hover-accent"
               @click="store.showRebootMenu = !store.showRebootMenu"
             >
               <RotateCcw :size="16" class="opacity-70" />
@@ -559,7 +559,7 @@ watch(
               class="absolute left-0 right-0 top-full mt-1 rounded-xl bg-theme-sidebar border border-theme-secondary overflow-hidden z-30"
             >
               <button
-                class="btn-pressable w-full px-3 py-2 text-xs text-left hover-accent transition-all flex items-center gap-2 text-theme-primary"
+                class="btn-pressable w-full px-3 py-2 text-xs text-left hover-accent flex items-center gap-2 text-theme-primary"
                 @click="
                   store.rebootDevice();
                   store.showRebootMenu = false;
@@ -569,14 +569,14 @@ watch(
                 Normal Reboot
               </button>
               <button
-                class="btn-pressable w-full px-3 py-2 text-xs text-left hover-accent transition-all text-color-warning flex items-center gap-2"
+                class="btn-pressable w-full px-3 py-2 text-xs text-left hover-accent text-color-warning flex items-center gap-2"
                 @click="store.rebootRecovery()"
               >
                 <RotateCcw :size="12" class="opacity-70" />
                 Recovery
               </button>
               <button
-                class="btn-pressable w-full px-3 py-2 text-xs text-left hover-accent transition-all text-[var(--color-tertiary)] flex items-center gap-2"
+                class="btn-pressable w-full px-3 py-2 text-xs text-left hover-accent text-[var(--color-tertiary)] flex items-center gap-2"
                 @click="store.rebootBootloader()"
               >
                 <Power :size="12" class="opacity-70" />

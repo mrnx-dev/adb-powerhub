@@ -78,7 +78,7 @@ watch(
     >
       <div class="text-theme-muted">No device connected. Connect a device to stream logs.</div>
       <button
-        class="px-4 py-2 rounded-lg bg-accent-light border border-accent-strong text-accent-emerald text-sm font-medium hover:bg-accent-medium transition-all"
+        class="px-4 py-2 rounded-lg bg-accent-light border border-accent-strong text-accent-emerald text-sm font-medium hover:bg-accent-medium transition-[background-color,border-color,color]"
         @click="deviceStore.autoConnect()"
       >
         Reconnect

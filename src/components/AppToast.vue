@@ -45,7 +45,7 @@ function onDismiss(id: number) {
       <div
         v-for="toast in toastStore.toasts"
         :key="toast.id"
-        class="pointer-events-auto flex flex-col gap-2 px-4 py-3 rounded-xl border-l-4 backdrop-blur-md shadow-theme-card text-sm transition-all duration-150"
+        class="pointer-events-auto flex flex-col gap-2 px-4 py-3 rounded-xl border-l-4 backdrop-blur-md shadow-theme-card text-sm transition-[opacity,transform] duration-150"
         :class="[typeStyles[toast.type], { 'scale-95 opacity-0': dismissing === toast.id }]"
         @click="onDismiss(toast.id)"
       >
@@ -64,10 +64,7 @@ function onDismiss(id: number) {
             <span class="text-[10px] text-theme-secondary">{{ toast.progress }}%</span>
           </div>
           <div class="progress-bar-track">
-            <div
-              class="progress-bar-fill transition-all duration-300"
-              :style="{ width: toast.progress + '%' }"
-            ></div>
+            <div class="progress-bar-fill" :style="{ width: toast.progress + '%' }"></div>
           </div>
         </div>
       </div>
@@ -77,10 +74,14 @@ function onDismiss(id: number) {
 
 <style scoped>
 .toast-enter-active {
-  transition: all 0.25s ease-out;
+  transition:
+    opacity var(--duration-standard) var(--ease-out),
+    transform var(--duration-standard) var(--ease-out);
 }
 .toast-leave-active {
-  transition: all 0.2s ease-in;
+  transition:
+    opacity 100ms var(--ease-accelerate),
+    transform 100ms var(--ease-accelerate);
 }
 .toast-enter-from {
   opacity: 0;

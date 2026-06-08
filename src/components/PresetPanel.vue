@@ -69,7 +69,7 @@ async function confirmDelete(preset: Preset) {
         <div
           v-for="(preset, index) in presetsStore.presets"
           :key="preset.id"
-          class="group flex items-center gap-1 shrink-0 px-2 py-1 bg-theme-btn/60 border border-theme-tertiary/60 rounded-md hover-border-accent transition-all"
+          class="group flex items-center gap-1 shrink-0 px-2 py-1 bg-theme-btn/60 border border-theme-tertiary/60 rounded-md hover-border-accent transition-[border-color]"
           :class="{ 'opacity-50': !deviceStore.connected }"
         >
           <!-- Run area -->

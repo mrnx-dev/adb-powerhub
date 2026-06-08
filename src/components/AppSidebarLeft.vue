@@ -63,7 +63,7 @@ onUnmounted(() => {
       :class="expanded ? 'justify-between px-4 py-3' : 'justify-center py-3'"
     >
       <button
-        class="p-1.5 rounded-lg hover:bg-theme-hover transition-all"
+        class="btn-pressable p-1.5 rounded-lg hover:bg-theme-hover"
         :title="expanded ? 'Collapse sidebar' : 'Expand sidebar'"
         @click="toggleSidebar"
       >
@@ -81,7 +81,7 @@ onUnmounted(() => {
       </h3>
 
       <button
-        class="btn-pressable rounded-lg border transition-all"
+        class="btn-pressable rounded-lg border"
         :class="[
           navStore.currentPage === 'dashboard'
             ? 'action-card-active'
@@ -98,7 +98,7 @@ onUnmounted(() => {
       </button>
 
       <button
-        class="btn-pressable rounded-lg border transition-all"
+        class="btn-pressable rounded-lg border"
         :class="[
           navStore.currentPage === 'logcat'
             ? 'action-card-active'
@@ -117,7 +117,7 @@ onUnmounted(() => {
       </button>
 
       <button
-        class="btn-pressable rounded-lg border transition-all"
+        class="btn-pressable rounded-lg border"
         :class="[
           navStore.currentPage === 'apps'
             ? 'action-card-active'
@@ -136,7 +136,7 @@ onUnmounted(() => {
       </button>
 
       <button
-        class="btn-pressable rounded-lg border transition-all"
+        class="btn-pressable rounded-lg border"
         :class="[
           navStore.currentPage === 'settings'
             ? 'action-card-active'

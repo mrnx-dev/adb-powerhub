@@ -73,7 +73,7 @@ function handleAutoReconnectChange(val: boolean) {
           <button
             v-for="m in modes"
             :key="m.value"
-            class="btn-pressable flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
+            class="btn-pressable flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
             :class="
               themeStore.mode === m.value
                 ? 'action-card-active'
@@ -94,7 +94,7 @@ function handleAutoReconnectChange(val: boolean) {
             <button
               v-for="theme in darkGroup"
               :key="theme.id"
-              class="btn-pressable flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs transition-all"
+              class="btn-pressable flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs"
               :class="
                 theme.id === themeStore.darkThemeId
                   ? 'action-card-active'
@@ -117,7 +117,7 @@ function handleAutoReconnectChange(val: boolean) {
             <button
               v-for="theme in lightGroup"
               :key="theme.id"
-              class="btn-pressable flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs transition-all"
+              class="btn-pressable flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs"
               :class="
                 theme.id === themeStore.lightThemeId
                   ? 'action-card-active'
@@ -144,7 +144,7 @@ function handleAutoReconnectChange(val: boolean) {
             <button
               v-for="theme in visibleThemes"
               :key="theme.id"
-              class="btn-pressable flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs transition-all"
+              class="btn-pressable flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs"
               :class="
                 isActiveTheme(theme.id)
                   ? 'action-card-active'
@@ -176,7 +176,7 @@ function handleAutoReconnectChange(val: boolean) {
             @change="store.setStayOnTop(store.stayOnTop)"
           />
           <div
-            class="w-9 h-5 bg-theme-toggle-track rounded-full peer peer-focus:outline-none after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-4 after:w-4 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[14px] rtl:peer-checked:after:-translate-x-[14px] peer-checked:after:bg-accent-emerald peer-active:after:w-[22px]"
+            class="w-9 h-5 bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-4 after:w-4 after:shadow-md after:transition-[transform,background-color,width] after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[14px] rtl:peer-checked:after:-translate-x-[14px] peer-checked:after:bg-accent-emerald peer-active:after:w-[22px]"
           ></div>
         </label>
       </div>
@@ -195,7 +195,7 @@ function handleAutoReconnectChange(val: boolean) {
             @change="store.setAutoDetectBinaries(store.autoDetectBinaries)"
           />
           <div
-            class="w-9 h-5 bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-4 after:w-4 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[14px] rtl:peer-checked:after:-translate-x-[14px] peer-checked:after:bg-accent-emerald peer-active:after:w-[22px]"
+            class="w-9 h-5 bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-4 after:w-4 after:shadow-md after:transition-[transform,background-color,width] after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[14px] rtl:peer-checked:after:-translate-x-[14px] peer-checked:after:bg-accent-emerald peer-active:after:w-[22px]"
           ></div>
         </label>
       </div>
@@ -214,7 +214,7 @@ function handleAutoReconnectChange(val: boolean) {
             @change="handleAutoReconnectChange(store.autoReconnect)"
           />
           <div
-            class="w-9 h-5 bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-4 after:w-4 after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[14px] rtl:peer-checked:after:-translate-x-[14px] peer-checked:after:bg-accent-emerald peer-active:after:w-[22px]"
+            class="w-9 h-5 bg-theme-toggle-track rounded-full peer peer-focus:outline-none peer-checked:bg-accent-emerald after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-[var(--bg-page)] after:rounded-full after:h-4 after:w-4 after:shadow-md after:transition-[transform,background-color,width] after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:after:translate-x-[14px] rtl:peer-checked:after:-translate-x-[14px] peer-checked:after:bg-accent-emerald peer-active:after:w-[22px]"
           ></div>
         </label>
       </div>

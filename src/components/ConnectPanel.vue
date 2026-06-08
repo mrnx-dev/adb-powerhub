@@ -198,7 +198,7 @@ function handleBackdropClick() {
       <div class="px-5 pt-4 pb-2 shrink-0">
         <div class="flex gap-1 bg-theme-btn rounded-lg p-0.5">
           <button
-            class="flex-1 py-2 rounded-md text-[11px] font-semibold transition-all duration-200 flex items-center justify-center gap-1.5"
+            class="flex-1 py-2 rounded-md text-[11px] font-semibold transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5"
             :class="
               activeTab === 'auto'
                 ? 'bg-accent-emerald text-theme-inverse shadow-sm'
@@ -209,7 +209,7 @@ function handleBackdropClick() {
             <Zap :size="13" />Auto
           </button>
           <button
-            class="flex-1 py-2 rounded-md text-[11px] font-semibold transition-all duration-200 flex items-center justify-center gap-1.5"
+            class="flex-1 py-2 rounded-md text-[11px] font-semibold transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5"
             :class="
               activeTab === 'manual'
                 ? 'bg-accent-emerald text-theme-inverse shadow-sm'
@@ -220,7 +220,7 @@ function handleBackdropClick() {
             <Terminal :size="13" />Manual
           </button>
           <button
-            class="flex-1 py-2 rounded-md text-[11px] font-semibold transition-all duration-200 flex items-center justify-center gap-1.5"
+            class="flex-1 py-2 rounded-md text-[11px] font-semibold transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5"
             :class="
               activeTab === 'saved'
                 ? 'bg-accent-emerald text-theme-inverse shadow-sm'

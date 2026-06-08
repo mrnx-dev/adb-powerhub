@@ -132,7 +132,7 @@ async function applyAdbPath() {
         </div>
         <div class="progress-bar-track mb-3">
           <div
-            class="progress-bar-fill transition-all duration-300"
+            class="progress-bar-fill"
             :style="{ width: store.downloadProgress.percent + '%' }"
           ></div>
         </div>
