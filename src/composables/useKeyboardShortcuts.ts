@@ -38,6 +38,12 @@ export function useKeyboardShortcuts() {
       return;
     }
 
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      navStore.navigateTo('screenshots');
+      return;
+    }
+
     if (e.ctrlKey && e.key === ',') {
       e.preventDefault();
       navStore.navigateTo('settings');

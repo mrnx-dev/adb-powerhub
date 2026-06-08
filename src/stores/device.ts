@@ -6,6 +6,9 @@ import { useSettingsStore } from './settings';
 import { useToastStore } from './toast';
 import { useConnectionHistoryStore } from './connectionHistory';
 
+// Screenshot Gallery debounce timer (module-level to survive store re-creation)
+let _ssRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const useDeviceStore = defineStore('device', () => {
   const toast = useToastStore();
   const connected = ref(false);
@@ -1008,6 +1011,22 @@ export const useDeviceStore = defineStore('device', () => {
       const path = await invoke<string>('adb_screenshot', { saveDir });
       addLog(`Screenshot saved: ${path}`, 'success');
       toast.show('Screenshot saved', 'success');
+      // ── Screenshot Gallery integration ──
+      try {
+        const { useScreenshotsStore } = await import('./screenshots');
+        const screenshotsStore = useScreenshotsStore();
+        screenshotsStore.prependPath(path);
+        // Debounced full refresh (catches any files added externally)
+        if (_ssRefreshTimer !== null) {
+          clearTimeout(_ssRefreshTimer);
+        }
+        _ssRefreshTimer = window.setTimeout(() => {
+          screenshotsStore.refresh();
+          _ssRefreshTimer = null;
+        }, 500);
+      } catch {
+        // Screenshots store not initialized — silently skip
+      }
       const lastSlash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
       if (lastSlash >= 0) {
         const dir = path.substring(0, lastSlash);

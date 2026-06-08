@@ -2292,3 +2292,278 @@ fn dirs_or_fallback_screenshots() -> String {
         .to_string_lossy()
         .to_string()
 }
+
+// ─── Screenshot Gallery Helpers ──────────────────────────────
+
+/// Read a file and return its contents as a base64-encoded string.
+fn read_file_base64(path: &str) -> Result<String, String> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)
+        .map_err(|e| format!("Cannot open file: {}", e))?;
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf)
+        .map_err(|e| format!("Cannot read file: {}", e))?;
+    use base64::Engine;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&buf))
+}
+
+// ─── Screenshot Gallery Structs ──────────────────────────────
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ImageDimensions {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ScreenshotFile {
+    pub filename: String,
+    pub path: String,
+    pub size_bytes: u64,
+    pub created_iso: String,
+    pub dimensions: Option<ImageDimensions>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ScreenshotListResult {
+    pub files: Vec<ScreenshotFile>,
+    pub total_count: usize,
+    pub truncated: bool,
+}
+
+// ─── Screenshot Gallery Helpers ──────────────────────────────
+
+/// Read PNG dimensions from IHDR chunk without external crate.
+/// PNG layout: [8-byte signature] [4-byte length BE] [4-byte "IHDR"]
+///              [4-byte width BE] [4-byte height BE] [...]
+fn read_png_dimensions(path: &std::path::PathBuf) -> Option<ImageDimensions> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut buf = [0u8; 24];
+    file.read_exact(&mut buf).ok()?;
+
+    const PNG_SIG: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
+    if buf[0..8] != PNG_SIG {
+        return None;
+    }
+    // Verify chunk type is IHDR (first chunk after signature)
+    if &buf[12..16] != b"IHDR" {
+        return None;
+    }
+
+    let width = u32::from_be_bytes([buf[16], buf[17], buf[18], buf[19]]);
+    let height = u32::from_be_bytes([buf[20], buf[21], buf[22], buf[23]]);
+
+    if width == 0 || height == 0 {
+        return None;
+    }
+    Some(ImageDimensions { width, height })
+}
+
+/// Convert SystemTime to ISO 8601 string without external crates.
+/// Format: "YYYY-MM-DDTHH:MM:SSZ"
+fn system_time_to_iso8601(t: std::time::SystemTime) -> String {
+    use std::time::UNIX_EPOCH;
+    let duration = t.duration_since(UNIX_EPOCH).unwrap_or_default();
+    let total_secs = duration.as_secs();
+
+    // Days since epoch → year/month/day calculation
+    let mut days = total_secs / 86400;
+    let time_of_day = total_secs % 86400;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    // Calculate year (starting from 1970)
+    let mut year: i64 = 1970;
+    loop {
+        let days_in_year = if is_leap(year) { 366 } else { 365 };
+        if days < days_in_year as u64 {
+            break;
+        }
+        days -= days_in_year as u64;
+        year += 1;
+    }
+
+    // Calculate month and day
+    let months_days: [u64; 12] = if is_leap(year) {
+        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    } else {
+        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    };
+
+    let mut month: u64 = 1;
+    for md in months_days {
+        if days < md {
+            break;
+        }
+        days -= md;
+        month += 1;
+    }
+    let day = days + 1;
+
+    format!(
+        "{}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        year, month, day, hours, minutes, seconds
+    )
+}
+
+fn is_leap(y: i64) -> bool {
+    (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
+}
+
+// ─── Screenshot Gallery Commands ─────────────────────────────
+
+#[tauri::command]
+pub fn adb_list_screenshots(dir_path: Option<String>) -> Result<ScreenshotListResult, String> {
+    let dir = dir_path
+        .filter(|p| !p.is_empty())
+        .unwrap_or_else(dirs_or_fallback_screenshots);
+
+    let dir_path_buf = std::path::PathBuf::from(&dir);
+    if !dir_path_buf.exists() || !dir_path_buf.is_dir() {
+        return Ok(ScreenshotListResult {
+            files: vec![],
+            total_count: 0,
+            truncated: false,
+        });
+    }
+
+    let mut files: Vec<ScreenshotFile> = Vec::new();
+    let mut total_count: usize = 0;
+    const MAX_FILES: usize = 500;
+
+    if let Ok(entries) = std::fs::read_dir(&dir_path_buf) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.to_lowercase())
+                .unwrap_or_default();
+            if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp") {
+                continue;
+            }
+
+            total_count += 1;
+            if files.len() >= MAX_FILES {
+                continue;
+            }
+
+            let metadata = match std::fs::metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+
+            let created = metadata
+                .modified()
+                .or_else(|_| metadata.created())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+
+            let filename = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+
+            let dimensions = if ext == "png" {
+                read_png_dimensions(&path)
+            } else {
+                None
+            };
+
+            files.push(ScreenshotFile {
+                filename,
+                path: path.to_string_lossy().to_string(),
+                size_bytes: metadata.len(),
+                created_iso: system_time_to_iso8601(created),
+                dimensions,
+            });
+        }
+    }
+
+    // Sort newest first by created_iso (string comparison works for ISO 8601)
+    files.sort_by(|a, b| b.created_iso.cmp(&a.created_iso));
+
+    Ok(ScreenshotListResult {
+        files,
+        total_count,
+        truncated: total_count > MAX_FILES,
+    })
+}
+
+#[tauri::command]
+pub fn adb_delete_screenshot(path: String, save_dir: Option<String>) -> Result<(), String> {
+    let path_buf = std::path::PathBuf::from(&path);
+    let canonical = path_buf
+        .canonicalize()
+        .map_err(|e| format!("Cannot resolve path: {}", e))?;
+
+    let save_dir_path = save_dir
+        .filter(|p| !p.is_empty())
+        .unwrap_or_else(dirs_or_fallback_screenshots);
+    let save_dir_canonical = std::path::PathBuf::from(&save_dir_path)
+        .canonicalize()
+        .unwrap_or_else(|_| std::path::PathBuf::from(&save_dir_path));
+
+    // Path traversal guard
+    if !canonical.starts_with(&save_dir_canonical) {
+        return Err("Access denied: file is outside screenshot directory".to_string());
+    }
+    if !canonical.is_file() {
+        return Err("Not a file".to_string());
+    }
+
+    std::fs::remove_file(&canonical).map_err(|e| format!("Failed to delete: {}", e))
+}
+
+#[tauri::command]
+pub fn adb_get_file_info(path: String) -> Result<ScreenshotFile, String> {
+    let path_buf = std::path::PathBuf::from(&path);
+    if !path_buf.is_file() {
+        return Err("File not found".to_string());
+    }
+
+    let metadata = std::fs::metadata(&path_buf)
+        .map_err(|e| format!("Cannot read file: {}", e))?;
+
+    let created = metadata
+        .modified()
+        .or_else(|_| metadata.created())
+        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+
+    let filename = path_buf
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let ext = path_buf
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .unwrap_or_default();
+
+    let dimensions = if ext == "png" {
+        read_png_dimensions(&path_buf)
+    } else {
+        None
+    };
+
+    Ok(ScreenshotFile {
+        filename,
+        path: path_buf.to_string_lossy().to_string(),
+        size_bytes: metadata.len(),
+        created_iso: system_time_to_iso8601(created),
+        dimensions,
+    })
+}
+
+#[tauri::command]
+pub fn adb_read_file_base64(path: String) -> Result<String, String> {
+    read_file_base64(&path)
+}
