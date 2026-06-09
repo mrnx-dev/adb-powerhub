@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted, onBeforeUnmount } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
-import { FolderOpen, Monitor, Copy, Trash2, ImageOff, Loader2 } from '@lucide/vue';
+import { ref, nextTick, watch, onMounted, onBeforeUnmount, onUnmounted, computed } from 'vue';
+import { FolderOpen, Monitor, Copy, Trash2, ImageOff, Loader2, RotateCw } from '@lucide/vue';
 import { useScreenshotsStore, type ScreenshotFile } from '../stores/screenshots';
 
 const store = useScreenshotsStore();
 
 const emit = defineEmits<{
-  select: [index: number];
+  select: [index: number, sourceRect?: DOMRect];
 }>();
 
-// ── Lazy loading image visibility ──
-const imageVisible = ref<Set<number>>(new Set());
+// ── Lazy loading via IntersectionObserver ──
+const visiblePaths = ref<Set<string>>(new Set());
 const cardObserver = ref<IntersectionObserver | null>(null);
 
 function initObserver() {
@@ -19,9 +18,9 @@ function initObserver() {
     (entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
-          const index = Number((entry.target as HTMLElement).dataset.index);
-          if (!isNaN(index)) {
-            imageVisible.value = new Set([...imageVisible.value, index]);
+          const path = (entry.target as HTMLElement).dataset.path;
+          if (path) {
+            visiblePaths.value = new Set([...visiblePaths.value, path]);
           }
           cardObserver.value?.unobserve(entry.target);
         }
@@ -31,9 +30,9 @@ function initObserver() {
   );
 }
 
-function observeCard(el: HTMLElement | null, index: number) {
+function observeCard(el: HTMLElement | null, path: string) {
   if (el && cardObserver.value) {
-    el.dataset.index = String(index);
+    el.dataset.path = path;
     cardObserver.value.observe(el);
   }
 }
@@ -44,43 +43,65 @@ watch(
   () => store.displayedFiles,
   () => {
     nextTick(() => {
-      // Reset visibility on list change
-      imageVisible.value = new Set();
+      visiblePaths.value = new Set();
       if (cardObserver.value) cardObserver.value.disconnect();
       initObserver();
+      // Reset all thumbnail states
+      thumbnailStates.value = new Map();
     });
   }
 );
 onBeforeUnmount(() => cardObserver.value?.disconnect());
 
-// ── Image loading state ──
-const brokenImages = ref<Set<number>>(new Set());
-const loadedUrls = ref<Map<number, string>>(new Map());
-const loadingIndices = ref<Set<number>>(new Set());
+// ── Per-card thumbnail load state ──
+const thumbnailStates = ref<Map<string, 'loading' | 'loaded' | 'broken'>>(new Map());
 
-// Watch for newly visible cards and trigger base64 load
+// Watch for newly visible paths and trigger thumbnail load
 watch(
-  () => [...imageVisible.value],
-  (visible) => {
-    for (const index of visible) {
-      const file = store.displayedFiles[index];
-      if (!file || loadedUrls.value.has(index) || loadingIndices.value.has(index)) continue;
-      loadingIndices.value = new Set([...loadingIndices.value, index]);
-      loadImageBase64(file.path)
-        .then((url) => {
-          loadedUrls.value = new Map([...loadedUrls.value, [index, url]]);
-          loadingIndices.value = new Set([...loadingIndices.value].filter((i) => i !== index));
+  () => [...visiblePaths.value],
+  () => {
+    for (const path of visiblePaths.value) {
+      const file = store.displayedFiles.find((f) => f.path === path);
+      if (!file) continue;
+      if (thumbnailStates.value.has(path)) continue;
+      // Set loading state
+      thumbnailStates.value = new Map([...thumbnailStates.value, [path, 'loading']]);
+      store
+        .loadThumbnail(path)
+        .then(() => {
+          thumbnailStates.value = new Map([...thumbnailStates.value, [path, 'loaded']]);
         })
         .catch(() => {
-          brokenImages.value = new Set([...brokenImages.value, index]);
-          loadingIndices.value = new Set([...loadingIndices.value].filter((i) => i !== index));
+          thumbnailStates.value = new Map([...thumbnailStates.value, [path, 'broken']]);
         });
     }
   }
 );
 
-function onImageError(index: number) {
-  brokenImages.value = new Set([...brokenImages.value, index]);
+function getThumbSrc(path: string): string {
+  return store.thumbnailCache.get(path) ?? '';
+}
+
+function handleRetry(path: string) {
+  thumbnailStates.value = new Map([...thumbnailStates.value, [path, 'loading']]);
+  store.retryThumbnail(path).then(() => {
+    if (store.thumbnailCache.has(path)) {
+      thumbnailStates.value = new Map([...thumbnailStates.value, [path, 'loaded']]);
+    } else {
+      thumbnailStates.value = new Map([...thumbnailStates.value, [path, 'broken']]);
+    }
+  });
+}
+
+function handleCardClick(index: number, event: MouseEvent) {
+  // If a long-press overlay is showing, don't open lightbox
+  if (longPressedPath.value) {
+    longPressedPath.value = null;
+    return;
+  }
+  const target = event.currentTarget as HTMLElement;
+  const rect = target.getBoundingClientRect();
+  emit('select', index, rect);
 }
 
 // ── Keyboard navigation (roving tabindex) ──
@@ -133,6 +154,58 @@ function handleGridKeydown(e: KeyboardEvent, index: number) {
   nextTick(() => cardRefs.value[next]?.focus());
 }
 
+// ── Long-press for touch devices (reveals action overlay) ──
+const longPressedPath = ref<string | null>(null);
+const isTouchDevice = computed(() => {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(hover: none)').matches;
+});
+
+const LONG_PRESS_MS = 500;
+const MOVE_PX = 10;
+let _lpTimers = new Map<string, ReturnType<typeof setTimeout>>();
+let _lpStartX = new Map<string, number>();
+let _lpStartY = new Map<string, number>();
+
+function onLongPressDown(path: string, e: PointerEvent) {
+  if (!isTouchDevice.value) return;
+  _lpStartX.set(path, e.clientX);
+  _lpStartY.set(path, e.clientY);
+  const timer = setTimeout(() => {
+    longPressedPath.value = path;
+  }, LONG_PRESS_MS);
+  _lpTimers.set(path, timer);
+}
+
+function onLongPressMove(path: string, e: PointerEvent) {
+  const startX = _lpStartX.get(path) ?? 0;
+  const startY = _lpStartY.get(path) ?? 0;
+  if (Math.abs(e.clientX - startX) > MOVE_PX || Math.abs(e.clientY - startY) > MOVE_PX) {
+    const timer = _lpTimers.get(path);
+    if (timer) {
+      clearTimeout(timer);
+      _lpTimers.delete(path);
+    }
+  }
+}
+
+function onLongPressUp(path: string) {
+  const timer = _lpTimers.get(path);
+  if (timer) {
+    clearTimeout(timer);
+    _lpTimers.delete(path);
+  }
+}
+
+function dismissOverlay() {
+  longPressedPath.value = null;
+}
+
+onUnmounted(() => {
+  for (const timer of _lpTimers.values()) clearTimeout(timer);
+  _lpTimers.clear();
+});
+
 // ── Inline delete confirmation ──
 const confirmingDelete = ref<string | null>(null);
 
@@ -155,34 +228,6 @@ async function confirmDelete(path: string) {
 }
 
 // ── Formatting helpers ──
-// ── Base64 image cache ──
-const imageCache = new Map<string, string>();
-const loadingImages = new Set<string>();
-
-async function loadImageBase64(path: string): Promise<string> {
-  if (imageCache.has(path)) return imageCache.get(path)!;
-  if (loadingImages.has(path)) {
-    // Wait for in-flight load
-    return new Promise((resolve) => {
-      const check = setInterval(() => {
-        if (imageCache.has(path)) {
-          clearInterval(check);
-          resolve(imageCache.get(path)!);
-        }
-      }, 50);
-    });
-  }
-  loadingImages.add(path);
-  try {
-    const base64 = await invoke<string>('adb_read_file_base64', { path });
-    const url = `data:image/png;base64,${base64}`;
-    imageCache.set(path, url);
-    return url;
-  } finally {
-    loadingImages.delete(path);
-  }
-}
-
 function formatDate(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -219,7 +264,8 @@ function aspectStyle(file: ScreenshotFile): Record<string, string> {
   if (file.dimensions) {
     return { '--aspect': `${file.dimensions.width}/${file.dimensions.height}` };
   }
-  return { '--aspect': '9/19.5' };
+  // FR-5 AC #4: default fallback is 9:16 (not 9:19.5)
+  return { '--aspect': '9/16' };
 }
 </script>
 
@@ -231,17 +277,22 @@ function aspectStyle(file: ScreenshotFile): Record<string, string> {
       :ref="
         (el) => {
           cardRefs[index] = el as HTMLElement | null;
-          observeCard(el as HTMLElement | null, index);
+          observeCard(el as HTMLElement | null, file.path);
         }
       "
       class="group relative rounded-lg bg-theme-card border border-theme-tertiary overflow-hidden transition-shadow duration-150 hover:shadow-lg focus-within:ring-2 focus-within:ring-accent-emerald/50"
+      @click="dismissOverlay"
+      @pointerdown="onLongPressDown(file.path, $event)"
+      @pointermove="onLongPressMove(file.path, $event)"
+      @pointerup="onLongPressUp(file.path)"
+      @pointercancel="onLongPressUp(file.path)"
     >
       <!-- Card button (roving tabindex) -->
       <button
         class="w-full text-left outline-none"
         :tabindex="index === focusedIndex ? 0 : -1"
         :aria-label="`Screenshot: ${file.filename}, ${formatDate(file.created_iso)}${file.dimensions ? `, ${formatDimensions(file.dimensions)}` : ''}`"
-        @click="emit('select', index)"
+        @click="handleCardClick(index, $event)"
         @keydown="handleGridKeydown($event, index)"
       >
         <!-- Thumbnail container -->
@@ -249,34 +300,42 @@ function aspectStyle(file: ScreenshotFile): Record<string, string> {
           class="relative aspect-[var(--aspect)] w-full bg-theme-page"
           :style="aspectStyle(file)"
         >
-          <!-- Broken image placeholder -->
+          <!-- Broken image placeholder with retry -->
           <div
-            v-if="brokenImages.has(index)"
+            v-if="thumbnailStates.get(file.path) === 'broken'"
             class="w-full h-full flex flex-col items-center justify-center gap-1 text-theme-muted"
           >
             <ImageOff :size="24" />
             <span class="text-xs px-2 text-center truncate max-w-full">{{ file.filename }}</span>
+            <button
+              class="btn-pressable flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-accent-emerald hover:bg-accent-emerald/10 transition-colors"
+              title="Retry loading image"
+              @click.stop="handleRetry(file.path)"
+            >
+              <RotateCw :size="12" />
+              Retry
+            </button>
           </div>
 
-          <!-- Lazy-loaded image -->
+          <!-- Loaded thumbnail -->
           <img
-            v-else-if="loadedUrls.has(index)"
-            :src="loadedUrls.get(index)"
+            v-else-if="thumbnailStates.get(file.path) === 'loaded' && getThumbSrc(file.path)"
+            :src="getThumbSrc(file.path)"
             :alt="file.filename"
             loading="lazy"
             class="w-full h-full object-cover"
-            @error="onImageError(index)"
+            @error="thumbnailStates = new Map([...thumbnailStates, [file.path, 'broken']])"
           />
 
-          <!-- Loading spinner while base64 loads -->
+          <!-- Loading spinner -->
           <div
-            v-else-if="imageVisible.has(index) && loadingIndices.has(index)"
+            v-else-if="thumbnailStates.get(file.path) === 'loading'"
             class="w-full h-full flex items-center justify-center bg-theme-card"
           >
             <Loader2 :size="20" class="animate-spin text-theme-muted" />
           </div>
 
-          <!-- Skeleton placeholder -->
+          <!-- Skeleton placeholder (not yet visible) -->
           <div v-else class="w-full h-full bg-theme-card animate-pulse" />
 
           <!-- Dimensions badge -->
@@ -295,10 +354,10 @@ function aspectStyle(file: ScreenshotFile): Record<string, string> {
         </div>
       </button>
 
-      <!-- Hover action overlay (desktop only) -->
+      <!-- Hover/touch action overlay -->
       <div
         class="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 px-2 py-2 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-        :class="{ 'opacity-100': confirmingDelete === file.path }"
+        :class="{ 'opacity-100': confirmingDelete === file.path || longPressedPath === file.path }"
         @click.stop
       >
         <template v-if="confirmingDelete === file.path">
@@ -355,9 +414,5 @@ function aspectStyle(file: ScreenshotFile): Record<string, string> {
 </template>
 
 <style scoped>
-@media (hover: none) {
-  .group:hover .opacity-0.group-hover\:opacity-100 {
-    opacity: 1;
-  }
-}
+/* Long-press overlay handled via JS state (longPressedPath) */
 </style>
