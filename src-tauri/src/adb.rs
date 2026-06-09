@@ -2333,31 +2333,19 @@ pub struct ScreenshotListResult {
 
 // ─── Screenshot Gallery Helpers ──────────────────────────────
 
-/// Read PNG dimensions from IHDR chunk without external crate.
-/// PNG layout: [8-byte signature] [4-byte length BE] [4-byte "IHDR"]
-///              [4-byte width BE] [4-byte height BE] [...]
-fn read_png_dimensions(path: &std::path::PathBuf) -> Option<ImageDimensions> {
-    use std::io::Read;
-    let mut file = std::fs::File::open(path).ok()?;
-    let mut buf = [0u8; 24];
-    file.read_exact(&mut buf).ok()?;
-
-    const PNG_SIG: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
-    if buf[0..8] != PNG_SIG {
-        return None;
+/// Read image dimensions from a file (PNG, JPEG, WebP supported).
+/// Uses the `image` crate's `image_dimensions()` which reads only headers.
+fn read_image_dimensions(path: &std::path::PathBuf) -> Option<ImageDimensions> {
+    match image::image_dimensions(path) {
+        Ok((width, height)) => {
+            if width == 0 || height == 0 {
+                None
+            } else {
+                Some(ImageDimensions { width, height })
+            }
+        }
+        Err(_) => None,
     }
-    // Verify chunk type is IHDR (first chunk after signature)
-    if &buf[12..16] != b"IHDR" {
-        return None;
-    }
-
-    let width = u32::from_be_bytes([buf[16], buf[17], buf[18], buf[19]]);
-    let height = u32::from_be_bytes([buf[20], buf[21], buf[22], buf[23]]);
-
-    if width == 0 || height == 0 {
-        return None;
-    }
-    Some(ImageDimensions { width, height })
 }
 
 /// Convert SystemTime to ISO 8601 string without external crates.
@@ -2470,11 +2458,7 @@ pub fn adb_list_screenshots(dir_path: Option<String>) -> Result<ScreenshotListRe
                 .unwrap_or("unknown")
                 .to_string();
 
-            let dimensions = if ext == "png" {
-                read_png_dimensions(&path)
-            } else {
-                None
-            };
+            let dimensions = read_image_dimensions(&path);
 
             files.push(ScreenshotFile {
                 filename,
@@ -2542,17 +2526,7 @@ pub fn adb_get_file_info(path: String) -> Result<ScreenshotFile, String> {
         .unwrap_or("unknown")
         .to_string();
 
-    let ext = path_buf
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase())
-        .unwrap_or_default();
-
-    let dimensions = if ext == "png" {
-        read_png_dimensions(&path_buf)
-    } else {
-        None
-    };
+    let dimensions = read_image_dimensions(&path_buf);
 
     Ok(ScreenshotFile {
         filename,
@@ -2566,4 +2540,50 @@ pub fn adb_get_file_info(path: String) -> Result<ScreenshotFile, String> {
 #[tauri::command]
 pub fn adb_read_file_base64(path: String) -> Result<String, String> {
     read_file_base64(&path)
+}
+
+/// Generate a thumbnail for a screenshot file.
+/// Returns base64-encoded JPEG or None if the image cannot be loaded.
+/// Includes path traversal guard (NFR-2).
+fn generate_thumbnail(path: &std::path::PathBuf) -> Result<Option<String>, String> {
+    // Path traversal guard — same pattern as adb_delete_screenshot
+    let canonical = path
+        .canonicalize()
+        .map_err(|e| format!("Cannot resolve path: {}", e))?;
+
+    let save_dir = dirs_or_fallback_screenshots();
+    let save_dir_canonical = std::path::PathBuf::from(&save_dir)
+        .canonicalize()
+        .unwrap_or_else(|_| std::path::PathBuf::from(&save_dir));
+
+    if !canonical.starts_with(&save_dir_canonical) {
+        return Err("Access denied: file is outside screenshot directory".to_string());
+    }
+
+    // Open and thumbnail the image
+    let img = match image::open(&canonical) {
+        Ok(img) => img,
+        Err(_) => return Ok(None), // corrupted/unsupported — never crash
+    };
+
+    let thumb = img.thumbnail(320, 320);
+
+    // Encode as JPEG quality 70
+    let mut buf = std::io::Cursor::new(Vec::new());
+    thumb
+        .write_to(&mut buf, image::ImageFormat::Jpeg)
+        .map_err(|e| format!("Failed to encode thumbnail: {}", e))?;
+
+    use base64::Engine;
+    Ok(Some(base64::engine::general_purpose::STANDARD.encode(buf.into_inner())))
+}
+
+#[tauri::command]
+pub async fn adb_get_thumbnail(path: String) -> Result<Option<String>, String> {
+    let path_buf = std::path::PathBuf::from(&path);
+    // Run thumbnail generation on a blocking thread to avoid blocking the
+    // async Tauri runtime.
+    tokio::task::spawn_blocking(move || generate_thumbnail(&path_buf))
+        .await
+        .map_err(|e| format!("Thumbnail task failed: {}", e))?
 }
