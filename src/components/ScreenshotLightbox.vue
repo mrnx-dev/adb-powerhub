@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import {
   X,
   ChevronLeft,
@@ -17,6 +16,7 @@ import { useScreenshotsStore } from '../stores/screenshots';
 const store = useScreenshotsStore();
 
 const lightboxRef = ref<HTMLElement | null>(null);
+const imageEl = ref<HTMLImageElement | null>(null);
 const imageLoading = ref(true);
 const imageError = ref(false);
 const confirmingDelete = ref(false);
@@ -25,40 +25,82 @@ let previousFocus: HTMLElement | null = null;
 const current = computed(() => store.currentLightboxFile);
 const lightboxSrc = ref('');
 
-// ── Base64 image cache ──
-const lightboxCache = new Map<string, string>();
+// ── FLIP transition state ──
+const prefersReducedMotion = ref(false);
+let reducedMotionQuery: MediaQueryList | null = null;
 
-async function loadLightboxImage(path: string): Promise<string> {
-  if (lightboxCache.has(path)) return lightboxCache.get(path)!;
-  const base64 = await invoke<string>('adb_read_file_base64', { path });
-  const url = `data:image/png;base64,${base64}`;
-  lightboxCache.set(path, url);
-  return url;
-}
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    prefersReducedMotion.value = reducedMotionQuery.matches;
+    const handler = (e: MediaQueryListEvent) => {
+      prefersReducedMotion.value = e.matches;
+    };
+    reducedMotionQuery.addEventListener('change', handler);
+  }
+});
 
-// ── Explicit image loader (no watcher timing dependency) ──
-let activeLoadId = 0;
+onBeforeUnmount(() => {
+  if (reducedMotionQuery) {
+    reducedMotionQuery.removeEventListener('change', () => {});
+  }
+});
 
+// ── Image loading via store unified cache ──
 async function loadCurrentImage() {
   const path = current.value?.path;
   if (!path) return;
 
-  const loadId = ++activeLoadId;
   imageLoading.value = true;
   imageError.value = false;
 
   try {
-    const url = await loadLightboxImage(path);
-    // Only apply if this is still the latest load request (ignore stale responses)
-    if (loadId === activeLoadId) {
-      lightboxSrc.value = url;
-      imageLoading.value = false;
-    }
+    const url = await store.loadImage(path);
+    lightboxSrc.value = url;
+    imageLoading.value = false;
+
+    // Apply FLIP transition after image loads
+    nextTick(() => {
+      if (!imageEl.value) return;
+      const sourceRect = store.lightboxSourceRect;
+
+      if (!sourceRect || prefersReducedMotion.value) {
+        // Simple fade (or skip animation for reduced motion)
+        return;
+      }
+
+      // Animate from sourceRect to current position
+      const destRect = imageEl.value.getBoundingClientRect();
+      const dx = sourceRect.left - destRect.left;
+      const dy = sourceRect.top - destRect.top;
+      const scaleX = sourceRect.width / destRect.width;
+      const scaleY = sourceRect.height / destRect.height;
+
+      if (dx === 0 && dy === 0 && scaleX === 1 && scaleY === 1) return;
+
+      imageEl.value.style.transformOrigin = 'top left';
+      imageEl.value.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
+      imageEl.value.style.opacity = '0.8';
+
+      // Force reflow to ensure initial transform is applied before animating
+      void imageEl.value.offsetHeight;
+
+      const duration = prefersReducedMotion.value ? '0ms' : '250ms';
+      imageEl.value.style.transition = `transform ${duration} ease-out, opacity 150ms ease-out`;
+      imageEl.value.style.transform = 'translate(0, 0) scale(1, 1)';
+      imageEl.value.style.opacity = '1';
+
+      // Clean up transition styles after animation
+      setTimeout(() => {
+        if (imageEl.value) {
+          imageEl.value.style.transition = '';
+          imageEl.value.style.transformOrigin = '';
+        }
+      }, 260);
+    });
   } catch {
-    if (loadId === activeLoadId) {
-      imageError.value = true;
-      imageLoading.value = false;
-    }
+    imageError.value = true;
+    imageLoading.value = false;
   }
 }
 
@@ -67,11 +109,10 @@ watch(
   (open) => {
     if (open) {
       previousFocus = document.activeElement as HTMLElement | null;
-      // Load image immediately when lightbox opens
       loadCurrentImage();
       nextTick(() => {
-        const closeBtn = lightboxRef.value?.querySelector<HTMLElement>('[data-close]');
-        closeBtn?.focus();
+        const closeBtn = lightboxRef.value?.querySelector('[data-close]') as HTMLElement | null;
+        if (closeBtn) closeBtn.focus();
       });
     } else {
       previousFocus?.focus();
@@ -87,10 +128,48 @@ watch(
   () => store.lightboxIndex,
   () => {
     if (store.lightboxOpen) {
-      loadCurrentImage();
+      // Crossfade for prev/next
+      if (lightboxSrc.value && !prefersReducedMotion.value) {
+        // Quick crossfade via opacity
+        lightboxSrc.value = '';
+        nextTick(() => {
+          loadCurrentImage();
+        });
+      } else {
+        loadCurrentImage();
+      }
     }
   }
 );
+
+// ── Close animation (FLIP zoom-out) ──
+function closeWithAnimation() {
+  if (!imageEl.value || prefersReducedMotion.value) {
+    store.closeLightbox();
+    return;
+  }
+
+  const sourceRect = store.lightboxSourceRect;
+  if (!sourceRect) {
+    store.closeLightbox();
+    return;
+  }
+
+  const destRect = imageEl.value.getBoundingClientRect();
+  const dx = sourceRect.left - destRect.left;
+  const dy = sourceRect.top - destRect.top;
+  const scaleX = sourceRect.width / destRect.width;
+  const scaleY = sourceRect.height / destRect.height;
+
+  imageEl.value.style.transition = 'transform 200ms ease-in, opacity 150ms ease-in';
+  imageEl.value.style.transformOrigin = 'top left';
+  imageEl.value.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
+  imageEl.value.style.opacity = '0';
+
+  setTimeout(() => {
+    store.closeLightbox();
+  }, 200);
+}
 
 // ── Keyboard handler ──
 function handleKeydown(e: KeyboardEvent) {
@@ -99,7 +178,7 @@ function handleKeydown(e: KeyboardEvent) {
       if (confirmingDelete.value) {
         confirmingDelete.value = false;
       } else {
-        store.closeLightbox();
+        closeWithAnimation();
       }
       break;
     case 'ArrowLeft':
@@ -137,7 +216,7 @@ function handleKeydown(e: KeyboardEvent) {
 function trapFocus(e: KeyboardEvent) {
   if (!lightboxRef.value) return;
   const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-  const focusable = lightboxRef.value.querySelectorAll<HTMLElement>(FOCUSABLE);
+  const focusable = Array.from(lightboxRef.value.querySelectorAll(FOCUSABLE)) as HTMLElement[];
   if (focusable.length === 0) return;
 
   const first = focusable[0];
@@ -203,7 +282,7 @@ function formatDate(iso: string): string {
         @keydown="handleKeydown"
       >
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="store.closeLightbox()" />
+        <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="closeWithAnimation()" />
 
         <!-- Header -->
         <div class="relative z-10 flex items-center justify-between px-4 py-3">
@@ -213,7 +292,7 @@ function formatDate(iso: string): string {
           <button
             data-close
             class="btn-pressable p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10"
-            @click="store.closeLightbox()"
+            @click="closeWithAnimation()"
           >
             <X :size="20" />
           </button>
@@ -231,6 +310,7 @@ function formatDate(iso: string): string {
           <!-- Image -->
           <img
             v-if="lightboxSrc && !imageError"
+            ref="imageEl"
             :key="current.path"
             :src="lightboxSrc"
             :alt="current.filename"
