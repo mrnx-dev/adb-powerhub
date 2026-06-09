@@ -57,6 +57,17 @@ function onDismiss(id: number) {
             :class="typeIconColors[toast.type]"
           />
           <span class="text-theme-primary leading-snug">{{ toast.message }}</span>
+          <button
+            v-if="toast.action"
+            class="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-emerald/20 text-accent-emerald hover:bg-accent-emerald/30 transition-colors whitespace-nowrap self-center"
+            :aria-label="toast.action.label"
+            @click.stop="
+              toast.action!.onClick();
+              toastStore.remove(toast.id);
+            "
+          >
+            {{ toast.action.label }}
+          </button>
         </div>
         <!-- Progress bar (only for progress toasts) -->
         <div v-if="toast.type === 'progress' && toast.progress !== undefined" class="w-full">
