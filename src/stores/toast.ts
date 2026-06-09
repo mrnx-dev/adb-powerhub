@@ -7,6 +7,7 @@ export interface ToastItem {
   type: 'success' | 'error' | 'info' | 'progress';
   timestamp: number;
   progress?: number;
+  action?: { label: string; onClick: () => void };
 }
 
 let nextId = 0;

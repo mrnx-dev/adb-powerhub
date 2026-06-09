@@ -1010,29 +1010,59 @@ export const useDeviceStore = defineStore('device', () => {
       const saveDir = settingsStore.screenshotSaveDir || null;
       const path = await invoke<string>('adb_screenshot', { saveDir });
       addLog(`Screenshot saved: ${path}`, 'success');
-      toast.show('Screenshot saved', 'success');
-      // ── Screenshot Gallery integration ──
+
+      // Try to get full file info immediately
       try {
         const { useScreenshotsStore } = await import('./screenshots');
         const screenshotsStore = useScreenshotsStore();
-        screenshotsStore.prependPath(path);
-        // Debounced full refresh (catches any files added externally)
+
+        let infoAdded = false;
+        try {
+          const info = await invoke<import('./screenshots').ScreenshotFile>('adb_get_file_info', {
+            path,
+          });
+          screenshotsStore.addFile(info);
+          infoAdded = true;
+        } catch {
+          // Retry once after 100ms if slow filesystem
+          await new Promise((r) => setTimeout(r, 100));
+          try {
+            const info = await invoke<import('./screenshots').ScreenshotFile>('adb_get_file_info', {
+              path,
+            });
+            screenshotsStore.addFile(info);
+            infoAdded = true;
+          } catch {
+            // Fallback to prependPath
+          }
+        }
+        if (!infoAdded) {
+          screenshotsStore.prependPath(path);
+        }
+
+        // Debounced full refresh
         if (_ssRefreshTimer !== null) {
           clearTimeout(_ssRefreshTimer);
         }
         _ssRefreshTimer = window.setTimeout(() => {
-          screenshotsStore.refresh();
+          screenshotsStore.refresh(undefined, true);
           _ssRefreshTimer = null;
         }, 500);
       } catch {
         // Screenshots store not initialized — silently skip
       }
-      const lastSlash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
-      if (lastSlash >= 0) {
-        const dir = path.substring(0, lastSlash);
-        try {
-          await invoke('open_folder', { path: dir });
-        } catch {}
+
+      // Toast with action button
+      toast.show('Screenshot saved', 'success');
+      try {
+        const { useNavigationStore } = await import('./navigation');
+        const nav = useNavigationStore();
+        const t = toast.toasts.find((x) => x.message === 'Screenshot saved');
+        if (t) {
+          t.action = { label: 'View in Gallery', onClick: () => nav.navigateTo('screenshots') };
+        }
+      } catch {
+        // Navigation store not available
       }
     } catch (e) {
       addLog(String(e), 'error');
