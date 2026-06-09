@@ -109,6 +109,7 @@ pub fn run() {
             adb_get_file_info,
             adb_list_screenshots,
             adb_read_file_base64,
+            adb_get_thumbnail,
             adb_reboot,
             adb_custom_cmd,
             adb_rotate,
