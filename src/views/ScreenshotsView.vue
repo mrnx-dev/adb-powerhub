@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { Camera, Loader2 } from '@lucide/vue';
+import { Camera, Loader2, RefreshCw } from '@lucide/vue';
 import { useScreenshotsStore, type SortMode, type FilterMode } from '../stores/screenshots';
 import { useDeviceStore } from '../stores/device';
 import { useSettingsStore } from '../stores/settings';
@@ -8,6 +8,7 @@ import { useNavigationStore } from '../stores/navigation';
 import { useToastStore } from '../stores/toast';
 import ScreenshotGrid from '../components/ScreenshotGrid.vue';
 import ScreenshotLightbox from '../components/ScreenshotLightbox.vue';
+import ScreenshotTruncationBanner from '../components/ScreenshotTruncationBanner.vue';
 
 const store = useScreenshotsStore();
 const deviceStore = useDeviceStore();
@@ -90,6 +91,18 @@ onMounted(() => {
 
       <div class="flex-1" />
 
+      <!-- Refresh button -->
+      <button
+        class="btn-pressable p-2 rounded-lg text-theme-muted hover:text-theme-primary hover:bg-theme-btn transition-colors"
+        :disabled="store.loading"
+        aria-label="Refresh screenshots"
+        :title="store.loading ? 'Refreshing…' : 'Refresh screenshots'"
+        @click="store.refresh(undefined, true)"
+      >
+        <Loader2 v-if="store.loading" :size="16" class="animate-spin" />
+        <RefreshCw v-else :size="16" />
+      </button>
+
       <!-- Sort dropdown -->
       <select
         :value="store.sortMode"
@@ -130,6 +143,14 @@ onMounted(() => {
 
     <!-- Content area -->
     <div class="flex-1 overflow-y-auto p-4">
+      <!-- Truncation banner -->
+      <ScreenshotTruncationBanner
+        v-if="store.isTruncated && !store.truncationBannerDismissed"
+        :total-count="store.totalCount"
+        :shown-count="store.files.length"
+        @dismiss="store.truncationBannerDismissed = true"
+      />
+      <div class="mb-3" />
       <!-- Loading: skeleton grid -->
       <div v-if="store.loading" class="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <div
@@ -144,7 +165,7 @@ onMounted(() => {
         <p class="text-theme-muted text-sm">{{ store.error }}</p>
         <button
           class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm hover-subtle"
-          @click="store.refresh()"
+          @click="store.refresh(undefined, true)"
         >
           Retry
         </button>
