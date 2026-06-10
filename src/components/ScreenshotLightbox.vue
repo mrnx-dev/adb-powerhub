@@ -472,9 +472,6 @@ function formatDate(iso: string): string {
           role="toolbar"
           aria-label="Lightbox controls"
         >
-          <button class="lb-btn btn-pressable" title="Previous (←)" @click="store.prevImage()">
-            <ChevronLeft :size="18" />
-          </button>
           <button class="lb-btn btn-pressable" title="Zoom out (-)" @click="zoomOut()">
             <Minus :size="18" />
           </button>
@@ -511,9 +508,6 @@ function formatDate(iso: string): string {
             @click="closeWithAnimation()"
           >
             <X :size="18" />
-          </button>
-          <button class="lb-btn btn-pressable" title="Next (→)" @click="store.nextImage()">
-            <ChevronRight :size="18" />
           </button>
         </div>
 
