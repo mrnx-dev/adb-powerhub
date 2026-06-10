@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import {
   X,
+  Check,
   ChevronLeft,
   ChevronRight,
   FolderOpen,
@@ -10,10 +11,18 @@ import {
   Trash2,
   ImageOff,
   Loader2,
+  Plus,
+  Minus,
+  Maximize,
+  Minimize,
+  ClipboardCopy,
 } from '@lucide/vue';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useScreenshotsStore } from '../stores/screenshots';
+import { useToastStore } from '../stores/toast';
 
 const store = useScreenshotsStore();
+const toast = useToastStore();
 
 const lightboxRef = ref<HTMLElement | null>(null);
 const imageEl = ref<HTMLImageElement | null>(null);
@@ -21,6 +30,145 @@ const imageLoading = ref(true);
 const imageError = ref(false);
 const confirmingDelete = ref(false);
 let previousFocus: HTMLElement | null = null;
+
+// ── Zoom + Pan state ──
+const zoomScale = ref(1);
+const zoomTx = ref(0);
+const zoomTy = ref(0);
+const isPanning = ref(false);
+const panStartX = ref(0);
+const panStartY = ref(0);
+const zoomContainerRef = ref<HTMLDivElement | null>(null);
+const flipAnimating = ref(false);
+
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 5;
+const ZOOM_STEP = 0.25;
+
+const zoomStyle = computed(() => ({
+  transform: `translate(${zoomTx.value}px, ${zoomTy.value}px) scale(${zoomScale.value})`,
+  transition: isPanning.value ? 'none' : 'transform 200ms cubic-bezier(0.23, 1, 0.32, 1)',
+}));
+
+const zoomPercentLabel = computed(() => {
+  if (zoomScale.value === 1) return 'Fit';
+  return `${Math.round(zoomScale.value * 100)}%`;
+});
+
+function resetZoom() {
+  zoomScale.value = 1;
+  zoomTx.value = 0;
+  zoomTy.value = 0;
+}
+
+function smoothZoom(delta: number, clientX: number, clientY: number) {
+  if (flipAnimating.value) return;
+  const container = zoomContainerRef.value;
+  if (!container) return;
+
+  const rect = container.getBoundingClientRect();
+  const cx = clientX - rect.left;
+  const cy = clientY - rect.top;
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+
+  const prevScale = zoomScale.value;
+  const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, prevScale + delta));
+  if (newScale === prevScale) return;
+
+  // Zoom toward cursor using viewport-center origin (matches preview math).
+  // Image-local coordinates of the point under cursor, relative to image center.
+  const imgLocalX = (cx - centerX - zoomTx.value) / prevScale;
+  const imgLocalY = (cy - centerY - zoomTy.value) / prevScale;
+
+  // After scale change, keep the same image-local point under the cursor.
+  zoomTx.value = cx - centerX - newScale * imgLocalX;
+  zoomTy.value = cy - centerY - newScale * imgLocalY;
+  zoomScale.value = newScale;
+}
+
+function zoomIn() {
+  smoothZoom(ZOOM_STEP, window.innerWidth / 2, window.innerHeight / 2);
+}
+
+function zoomOut() {
+  smoothZoom(-ZOOM_STEP, window.innerWidth / 2, window.innerHeight / 2);
+}
+
+function onWheel(e: WheelEvent) {
+  if (!store.lightboxOpen) return;
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+  smoothZoom(delta, e.clientX, e.clientY);
+  hideHint();
+}
+
+function onDblClick(e: MouseEvent) {
+  if (!store.lightboxOpen || flipAnimating.value) return;
+  if (zoomScale.value !== 1 || zoomTx.value !== 0 || zoomTy.value !== 0) {
+    resetZoom();
+  } else {
+    smoothZoom(2, e.clientX, e.clientY);
+  }
+  hideHint();
+}
+
+function onPointerDown(e: PointerEvent) {
+  if (!store.lightboxOpen || flipAnimating.value) return;
+  isPanning.value = true;
+  panStartX.value = e.clientX - zoomTx.value;
+  panStartY.value = e.clientY - zoomTy.value;
+  (e.currentTarget as HTMLElement)?.setPointerCapture?.(e.pointerId);
+  hideHint();
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!isPanning.value) return;
+  zoomTx.value = e.clientX - panStartX.value;
+  zoomTy.value = e.clientY - panStartY.value;
+}
+
+function onPointerUp() {
+  isPanning.value = false;
+}
+
+// ── Fullscreen ──
+const isFullscreen = ref(false);
+
+async function toggleFullscreen() {
+  try {
+    const win = getCurrentWindow();
+    if (isFullscreen.value) {
+      await win.setFullscreen(false);
+      isFullscreen.value = false;
+    } else {
+      await win.setFullscreen(true);
+      isFullscreen.value = true;
+    }
+  } catch {
+    // Fullscreen not supported or failed
+  }
+}
+
+// ── Copy image ──
+async function copyImageToClipboard() {
+  if (!lightboxSrc.value) return;
+  try {
+    const res = await fetch(lightboxSrc.value);
+    const blob = await res.blob();
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+    toast.show('Image copied to clipboard', 'success');
+  } catch {
+    toast.show('Failed to copy image', 'error');
+  }
+}
+
+// ── Hints ──
+const hintVisible = ref(true);
+
+function hideHint() {
+  hintVisible.value = false;
+}
 
 const current = computed(() => store.currentLightboxFile);
 const lightboxSrc = ref('');
@@ -37,6 +185,8 @@ onMounted(() => {
       prefersReducedMotion.value = e.matches;
     };
     reducedMotionQuery.addEventListener('change', handler);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
   }
 });
 
@@ -44,6 +194,8 @@ onBeforeUnmount(() => {
   if (reducedMotionQuery) {
     reducedMotionQuery.removeEventListener('change', () => {});
   }
+  window.removeEventListener('pointermove', onPointerMove);
+  window.removeEventListener('pointerup', onPointerUp);
 });
 
 // ── Image loading via store unified cache ──
@@ -65,11 +217,9 @@ async function loadCurrentImage() {
       const sourceRect = store.lightboxSourceRect;
 
       if (!sourceRect || prefersReducedMotion.value) {
-        // Simple fade (or skip animation for reduced motion)
         return;
       }
 
-      // Animate from sourceRect to current position
       const destRect = imageEl.value.getBoundingClientRect();
       const dx = sourceRect.left - destRect.left;
       const dy = sourceRect.top - destRect.top;
@@ -79,10 +229,10 @@ async function loadCurrentImage() {
       if (dx === 0 && dy === 0 && scaleX === 1 && scaleY === 1) return;
 
       imageEl.value.style.transformOrigin = 'top left';
+      flipAnimating.value = true;
       imageEl.value.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
       imageEl.value.style.opacity = '0.8';
 
-      // Force reflow to ensure initial transform is applied before animating
       void imageEl.value.offsetHeight;
 
       const duration = prefersReducedMotion.value ? '0ms' : '250ms';
@@ -90,8 +240,8 @@ async function loadCurrentImage() {
       imageEl.value.style.transform = 'translate(0, 0) scale(1, 1)';
       imageEl.value.style.opacity = '1';
 
-      // Clean up transition styles after animation
       setTimeout(() => {
+        flipAnimating.value = false;
         if (imageEl.value) {
           imageEl.value.style.transition = '';
           imageEl.value.style.transformOrigin = '';
@@ -108,6 +258,8 @@ watch(
   () => store.lightboxOpen,
   (open) => {
     if (open) {
+      resetZoom();
+      hintVisible.value = true;
       previousFocus = document.activeElement as HTMLElement | null;
       loadCurrentImage();
       nextTick(() => {
@@ -119,6 +271,14 @@ watch(
       previousFocus = null;
       confirmingDelete.value = false;
       lightboxSrc.value = '';
+      resetZoom();
+      hintVisible.value = true;
+      if (isFullscreen.value) {
+        getCurrentWindow()
+          .setFullscreen(false)
+          .catch(() => {});
+        isFullscreen.value = false;
+      }
     }
   }
 );
@@ -128,9 +288,8 @@ watch(
   () => store.lightboxIndex,
   () => {
     if (store.lightboxOpen) {
-      // Crossfade for prev/next
+      resetZoom();
       if (lightboxSrc.value && !prefersReducedMotion.value) {
-        // Quick crossfade via opacity
         lightboxSrc.value = '';
         nextTick(() => {
           loadCurrentImage();
@@ -144,6 +303,7 @@ watch(
 
 // ── Close animation (FLIP zoom-out) ──
 function closeWithAnimation() {
+  resetZoom();
   if (!imageEl.value || prefersReducedMotion.value) {
     store.closeLightbox();
     return;
@@ -202,9 +362,31 @@ function handleKeydown(e: KeyboardEvent) {
       break;
     case 'f':
     case 'F':
-      if (!e.ctrlKey && current.value) {
-        store.openFolder(current.value.path);
+      if (!e.ctrlKey) {
+        e.preventDefault();
+        toggleFullscreen();
       }
+      break;
+    case 'c':
+    case 'C':
+      if (!e.ctrlKey) {
+        e.preventDefault();
+        copyImageToClipboard();
+      }
+      break;
+    case '+':
+    case '=':
+      e.preventDefault();
+      zoomIn();
+      break;
+    case '-':
+    case '_':
+      e.preventDefault();
+      zoomOut();
+      break;
+    case '0':
+      e.preventDefault();
+      resetZoom();
       break;
     case 'Tab':
       trapFocus(e);
@@ -284,43 +466,107 @@ function formatDate(iso: string): string {
         <!-- Backdrop -->
         <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" @click="closeWithAnimation()" />
 
-        <!-- Header -->
-        <div class="relative z-10 flex items-center justify-between px-4 py-3">
-          <span class="text-white/80 text-sm">
-            Screenshot {{ store.lightboxIndex + 1 }}/{{ store.displayedFiles.length }}
-          </span>
+        <!-- Top centered toolbar -->
+        <div
+          class="absolute top-4 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-0.5 px-2 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/10 shadow-lg"
+          role="toolbar"
+          aria-label="Lightbox controls"
+        >
+          <button class="lb-btn btn-pressable" title="Previous (←)" @click="store.prevImage()">
+            <ChevronLeft :size="18" />
+          </button>
+          <button class="lb-btn btn-pressable" title="Zoom out (-)" @click="zoomOut()">
+            <Minus :size="18" />
+          </button>
+          <button class="lb-btn btn-pressable" title="Fit to screen (0)" @click="resetZoom()">
+            <Maximize :size="18" />
+          </button>
+          <button class="lb-btn btn-pressable" title="Zoom in (+)" @click="zoomIn()">
+            <Plus :size="18" />
+          </button>
+
+          <div class="w-px h-5 bg-white/10 mx-1" />
+
           <button
+            class="lb-btn btn-pressable"
+            title="Toggle fullscreen (F)"
+            @click="toggleFullscreen()"
+          >
+            <component :is="isFullscreen ? Minimize : Maximize" :size="18" />
+          </button>
+          <button
+            class="lb-btn btn-pressable"
+            title="Copy image (C)"
+            @click="copyImageToClipboard()"
+          >
+            <ClipboardCopy :size="18" />
+          </button>
+
+          <div class="w-px h-5 bg-white/10 mx-1" />
+
+          <button
+            class="lb-btn btn-pressable"
+            title="Close (Esc)"
             data-close
-            class="btn-pressable p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10"
             @click="closeWithAnimation()"
           >
-            <X :size="20" />
+            <X :size="18" />
+          </button>
+          <button class="lb-btn btn-pressable" title="Next (→)" @click="store.nextImage()">
+            <ChevronRight :size="18" />
           </button>
         </div>
 
-        <!-- Image area -->
-        <div class="relative z-10 flex-1 flex items-center justify-center min-h-0 px-12">
+        <!-- Nav arrows -->
+        <template v-if="store.displayedFiles.length > 1">
+          <button
+            class="lb-nav-arrow btn-pressable left-4"
+            title="Previous"
+            @click="store.prevImage()"
+          >
+            <ChevronLeft :size="22" />
+          </button>
+          <button
+            class="lb-nav-arrow btn-pressable right-4"
+            title="Next"
+            @click="store.nextImage()"
+          >
+            <ChevronRight :size="22" />
+          </button>
+        </template>
+
+        <!-- Image viewport -->
+        <div
+          ref="zoomContainerRef"
+          class="relative z-10 flex-1 flex items-center justify-center min-h-0 overflow-hidden"
+          :class="{ 'cursor-grab': !isPanning && zoomScale > 1, 'cursor-grabbing': isPanning }"
+          @wheel="onWheel"
+          @dblclick="onDblClick"
+          @pointerdown="onPointerDown"
+        >
           <!-- Loading spinner -->
           <Loader2
             v-if="imageLoading && !imageError"
             :size="32"
-            class="animate-spin text-white/60 absolute"
+            class="animate-spin text-white/60 absolute z-10"
           />
 
-          <!-- Image -->
-          <img
-            v-if="lightboxSrc && !imageError"
-            ref="imageEl"
-            :key="current.path"
-            :src="lightboxSrc"
-            :alt="current.filename"
-            class="max-w-[90vw] max-h-[80vh] object-contain rounded shadow-2xl"
-            @load="imageLoading = false"
-            @error="
-              imageError = true;
-              imageLoading = false;
-            "
-          />
+          <!-- Zoomed image wrapper -->
+          <div v-if="lightboxSrc && !imageError" :style="zoomStyle" class="will-change-transform">
+            <img
+              ref="imageEl"
+              :key="current.path"
+              :src="lightboxSrc"
+              :alt="current.filename"
+              class="max-w-[90vw] max-h-[80vh] object-contain rounded shadow-2xl select-none"
+              draggable="false"
+              @load="imageLoading = false"
+              @error="
+                imageError = true;
+                imageLoading = false;
+              "
+            />
+          </div>
 
           <!-- Error fallback -->
           <div v-if="imageError" class="text-white/60 text-center flex flex-col items-center gap-3">
@@ -333,34 +579,29 @@ function formatDate(iso: string): string {
               Open in OS Viewer
             </button>
           </div>
-
-          <!-- Nav arrows (hidden when only 1 image) -->
-          <template v-if="store.displayedFiles.length > 1">
-            <button
-              class="btn-pressable absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-opacity duration-150"
-              @click="store.prevImage()"
-            >
-              <ChevronLeft :size="28" />
-            </button>
-            <button
-              class="btn-pressable absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-opacity duration-150"
-              @click="store.nextImage()"
-            >
-              <ChevronRight :size="28" />
-            </button>
-          </template>
         </div>
 
-        <!-- Metadata bar -->
+        <!-- Info bar (centered bottom, above metadata) -->
+        <div
+          class="absolute bottom-[3.25rem] left-1/2 -translate-x-1/2 z-[110] flex items-center gap-3 px-3 py-1.5 rounded-lg bg-white/[0.08] backdrop-blur-md border border-white/10 text-xs text-white/60"
+        >
+          <span>{{ store.lightboxIndex + 1 }} / {{ store.displayedFiles.length }}</span>
+          <span v-if="current.dimensions" class="w-px h-3 bg-white/10" />
+          <span v-if="current.dimensions"
+            >{{ current.dimensions.width }}×{{ current.dimensions.height }}</span
+          >
+          <span class="w-px h-3 bg-white/10" />
+          <span>{{ formatSize(current.size_bytes) }}</span>
+          <span class="w-px h-3 bg-white/10" />
+          <span class="text-white/90 font-medium">{{ zoomPercentLabel }}</span>
+        </div>
+
+        <!-- Bottom metadata + action bar -->
         <div
           class="relative z-10 flex items-center justify-between px-4 py-3 border-t border-white/10 flex-wrap gap-y-2"
         >
           <div class="text-white/70 text-xs flex flex-wrap gap-x-3 gap-y-1">
             <span class="truncate max-w-[180px]">{{ current.filename }}</span>
-            <span v-if="current.dimensions"
-              >{{ current.dimensions.width }}×{{ current.dimensions.height }}</span
-            >
-            <span>{{ formatSize(current.size_bytes) }}</span>
             <span>{{ formatDate(current.created_iso) }}</span>
           </div>
 
@@ -371,13 +612,13 @@ function formatDate(iso: string): string {
                 class="btn-pressable p-1.5 rounded text-white hover:bg-white/20"
                 @click="confirmDelete"
               >
-                ✓
+                <Check :size="16" />
               </button>
               <button
                 class="btn-pressable p-1.5 rounded text-white hover:bg-white/20"
                 @click="cancelDelete"
               >
-                ✗
+                <X :size="16" />
               </button>
             </template>
             <template v-else>
@@ -412,20 +653,112 @@ function formatDate(iso: string): string {
             </template>
           </div>
         </div>
+
+        <!-- Interaction hints -->
+        <div
+          class="absolute bottom-[6.5rem] left-1/2 -translate-x-1/2 z-[105] text-center text-xs text-white/40 pointer-events-none transition-opacity duration-300"
+          :class="{ 'opacity-0': !hintVisible }"
+        >
+          <p>Double-click to zoom • Scroll to zoom • Drag to pan</p>
+        </div>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <style scoped>
+/* Entry/exit with scale(0.95) + opacity per Emil */
 .lightbox-enter-active {
-  transition: opacity 200ms ease-out;
+  transition:
+    opacity 250ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 250ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .lightbox-leave-active {
-  transition: opacity 150ms ease-out;
+  transition:
+    opacity 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
 }
-.lightbox-enter-from,
+.lightbox-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
 .lightbox-leave-to {
   opacity: 0;
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lightbox-enter-active,
+  .lightbox-leave-active {
+    transition: opacity 100ms ease;
+    transform: none !important;
+  }
+  .lightbox-enter-from,
+  .lightbox-leave-to {
+    transform: none !important;
+  }
+}
+
+/* Toolbar button */
+.lb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 0.5rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition:
+    transform var(--duration-quick) var(--ease-out),
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lb-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+.lb-btn:active {
+  transform: scale(0.93);
+}
+
+/* Nav arrows */
+.lb-nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition:
+    transform var(--duration-quick) var(--ease-out),
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lb-nav-arrow:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+.lb-nav-arrow:active {
+  transform: translateY(-50%) scale(0.93);
 }
 </style>
