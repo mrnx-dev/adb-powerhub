@@ -44,6 +44,7 @@ const emit = defineEmits<{
         v-if="!connected"
         :disabled="connecting"
         class="w-full btn-primary py-3 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        :class="{ 'animate-shimmer': connecting }"
         aria-label="Auto connect to device"
         :aria-disabled="connecting"
         @click="emit('auto-connect')"
@@ -63,17 +64,23 @@ const emit = defineEmits<{
     </div>
 
     <!-- Status Row (appears during connecting phase, FR-2) -->
-    <StatusRow v-if="connecting && !error && !connected" :status="status" />
+    <Transition name="status-fade">
+      <StatusRow v-if="connecting && !error && !connected" :status="status" />
+    </Transition>
 
     <!-- Success Card (FR-5 AC5.1) -->
-    <SuccessCard
-      v-if="connected"
-      :device-model="deviceModel"
-      :device-id="deviceId"
-      :transport="transport"
-    />
+    <Transition name="card-fade">
+      <SuccessCard
+        v-if="connected"
+        :device-model="deviceModel"
+        :device-id="deviceId"
+        :transport="transport"
+      />
+    </Transition>
 
     <!-- Error Banner (FR-5 AC5.2) -->
-    <ErrorBanner v-if="error" :message="errorMessage" />
+    <Transition name="card-fade">
+      <ErrorBanner v-if="error" :message="errorMessage" />
+    </Transition>
   </div>
 </template>

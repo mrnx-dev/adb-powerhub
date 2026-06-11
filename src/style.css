@@ -1547,6 +1547,134 @@ input[type='range']::-moz-range-thumb {
 }
 
 /* ============================================================
+   CONNECT PANEL — Status / Card Transitions (Blueprint §11)
+   ============================================================ */
+
+/* StatusRow fade-up (enter: 200ms, leave: 150ms) */
+.status-fade-enter-active {
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+.status-fade-leave-active {
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+.status-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
+}
+.status-fade-leave-to {
+  opacity: 0;
+}
+
+/* SuccessCard / ErrorBanner fade+scale (enter: 200ms, leave: 150ms) */
+.card-fade-enter-active {
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+.card-fade-leave-active {
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+.card-fade-enter-from {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.card-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+/* Saved device list stagger (each item 60ms apart, max 180ms total) */
+.list-stagger-enter-active {
+  transition:
+    opacity 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+}
+.list-stagger-leave-active {
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+.list-stagger-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.list-stagger-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+/* Stagger delay per item (up to 3 items = 180ms max) */
+.list-stagger-enter-active:nth-child(1) {
+  transition-delay: 0ms;
+}
+.list-stagger-enter-active:nth-child(2) {
+  transition-delay: 60ms;
+}
+.list-stagger-enter-active:nth-child(3) {
+  transition-delay: 120ms;
+}
+.list-stagger-enter-active:nth-child(4) {
+  transition-delay: 180ms;
+}
+.list-stagger-enter-active:nth-child(5) {
+  transition-delay: 180ms;
+}
+
+/* Manual section collapse (expand: 200ms, collapse: 150ms) */
+.collapse-enter-active {
+  transition:
+    opacity 200ms var(--ease-out),
+    max-height 200ms var(--ease-out);
+  overflow: hidden;
+}
+.collapse-leave-active {
+  transition:
+    opacity 150ms ease,
+    max-height 150ms ease;
+  overflow: hidden;
+}
+.collapse-enter-from,
+.collapse-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+.collapse-enter-to,
+.collapse-leave-from {
+  max-height: 300px;
+}
+
+/* Shimmer animation for Auto Connect button loading (FR-1 AC4) */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Button :active press effect (100-160ms, per NFR-1 / blueprint §11 #10) */
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ============================================================
    STATUS BADGE
    ============================================================ */
 
@@ -1800,6 +1928,39 @@ input[type='range']::-moz-range-thumb {
   }
   .drop-zone-icon {
     animation: none !important;
+  }
+  .status-fade-enter-active,
+  .status-fade-leave-active,
+  .card-fade-enter-active,
+  .card-fade-leave-active {
+    transition: opacity 100ms linear !important;
+    transform: none !important;
+  }
+  .status-fade-enter-from,
+  .status-fade-leave-to,
+  .card-fade-enter-from,
+  .card-fade-leave-to {
+    transform: none !important;
+  }
+  .list-stagger-enter-active,
+  .list-stagger-leave-active {
+    transition: none !important;
+  }
+  .list-stagger-enter-from {
+    opacity: 0;
+    transform: none !important;
+  }
+  .collapse-enter-active,
+  .collapse-leave-active {
+    transition: opacity 100ms linear !important;
+    max-height: none !important;
+  }
+  .animate-shimmer {
+    animation: none !important;
+    background: none !important;
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: none;
   }
 }
 

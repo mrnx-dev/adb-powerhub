@@ -50,60 +50,62 @@ function toggle() {
     </button>
 
     <!-- Collapsible content (FR-4 AC2) -->
-    <div
-      v-if="expanded"
-      id="manual-content"
-      role="region"
-      aria-labelledby="manual-header"
-      class="space-y-4 pt-2"
-    >
-      <div class="space-y-3">
-        <div>
-          <label
-            class="text-[10px] text-theme-muted uppercase tracking-wider font-semibold mb-1.5 block"
-            >IP Address</label
-          >
-          <input
-            v-model="localIp"
-            type="text"
-            placeholder="e.g., 192.168.1.5"
-            aria-label="IP address"
-            class="w-full input-terminal py-2 px-3 text-xs text-theme-primary placeholder:text-theme-muted"
-            @keyup.enter="handleConnect"
-          />
+    <Transition name="collapse">
+      <div
+        v-if="expanded"
+        id="manual-content"
+        role="region"
+        aria-labelledby="manual-header"
+        class="space-y-4 pt-2"
+      >
+        <div class="space-y-3">
+          <div>
+            <label
+              class="text-[10px] text-theme-muted uppercase tracking-wider font-semibold mb-1.5 block"
+              >IP Address</label
+            >
+            <input
+              v-model="localIp"
+              type="text"
+              placeholder="e.g., 192.168.1.5"
+              aria-label="IP address"
+              class="w-full input-terminal py-2 px-3 text-xs text-theme-primary placeholder:text-theme-muted"
+              @keyup.enter="handleConnect"
+            />
+          </div>
+          <div>
+            <label
+              class="text-[10px] text-theme-muted uppercase tracking-wider font-semibold mb-1.5 block"
+              >Port</label
+            >
+            <input
+              v-model.number="localPort"
+              type="number"
+              placeholder="5555"
+              aria-label="Port number"
+              class="w-full input-terminal py-2 px-3 text-xs text-theme-primary placeholder:text-theme-muted"
+              @keyup.enter="handleConnect"
+            />
+          </div>
         </div>
-        <div>
-          <label
-            class="text-[10px] text-theme-muted uppercase tracking-wider font-semibold mb-1.5 block"
-            >Port</label
-          >
-          <input
-            v-model.number="localPort"
-            type="number"
-            placeholder="5555"
-            aria-label="Port number"
-            class="w-full input-terminal py-2 px-3 text-xs text-theme-primary placeholder:text-theme-muted"
-            @keyup.enter="handleConnect"
-          />
-        </div>
-      </div>
 
-      <div class="flex gap-2">
-        <button
-          :disabled="connecting || !localIp.trim()"
-          class="flex-1 btn-primary py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-          @click="handleConnect"
-        >
-          <Terminal :size="13" />
-          {{ connecting ? 'Connecting...' : 'Connect' }}
-        </button>
-        <button
-          class="bg-theme-btn border border-theme-tertiary text-theme-secondary py-2.5 px-3 rounded-lg text-xs hover:text-theme-primary hover:bg-theme-hover transition-colors"
-          @click="handleClear"
-        >
-          Clear
-        </button>
+        <div class="flex gap-2">
+          <button
+            :disabled="connecting || !localIp.trim()"
+            class="flex-1 btn-primary py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+            @click="handleConnect"
+          >
+            <Terminal :size="13" />
+            {{ connecting ? 'Connecting...' : 'Connect' }}
+          </button>
+          <button
+            class="bg-theme-btn border border-theme-tertiary text-theme-secondary py-2.5 px-3 rounded-lg text-xs hover:text-theme-primary hover:bg-theme-hover transition-colors"
+            @click="handleClear"
+          >
+            Clear
+          </button>
+        </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
