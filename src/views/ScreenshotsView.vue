@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { Camera, Loader2, RefreshCw } from '@lucide/vue';
+import { Camera, Loader2, RefreshCw, Folder } from '@lucide/vue';
 import { useScreenshotsStore, type SortMode, type FilterMode } from '../stores/screenshots';
 import { useDeviceStore } from '../stores/device';
 import { useSettingsStore } from '../stores/settings';
@@ -72,25 +72,6 @@ onMounted(() => {
     <div
       class="flex items-center gap-3 px-4 py-3 border-b border-theme-tertiary shrink-0 flex-wrap"
     >
-      <!-- Take Screenshot -->
-      <button
-        class="btn-pressable flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
-        :class="
-          deviceStore.connected
-            ? 'bg-accent-emerald text-white hover:bg-accent-emerald/90'
-            : 'bg-theme-btn text-theme-muted cursor-not-allowed'
-        "
-        :disabled="!deviceStore.connected || capturing"
-        :title="!deviceStore.connected ? 'Connect a device to take screenshots' : undefined"
-        @click="handleCapture"
-      >
-        <Loader2 v-if="capturing" :size="16" class="animate-spin" />
-        <Camera v-else :size="16" />
-        <span>{{ capturing ? 'Capturing…' : 'Take Screenshot' }}</span>
-      </button>
-
-      <div class="flex-1" />
-
       <!-- Refresh button -->
       <button
         class="btn-pressable p-2 rounded-lg text-theme-muted hover:text-theme-primary hover:bg-theme-btn transition-colors"
@@ -122,7 +103,7 @@ onMounted(() => {
           class="btn-pressable px-2.5 py-1 rounded-md text-xs font-medium transition-colors duration-150"
           :class="
             store.filterMode === f.value
-              ? 'bg-accent-emerald text-white'
+              ? 'bg-accent-emerald text-theme-inverse'
               : 'bg-theme-btn text-theme-muted border border-theme-tertiary hover:border-accent-emerald/40'
           "
           @click="store.setFilter(f.value)"
@@ -132,7 +113,9 @@ onMounted(() => {
       </div>
 
       <!-- Breadcrumb -->
-      <span class="text-xs text-theme-muted whitespace-nowrap">📁 {{ dirDisplay }}</span>
+      <span class="text-xs text-theme-muted whitespace-nowrap flex items-center gap-1"
+        ><Folder :size="14" /> {{ dirDisplay }}</span
+      >
       <button
         class="btn-pressable text-xs text-accent-emerald hover:underline whitespace-nowrap"
         @click="navStore.navigateTo('settings')"
@@ -153,11 +136,7 @@ onMounted(() => {
       <div class="mb-3" />
       <!-- Loading: skeleton grid -->
       <div v-if="store.loading" class="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        <div
-          v-for="i in 12"
-          :key="i"
-          class="aspect-[9/19.5] rounded-lg bg-theme-card animate-pulse"
-        />
+        <div v-for="i in 12" :key="i" class="aspect-video rounded-lg bg-theme-card animate-pulse" />
       </div>
 
       <!-- Error banner -->
@@ -182,7 +161,7 @@ onMounted(() => {
           class="btn-pressable flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
           :class="
             deviceStore.connected
-              ? 'bg-accent-emerald text-white'
+              ? 'bg-accent-emerald text-theme-inverse'
               : 'bg-theme-btn text-theme-muted cursor-not-allowed'
           "
           :disabled="!deviceStore.connected"

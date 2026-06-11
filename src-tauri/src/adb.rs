@@ -2545,16 +2545,23 @@ pub fn adb_read_file_base64(path: String) -> Result<String, String> {
 /// Generate a thumbnail for a screenshot file.
 /// Returns base64-encoded JPEG or None if the image cannot be loaded.
 /// Includes path traversal guard (NFR-2).
-fn generate_thumbnail(path: &std::path::PathBuf) -> Result<Option<String>, String> {
-    // Path traversal guard — same pattern as adb_delete_screenshot
+fn generate_thumbnail(
+    path: &std::path::PathBuf,
+    dir_path: Option<String>,
+) -> Result<Option<String>, String> {
+    // Path traversal guard — same pattern as adb_list_screenshots
     let canonical = path
         .canonicalize()
         .map_err(|e| format!("Cannot resolve path: {}", e))?;
 
-    let save_dir = dirs_or_fallback_screenshots();
-    let save_dir_canonical = std::path::PathBuf::from(&save_dir)
+    let save_dir = dir_path
+        .filter(|p| !p.is_empty())
+        .map(|p| std::path::PathBuf::from(&p))
+        .unwrap_or_else(|| std::path::PathBuf::from(&dirs_or_fallback_screenshots()));
+
+    let save_dir_canonical = save_dir
         .canonicalize()
-        .unwrap_or_else(|_| std::path::PathBuf::from(&save_dir));
+        .unwrap_or_else(|_| save_dir.clone());
 
     if !canonical.starts_with(&save_dir_canonical) {
         return Err("Access denied: file is outside screenshot directory".to_string());
@@ -2579,11 +2586,14 @@ fn generate_thumbnail(path: &std::path::PathBuf) -> Result<Option<String>, Strin
 }
 
 #[tauri::command]
-pub async fn adb_get_thumbnail(path: String) -> Result<Option<String>, String> {
+pub async fn adb_get_thumbnail(
+    path: String,
+    dir_path: Option<String>,
+) -> Result<Option<String>, String> {
     let path_buf = std::path::PathBuf::from(&path);
     // Run thumbnail generation on a blocking thread to avoid blocking the
     // async Tauri runtime.
-    tokio::task::spawn_blocking(move || generate_thumbnail(&path_buf))
+    tokio::task::spawn_blocking(move || generate_thumbnail(&path_buf, dir_path))
         .await
         .map_err(|e| format!("Thumbnail task failed: {}", e))?
 }

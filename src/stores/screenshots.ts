@@ -107,7 +107,10 @@ export const useScreenshotsStore = defineStore('screenshots', () => {
       return inflightThumbnails.value.get(path)!;
     }
     // Fetch thumbnail
-    const promise = invoke<string | null>('adb_get_thumbnail', { path })
+    const promise = invoke<string | null>('adb_get_thumbnail', {
+      path,
+      dirPath: getSaveDir() || null,
+    })
       .then((result) => {
         if (result) {
           const url = `data:image/jpeg;base64,${result}`;

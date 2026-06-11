@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted, onBeforeUnmount, onUnmounted, computed } from 'vue';
-import { FolderOpen, Monitor, Copy, Trash2, ImageOff, Loader2, RotateCw } from '@lucide/vue';
-import { useScreenshotsStore, type ScreenshotFile } from '../stores/screenshots';
+import {
+  FolderOpen,
+  Monitor,
+  Copy,
+  Trash2,
+  ImageOff,
+  Loader2,
+  RotateCw,
+  Check,
+  X,
+} from '@lucide/vue';
+import { useScreenshotsStore } from '../stores/screenshots';
 
 const store = useScreenshotsStore();
 
@@ -259,14 +269,6 @@ function formatDimensions(dims: { width: number; height: number } | null): strin
   }
   return `${dims.width}×${dims.height}`;
 }
-
-function aspectStyle(file: ScreenshotFile): Record<string, string> {
-  if (file.dimensions) {
-    return { '--aspect': `${file.dimensions.width}/${file.dimensions.height}` };
-  }
-  // FR-5 AC #4: default fallback is 9:16 (not 9:19.5)
-  return { '--aspect': '9/16' };
-}
 </script>
 
 <template>
@@ -295,11 +297,8 @@ function aspectStyle(file: ScreenshotFile): Record<string, string> {
         @click="handleCardClick(index, $event)"
         @keydown="handleGridKeydown($event, index)"
       >
-        <!-- Thumbnail container -->
-        <div
-          class="relative aspect-[var(--aspect)] w-full bg-theme-page"
-          :style="aspectStyle(file)"
-        >
+        <!-- Thumbnail container (fixed landscape, image center-cropped via object-cover) -->
+        <div class="relative aspect-video w-full bg-theme-page">
           <!-- Broken image placeholder with retry -->
           <div
             v-if="thumbnailStates.get(file.path) === 'broken'"
@@ -368,14 +367,14 @@ function aspectStyle(file: ScreenshotFile): Record<string, string> {
             title="Confirm delete"
             @click.stop="confirmDelete(file.path)"
           >
-            ✓
+            <Check :size="14" />
           </button>
           <button
             class="btn-pressable p-1 rounded text-white hover:bg-white/20"
             title="Cancel"
             @click.stop="cancelDeleteConfirm"
           >
-            ✗
+            <X :size="14" />
           </button>
         </template>
         <template v-else>

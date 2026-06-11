@@ -143,7 +143,7 @@ A cross-platform desktop application for controlling Android devices via ADB (An
 | Frontend         | Vue 3 (Composition API + `<script setup>`) |
 | State Management | Pinia                                      |
 | Styling          | Tailwind CSS v4                            |
-| Icons            | Lucide Vue, Material Design Icons     |
+| Icons            | Lucide Vue, Material Design Icons          |
 | Build            | Vite                                       |
 | Desktop          | Tauri v2                                   |
 | Backend          | Rust (2021 edition)                        |
@@ -243,15 +243,15 @@ Produced installers will be in `src-tauri/target/release/bundle/`.
 
 ## Keyboard Shortcuts
 
-| Shortcut          | Action                         |
-| ----------------- | ------------------------------ |
-| `Ctrl+K`         | Focus terminal input           |
-| `Ctrl+M`         | Toggle screen mirror           |
-| `Ctrl+Shift+S`   | Navigate to Screenshots page   |
-| `Ctrl+Shift+D`   | Disconnect device              |
-| `Ctrl+,`         | Navigate to Settings page       |
-| `Escape`         | Close menus / reboot menu      |
-| `Alt+1`-`Alt+9`  | Run command preset 1-9          |
+| Shortcut        | Action                       |
+| --------------- | ---------------------------- |
+| `Ctrl+K`        | Focus terminal input         |
+| `Ctrl+M`        | Toggle screen mirror         |
+| `Ctrl+Shift+S`  | Navigate to Screenshots page |
+| `Ctrl+Shift+D`  | Disconnect device            |
+| `Ctrl+,`        | Navigate to Settings page    |
+| `Escape`        | Close menus / reboot menu    |
+| `Alt+1`-`Alt+9` | Run command preset 1-9       |
 
 ---
 
@@ -261,127 +261,127 @@ Produced installers will be in `src-tauri/target/release/bundle/`.
 
 ### Phase 1 - Core Foundation [DONE]
 
-| # | Feature | Status | Notes |
-|---|---------|--------|-------|
-| 1.1 | Tauri v2 + Vue 3 project scaffold | Done | Vite, Pinia, Tailwind v4 |
-| 1.2 | Custom title bar | Done | Traffic-light controls, drag region |
-| 1.3 | ADB connect/disconnect | Done | WiFi, USB, pairing mode |
-| 1.4 | Device stats polling | Done | Battery, CPU, model info, RAM, storage, resolution, voltage |
-| 1.5 | Connectivity toggles | Done | WiFi, data, airplane, Bluetooth |
-| 1.6 | Navigation shortcuts | Done | Keyboard nav, terminal focus |
+| #   | Feature                           | Status | Notes                                                       |
+| --- | --------------------------------- | ------ | ----------------------------------------------------------- |
+| 1.1 | Tauri v2 + Vue 3 project scaffold | Done   | Vite, Pinia, Tailwind v4                                    |
+| 1.2 | Custom title bar                  | Done   | Traffic-light controls, drag region                         |
+| 1.3 | ADB connect/disconnect            | Done   | WiFi, USB, pairing mode                                     |
+| 1.4 | Device stats polling              | Done   | Battery, CPU, model info, RAM, storage, resolution, voltage |
+| 1.5 | Connectivity toggles              | Done   | WiFi, data, airplane, Bluetooth                             |
+| 1.6 | Navigation shortcuts              | Done   | Keyboard nav, terminal focus                                |
 
 ### Phase 2 - Controls and Terminal [DONE]
 
-| # | Feature | Status | Notes |
-|---|---------|--------|-------|
-| 2.1 | Remote control keys | Done | Home, Back, Recent, Volume, Media, Power |
-| 2.2 | Text input to device | Done | ADB input text |
-| 2.3 | Brightness control | Done | Slider 0-255 |
-| 2.4 | DPI/density changer | Done | Slider + reset button |
-| 2.5 | Terminal (ADB shell) | Done | Timestamped logs, copy, export |
-| 2.6 | System actions | Done | Screenshot, reboot (normal/recovery/bootloader) |
-| 2.7 | Developer toggles | Done | Show taps, layout bounds, stay awake |
+| #   | Feature              | Status | Notes                                           |
+| --- | -------------------- | ------ | ----------------------------------------------- |
+| 2.1 | Remote control keys  | Done   | Home, Back, Recent, Volume, Media, Power        |
+| 2.2 | Text input to device | Done   | ADB input text                                  |
+| 2.3 | Brightness control   | Done   | Slider 0-255                                    |
+| 2.4 | DPI/density changer  | Done   | Slider + reset button                           |
+| 2.5 | Terminal (ADB shell) | Done   | Timestamped logs, copy, export                  |
+| 2.6 | System actions       | Done   | Screenshot, reboot (normal/recovery/bootloader) |
+| 2.7 | Developer toggles    | Done   | Show taps, layout bounds, stay awake            |
 
 ### Phase 3 - Settings and Persistence [DONE]
 
-| # | Feature | Status | Notes |
-|---|---------|--------|-------|
-| 3.1 | Settings persistence | Done | Tauri store plugin (JSON files) |
-| 3.2 | Binary path management | Done | Auto-detect, manual, in-app ADB download |
-| 3.3 | Scrcpy configuration | Done | Quality presets, recording format, save dirs |
-| 3.4 | Connection history | Done | Saved devices (ip+port+method) |
-| 3.5 | Multi-theme system | Done | 18 themes + auto mode |
+| #   | Feature                | Status | Notes                                        |
+| --- | ---------------------- | ------ | -------------------------------------------- |
+| 3.1 | Settings persistence   | Done   | Tauri store plugin (JSON files)              |
+| 3.2 | Binary path management | Done   | Auto-detect, manual, in-app ADB download     |
+| 3.3 | Scrcpy configuration   | Done   | Quality presets, recording format, save dirs |
+| 3.4 | Connection history     | Done   | Saved devices (ip+port+method)               |
+| 3.5 | Multi-theme system     | Done   | 18 themes + auto mode                        |
 
 ### Phase 4 - Screen Mirroring [DONE]
 
-| # | Feature | Status | Notes |
-|---|---------|--------|-------|
-| 4.1 | Scrcpy launch/stop | Done | Binary detection, process management |
-| 4.2 | Mirror control toggles | Done | Show touches, stay awake, turn screen off, always-on-top, no-control |
-| 4.3 | Screen recording | Done | MKV/MP4 format, start/stop from UI |
-| 4.4 | Reconnect on disconnect | Done | Auto-reconnect watcher |
+| #   | Feature                 | Status | Notes                                                                |
+| --- | ----------------------- | ------ | -------------------------------------------------------------------- |
+| 4.1 | Scrcpy launch/stop      | Done   | Binary detection, process management                                 |
+| 4.2 | Mirror control toggles  | Done   | Show touches, stay awake, turn screen off, always-on-top, no-control |
+| 4.3 | Screen recording        | Done   | MKV/MP4 format, start/stop from UI                                   |
+| 4.4 | Reconnect on disconnect | Done   | Auto-reconnect watcher                                               |
 
 ### Phase 5 - Logcat [DONE]
 
-| # | Feature | Status | Notes |
-|---|---------|--------|-------|
-| 5.1 | Real-time logcat stream | Done | Tauri event channel, colored output |
-| 5.2 | Level filtering | Done | Verbose/Debug/Info/Warning/Error/Fatal |
-| 5.3 | Tag + text search | Done | Multi-tag include/exclude chips |
-| 5.4 | Active app filter | Done | Foreground package detection |
-| 5.5 | Pause/resume + export | Done | Stream control and file export |
+| #   | Feature                 | Status | Notes                                  |
+| --- | ----------------------- | ------ | -------------------------------------- |
+| 5.1 | Real-time logcat stream | Done   | Tauri event channel, colored output    |
+| 5.2 | Level filtering         | Done   | Verbose/Debug/Info/Warning/Error/Fatal |
+| 5.3 | Tag + text search       | Done   | Multi-tag include/exclude chips        |
+| 5.4 | Active app filter       | Done   | Foreground package detection           |
+| 5.5 | Pause/resume + export   | Done   | Stream control and file export         |
 
 ### Phase 6 - App Manager [DONE]
 
-| # | Feature | Status | Notes |
-|---|---------|--------|-------|
-| 6.1 | App list with icons | Done | Grid view, sort, filter (system/user/all) |
-| 6.2 | App detail panel | Done | Version, dates, sizes, data/cache usage |
-| 6.3 | App actions | Done | Open, uninstall, clear data, force stop, enable/disable |
-| 6.4 | Icon extraction | Done | resources.arsc parser then on-device ZIP fallback |
-| 6.5 | Drag-and-drop APK install | Done | Drop zone overlay, install queue |
-| 6.6 | Keyboard navigation | Done | Arrow keys, Enter, Space, /, Escape |
-| 6.7 | Active app detection | Done | Poll foreground package, badge in list |
+| #   | Feature                   | Status | Notes                                                   |
+| --- | ------------------------- | ------ | ------------------------------------------------------- |
+| 6.1 | App list with icons       | Done   | Grid view, sort, filter (system/user/all)               |
+| 6.2 | App detail panel          | Done   | Version, dates, sizes, data/cache usage                 |
+| 6.3 | App actions               | Done   | Open, uninstall, clear data, force stop, enable/disable |
+| 6.4 | Icon extraction           | Done   | resources.arsc parser then on-device ZIP fallback       |
+| 6.5 | Drag-and-drop APK install | Done   | Drop zone overlay, install queue                        |
+| 6.6 | Keyboard navigation       | Done   | Arrow keys, Enter, Space, /, Escape                     |
+| 6.7 | Active app detection      | Done   | Poll foreground package, badge in list                  |
 
 ### Phase 7 - Command Presets [DONE]
 
-| # | Feature | Status | Notes |
-|---|---------|--------|-------|
-| 7.1 | Preset CRUD | Done | Built-in + user presets, create/edit/delete |
-| 7.2 | Quick-run shortcuts | Done | Alt+1-9 keyboard shortcuts |
-| 7.3 | Preset panel | Done | Sidebar with scroll, custom scrollbar |
+| #   | Feature             | Status | Notes                                       |
+| --- | ------------------- | ------ | ------------------------------------------- |
+| 7.1 | Preset CRUD         | Done   | Built-in + user presets, create/edit/delete |
+| 7.2 | Quick-run shortcuts | Done   | Alt+1-9 keyboard shortcuts                  |
+| 7.3 | Preset panel        | Done   | Sidebar with scroll, custom scrollbar       |
 
 ### Phase 8 - Screenshot Gallery [DONE]
 
-| # | Feature | Status | Notes |
-|---|---------|--------|-------|
-| 8.1 | Screenshot gallery grid | Done | Lazy-loaded thumbnails, intersection observer |
-| 8.2 | Sort and filter | Done | Newest/Oldest/Largest, All/Today/This Week |
-| 8.3 | Lightbox viewer | Done | Full-screen, arrow key navigation, zoom, metadata |
-| 8.4 | Lightbox actions | Done | Open in viewer, open folder, copy path, delete |
-| 8.5 | Take and auto-refresh | Done | Capture button, debounced refresh, prepend path |
-| 8.6 | Rust backend | Done | adb_list_screenshots, adb_delete_screenshot, adb_read_file_base64, adb_get_file_info, PNG IHDR dimension parser |
-| 8.7 | Keyboard shortcut | Done | Ctrl+Shift+S to Screenshots page |
+| #   | Feature                 | Status | Notes                                                                                                           |
+| --- | ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------- |
+| 8.1 | Screenshot gallery grid | Done   | Lazy-loaded thumbnails, intersection observer                                                                   |
+| 8.2 | Sort and filter         | Done   | Newest/Oldest/Largest, All/Today/This Week                                                                      |
+| 8.3 | Lightbox viewer         | Done   | Full-screen, arrow key navigation, zoom, metadata                                                               |
+| 8.4 | Lightbox actions        | Done   | Open in viewer, open folder, copy path, delete                                                                  |
+| 8.5 | Take and auto-refresh   | Done   | Capture button, debounced refresh, prepend path                                                                 |
+| 8.6 | Rust backend            | Done   | adb_list_screenshots, adb_delete_screenshot, adb_read_file_base64, adb_get_file_info, PNG IHDR dimension parser |
+| 8.7 | Keyboard shortcut       | Done   | Ctrl+Shift+S to Screenshots page                                                                                |
 
 ### Phase 9 - Polish and UX [DONE]
 
-| # | Feature | Status | Notes |
-|---|---------|--------|-------|
-| 9.1 | Theme system | Done | 18 themes (6 dark, 6 mono, 6 light) + auto |
-| 9.2 | Theme-aware accents | Done | Emerald accent, semantic token system |
-| 9.3 | Transition system | Done | Page transitions, stagger, reduced-motion |
-| 9.4 | Glass-morphism | Done | glass-card, backdrop-blur, border tokens |
-| 9.5 | Custom scrollbar | Done | Thin, theme-aware |
-| 9.6 | Pressable buttons | Done | btn-pressable with scale transform |
-| 9.7 | Lightbox bug fix | Done | v-if instead of v-show prevents empty-src error |
+| #   | Feature             | Status | Notes                                           |
+| --- | ------------------- | ------ | ----------------------------------------------- |
+| 9.1 | Theme system        | Done   | 18 themes (6 dark, 6 mono, 6 light) + auto      |
+| 9.2 | Theme-aware accents | Done   | Emerald accent, semantic token system           |
+| 9.3 | Transition system   | Done   | Page transitions, stagger, reduced-motion       |
+| 9.4 | Glass-morphism      | Done   | glass-card, backdrop-blur, border tokens        |
+| 9.5 | Custom scrollbar    | Done   | Thin, theme-aware                               |
+| 9.6 | Pressable buttons   | Done   | btn-pressable with scale transform              |
+| 9.7 | Lightbox bug fix    | Done   | v-if instead of v-show prevents empty-src error |
 
 ---
 
 ### Phase 10 - Upcoming Features [PLANNED]
 
-| # | Feature | Priority | Notes |
-|---|---------|--------|-------|
-| 10.1 | File push/pull | P1 | Push files to device, pull files from device |
-| 10.2 | Screen recording in-gallery | P1 | View recordings alongside screenshots |
-| 10.3 | Batch screenshot operations | P2 | Multi-select delete, share, copy paths |
-| 10.4 | Screenshot crop/annotate | P2 | Basic crop + drawing overlay before share |
-| 10.5 | App backup and restore | P2 | adb backup / adb restore with progress |
-| 10.6 | Device file explorer | P2 | Browse device filesystem (limited to /sdcard) |
-| 10.7 | Logcat bookmark/favorite | P3 | Save filter presets per tag/level combo |
-| 10.8 | Custom command macro builder | P3 | Chain multiple ADB commands as a macro |
-| 10.9 | Multi-device support | P3 | Switch between connected devices |
-| 10.10 | Auto-update | P3 | Tauri updater for new releases |
+| #     | Feature                      | Priority | Notes                                         |
+| ----- | ---------------------------- | -------- | --------------------------------------------- |
+| 10.1  | File push/pull               | P1       | Push files to device, pull files from device  |
+| 10.2  | Screen recording in-gallery  | P1       | View recordings alongside screenshots         |
+| 10.3  | Batch screenshot operations  | P2       | Multi-select delete, share, copy paths        |
+| 10.4  | Screenshot crop/annotate     | P2       | Basic crop + drawing overlay before share     |
+| 10.5  | App backup and restore       | P2       | adb backup / adb restore with progress        |
+| 10.6  | Device file explorer         | P2       | Browse device filesystem (limited to /sdcard) |
+| 10.7  | Logcat bookmark/favorite     | P3       | Save filter presets per tag/level combo       |
+| 10.8  | Custom command macro builder | P3       | Chain multiple ADB commands as a macro        |
+| 10.9  | Multi-device support         | P3       | Switch between connected devices              |
+| 10.10 | Auto-update                  | P3       | Tauri updater for new releases                |
 
 ### Phase 11 - Infrastructure and Quality [PLANNED]
 
-| # | Feature | Priority | Notes |
-|---|---------|--------|-------|
-| 11.1 | E2E tests (Playwright) | P1 | Core flows: connect, command, screenshot |
-| 11.2 | Rust unit tests | P1 | ADB command helpers, icon parser |
-| 11.3 | CI pipeline hardening | P2 | Lint, type-check, build on all platforms |
-| 11.4 | Error boundary components | P2 | Graceful error UI instead of blank screen |
-| 11.5 | Accessibility audit | P2 | ARIA labels, keyboard nav, focus trapping |
-| 11.6 | Performance profiling | P3 | Large device lists, icon loading, logcat memory |
+| #    | Feature                   | Priority | Notes                                           |
+| ---- | ------------------------- | -------- | ----------------------------------------------- |
+| 11.1 | E2E tests (Playwright)    | P1       | Core flows: connect, command, screenshot        |
+| 11.2 | Rust unit tests           | P1       | ADB command helpers, icon parser                |
+| 11.3 | CI pipeline hardening     | P2       | Lint, type-check, build on all platforms        |
+| 11.4 | Error boundary components | P2       | Graceful error UI instead of blank screen       |
+| 11.5 | Accessibility audit       | P2       | ARIA labels, keyboard nav, focus trapping       |
+| 11.6 | Performance profiling     | P3       | Large device lists, icon loading, logcat memory |
 
 ---
 

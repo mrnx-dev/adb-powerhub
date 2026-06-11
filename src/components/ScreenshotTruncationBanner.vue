@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { X } from '@lucide/vue';
 defineProps<{
   totalCount: number;
   shownCount: number;
@@ -26,7 +27,7 @@ defineEmits<{
       aria-label="Dismiss truncation banner"
       @click="$emit('dismiss')"
     >
-      ✕
+      <X :size="14" />
     </button>
   </div>
 </template>

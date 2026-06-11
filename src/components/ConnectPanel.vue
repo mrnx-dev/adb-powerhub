@@ -13,6 +13,7 @@ import {
   Loader2,
   X,
   Trash2,
+  ChevronRight,
 } from '@lucide/vue';
 import { ref, computed, watch } from 'vue';
 
@@ -20,17 +21,8 @@ const store = useDeviceStore();
 const nav = useNavigationStore();
 const history = useConnectionHistoryStore();
 
-const activeTab = ref<'auto' | 'manual' | 'saved'>('auto');
 const savedDevices = computed(() => history.getAll());
-
-watch(
-  () => nav.connectPanelOpen,
-  (open) => {
-    if (open && store.connected) {
-      activeTab.value = 'manual';
-    }
-  }
-);
+const manualExpanded = ref(false);
 
 let wasConnecting = false;
 watch(
@@ -97,51 +89,6 @@ const statusLabel = computed(() => {
   }
 });
 
-const stepperSteps = computed(() => {
-  const status = store.autoConnectStatus;
-  return [
-    {
-      label: 'Detect USB',
-      state: getStepState(
-        ['detecting_usb', 'enabling_tcp', 'detecting_ip', 'connecting_tcp', 'connected'],
-        ['detecting_usb'],
-        status
-      ),
-    },
-    {
-      label: 'Enable TCP',
-      state: getStepState(
-        ['enabling_tcp', 'detecting_ip', 'connecting_tcp', 'connected'],
-        ['enabling_tcp'],
-        status
-      ),
-    },
-    {
-      label: 'Detect IP',
-      state: getStepState(
-        ['detecting_ip', 'connecting_tcp', 'connected'],
-        ['detecting_ip'],
-        status
-      ),
-    },
-    {
-      label: 'Connect Wi-Fi',
-      state: getStepState(['connecting_tcp', 'connected'], ['connecting_tcp'], status),
-    },
-  ];
-});
-
-function getStepState(
-  doneStates: string[],
-  activeStates: string[],
-  current: string
-): 'done' | 'active' | 'pending' {
-  if (doneStates.includes(current) && !activeStates.includes(current)) return 'done';
-  if (activeStates.includes(current)) return 'active';
-  if (current === 'connected') return 'done';
-  return 'pending';
-}
-
 function closePanel() {
   nav.closeConnectPanel();
 }
@@ -181,9 +128,7 @@ function handleBackdropClick() {
             <h2 class="font-sans text-sm font-semibold tracking-wider uppercase leading-tight">
               Connect
             </h2>
-            <p class="text-[10px] text-theme-muted leading-tight mt-0.5">
-              Connect to a device via USB, Wi-Fi, or saved list
-            </p>
+            <p class="text-[10px] text-theme-muted leading-tight mt-0.5">Connect to your device</p>
           </div>
         </div>
         <button
@@ -194,52 +139,10 @@ function handleBackdropClick() {
         </button>
       </div>
 
-      <!-- Pill Tabs -->
-      <div class="px-5 pt-4 pb-2 shrink-0">
-        <div class="flex gap-1 bg-theme-btn rounded-lg p-0.5">
-          <button
-            class="flex-1 py-2 rounded-md text-[11px] font-semibold transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5"
-            :class="
-              activeTab === 'auto'
-                ? 'bg-accent-emerald text-theme-inverse shadow-sm'
-                : 'text-theme-secondary hover:text-theme-primary'
-            "
-            @click="activeTab = 'auto'"
-          >
-            <Zap :size="13" />Auto
-          </button>
-          <button
-            class="flex-1 py-2 rounded-md text-[11px] font-semibold transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5"
-            :class="
-              activeTab === 'manual'
-                ? 'bg-accent-emerald text-theme-inverse shadow-sm'
-                : 'text-theme-secondary hover:text-theme-primary'
-            "
-            @click="activeTab = 'manual'"
-          >
-            <Terminal :size="13" />Manual
-          </button>
-          <button
-            class="flex-1 py-2 rounded-md text-[11px] font-semibold transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5"
-            :class="
-              activeTab === 'saved'
-                ? 'bg-accent-emerald text-theme-inverse shadow-sm'
-                : 'text-theme-secondary hover:text-theme-primary'
-            "
-            @click="activeTab = 'saved'"
-          >
-            <Bookmark :size="13" />Saved
-            <span v-if="savedDevices.length > 0" class="text-[9px] opacity-70"
-              >({{ savedDevices.length }})</span
-            >
-          </button>
-        </div>
-      </div>
-
       <!-- Scrollable Body -->
       <div class="flex-1 overflow-y-auto px-5 pb-6">
-        <!-- Tab: Auto Connect -->
-        <div v-if="activeTab === 'auto'" class="space-y-4 pt-2">
+        <!-- 1. Auto Connect Section -->
+        <div class="space-y-4 pt-2">
           <div class="text-center py-6">
             <div
               class="w-12 h-12 rounded-2xl bg-accent-light border border-accent-default flex items-center justify-center mx-auto mb-3"
@@ -257,49 +160,6 @@ function handleBackdropClick() {
               <Zap :size="16" />
               <span>{{ store.connecting ? 'Connecting...' : 'Auto Connect' }}</span>
             </button>
-          </div>
-
-          <!-- Stepper -->
-          <div
-            v-if="store.autoConnectStatus !== 'idle' && store.autoConnectStatus !== 'error'"
-            class="space-y-0"
-          >
-            <div v-for="(step, i) in stepperSteps" :key="step.label" class="flex items-start gap-3">
-              <div class="flex flex-col items-center">
-                <div
-                  class="stepper-dot"
-                  :class="{
-                    'stepper-dot-done': step.state === 'done',
-                    'stepper-dot-active': step.state === 'active',
-                  }"
-                ></div>
-                <div
-                  v-if="i < stepperSteps.length - 1"
-                  class="stepper-line"
-                  :class="{ 'stepper-line-done': step.state === 'done' }"
-                ></div>
-              </div>
-              <div class="pb-4">
-                <div
-                  class="text-xs font-medium"
-                  :class="
-                    step.state === 'done'
-                      ? 'text-accent-emerald'
-                      : step.state === 'active'
-                        ? 'text-theme-primary'
-                        : 'text-theme-muted'
-                  "
-                >
-                  {{ step.label }}
-                </div>
-                <div
-                  v-if="step.state === 'active' && statusLabel"
-                  class="text-[10px] text-theme-muted mt-0.5"
-                >
-                  {{ statusLabel }}
-                </div>
-              </div>
-            </div>
           </div>
 
           <!-- Connecting progress bar -->
@@ -348,72 +208,11 @@ function handleBackdropClick() {
           </div>
         </div>
 
-        <!-- Tab: Manual Connect -->
-        <div v-if="activeTab === 'manual'" class="space-y-4 pt-2">
-          <div class="space-y-3">
-            <div>
-              <label
-                class="text-[10px] text-theme-muted uppercase tracking-wider font-semibold mb-1.5 block"
-                >IP Address</label
-              >
-              <input
-                v-model="store.ipAddress"
-                type="text"
-                placeholder="e.g., 192.168.1.5"
-                class="w-full input-terminal py-2 px-3 text-xs text-theme-primary placeholder:text-theme-muted"
-              />
-            </div>
-            <div>
-              <label
-                class="text-[10px] text-theme-muted uppercase tracking-wider font-semibold mb-1.5 block"
-                >Port</label
-              >
-              <input
-                v-model.number="store.port"
-                type="number"
-                placeholder="5555"
-                class="w-full input-terminal py-2 px-3 text-xs text-theme-primary placeholder:text-theme-muted"
-              />
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <button
-              :disabled="store.connecting || !store.ipAddress.trim()"
-              class="flex-1 btn-primary py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-              @click="handleConnect"
-            >
-              <Terminal :size="13" />
-              {{ store.connecting ? 'Connecting...' : 'Connect' }}
-            </button>
-            <button
-              v-if="store.connecting"
-              class="bg-theme-btn border border-color-error text-color-error py-2.5 px-3 rounded-lg text-xs hover-accent transition-colors"
-              @click="store.cancelConnect()"
-            >
-              Cancel
-            </button>
-          </div>
+        <!-- Divider -->
+        <div class="border-t border-theme-tertiary my-3"></div>
 
-          <!-- Connected state in manual tab -->
-          <div v-if="store.connected" class="space-y-3 pt-2">
-            <div
-              class="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-accent-light border border-accent-default"
-            >
-              <Check :size="14" class="text-accent-emerald shrink-0" />
-              <div class="flex-1 min-w-0">
-                <div class="text-xs font-semibold text-accent-emerald truncate">
-                  {{ store.model || store.deviceId }}
-                </div>
-                <div class="text-[10px] text-theme-muted">
-                  {{ store.transport === 'wifi' ? 'Wi-Fi' : 'USB' }} &middot; {{ store.deviceId }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab: Saved Devices -->
-        <div v-if="activeTab === 'saved'" class="space-y-2.5 pt-2">
+        <!-- 2. Quick Reconnect Section -->
+        <div class="space-y-2.5">
           <div v-if="savedDevices.length === 0" class="text-center py-10">
             <Bookmark :size="28" class="mx-auto mb-2 opacity-20 text-theme-muted" />
             <p class="text-xs text-theme-muted">No saved devices yet</p>
@@ -455,6 +254,86 @@ function handleBackdropClick() {
               >
                 <Trash2 :size="13" />
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div class="border-t border-theme-tertiary my-3"></div>
+
+        <!-- 3. Manual Connect Section (collapsible) -->
+        <div>
+          <button
+            class="w-full flex items-center justify-between py-2 px-1 text-xs font-medium text-theme-secondary hover:text-theme-primary hover:bg-theme-hover/50 rounded-lg transition-colors"
+            @click="manualExpanded = !manualExpanded"
+          >
+            <span>Connect via IP address</span>
+            <ChevronRight
+              :size="14"
+              class="transition-transform duration-200"
+              :class="{ 'rotate-90': manualExpanded }"
+            />
+          </button>
+          <div v-if="manualExpanded" class="space-y-4 pt-2">
+            <div class="space-y-3">
+              <div>
+                <label
+                  class="text-[10px] text-theme-muted uppercase tracking-wider font-semibold mb-1.5 block"
+                  >IP Address</label
+                >
+                <input
+                  v-model="store.ipAddress"
+                  type="text"
+                  placeholder="e.g., 192.168.1.5"
+                  class="w-full input-terminal py-2 px-3 text-xs text-theme-primary placeholder:text-theme-muted"
+                />
+              </div>
+              <div>
+                <label
+                  class="text-[10px] text-theme-muted uppercase tracking-wider font-semibold mb-1.5 block"
+                  >Port</label
+                >
+                <input
+                  v-model.number="store.port"
+                  type="number"
+                  placeholder="5555"
+                  class="w-full input-terminal py-2 px-3 text-xs text-theme-primary placeholder:text-theme-muted"
+                />
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button
+                :disabled="store.connecting || !store.ipAddress.trim()"
+                class="flex-1 btn-primary py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                @click="handleConnect"
+              >
+                <Terminal :size="13" />
+                {{ store.connecting ? 'Connecting...' : 'Connect' }}
+              </button>
+              <button
+                v-if="store.connecting"
+                class="bg-theme-btn border border-color-error text-color-error py-2.5 px-3 rounded-lg text-xs hover-accent transition-colors"
+                @click="store.cancelConnect()"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <!-- Connected state in manual section -->
+            <div v-if="store.connected" class="space-y-3 pt-2">
+              <div
+                class="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-accent-light border border-accent-default"
+              >
+                <Check :size="14" class="text-accent-emerald shrink-0" />
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs font-semibold text-accent-emerald truncate">
+                    {{ store.model || store.deviceId }}
+                  </div>
+                  <div class="text-[10px] text-theme-muted">
+                    {{ store.transport === 'wifi' ? 'Wi-Fi' : 'USB' }} &middot; {{ store.deviceId }}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
