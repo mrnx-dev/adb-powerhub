@@ -2,9 +2,10 @@
 import { useDeviceStore } from '../stores/device';
 import { useNavigationStore } from '../stores/navigation';
 import { useConnectionHistoryStore } from '../stores/connectionHistory';
-import { Link, Terminal, Check, X, ChevronRight } from '@lucide/vue';
+import { Link, X } from '@lucide/vue';
 import ConnectAutoSection from './connect/ConnectAutoSection.vue';
 import QuickReconnectList from './connect/QuickReconnectList.vue';
+import ManualConnectSection from './connect/ManualConnectSection.vue';
 import { ref, computed, watch } from 'vue';
 
 const store = useDeviceStore();
@@ -136,81 +137,18 @@ function handleBackdropClick() {
         <div class="border-t border-theme-tertiary my-3"></div>
 
         <!-- 3. Manual Connect Section (collapsible) -->
-        <div>
-          <button
-            class="w-full flex items-center justify-between py-2 px-1 text-xs font-medium text-theme-secondary hover:text-theme-primary hover:bg-theme-hover/50 rounded-lg transition-colors"
-            @click="manualExpanded = !manualExpanded"
-          >
-            <span>Connect via IP address</span>
-            <ChevronRight
-              :size="14"
-              class="transition-transform duration-200"
-              :class="{ 'rotate-90': manualExpanded }"
-            />
-          </button>
-          <div v-if="manualExpanded" class="space-y-4 pt-2">
-            <div class="space-y-3">
-              <div>
-                <label
-                  class="text-[10px] text-theme-muted uppercase tracking-wider font-semibold mb-1.5 block"
-                  >IP Address</label
-                >
-                <input
-                  v-model="store.ipAddress"
-                  type="text"
-                  placeholder="e.g., 192.168.1.5"
-                  class="w-full input-terminal py-2 px-3 text-xs text-theme-primary placeholder:text-theme-muted"
-                />
-              </div>
-              <div>
-                <label
-                  class="text-[10px] text-theme-muted uppercase tracking-wider font-semibold mb-1.5 block"
-                  >Port</label
-                >
-                <input
-                  v-model.number="store.port"
-                  type="number"
-                  placeholder="5555"
-                  class="w-full input-terminal py-2 px-3 text-xs text-theme-primary placeholder:text-theme-muted"
-                />
-              </div>
-            </div>
-            <div class="flex gap-2">
-              <button
-                :disabled="store.connecting || !store.ipAddress.trim()"
-                class="flex-1 btn-primary py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                @click="handleConnect"
-              >
-                <Terminal :size="13" />
-                {{ store.connecting ? 'Connecting...' : 'Connect' }}
-              </button>
-              <button
-                v-if="store.connecting"
-                class="bg-theme-btn border border-color-error text-color-error py-2.5 px-3 rounded-lg text-xs hover-accent transition-colors"
-                @click="store.cancelConnect()"
-              >
-                Cancel
-              </button>
-            </div>
-
-            <!-- Connected state in manual section -->
-            <div v-if="store.connected" class="space-y-3 pt-2">
-              <div
-                class="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-accent-light border border-accent-default"
-              >
-                <Check :size="14" class="text-accent-emerald shrink-0" />
-                <div class="flex-1 min-w-0">
-                  <div class="text-xs font-semibold text-accent-emerald truncate">
-                    {{ store.model || store.deviceId }}
-                  </div>
-                  <div class="text-[10px] text-theme-muted">
-                    {{ store.transport === 'wifi' ? 'Wi-Fi' : 'USB' }} &middot; {{ store.deviceId }}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ManualConnectSection
+          :connecting="store.connecting"
+          :expanded="manualExpanded"
+          @connect="
+            (ip, port) => {
+              store.ipAddress = ip;
+              store.port = port;
+              handleConnect();
+            }
+          "
+          @update:expanded="manualExpanded = $event"
+        />
       </div>
     </div>
   </Transition>
