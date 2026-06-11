@@ -78,34 +78,34 @@ watch(
 async function onAutoConnect() {
   lastError.value = '';
   connectSource.value = 'auto';
-  try {
-    await store.autoConnect();
-  } catch (e) {
-    lastError.value = String(e);
-    connectSource.value = null;
-  }
+  await store.autoConnect();
+  // autoConnect() sets autoConnectStatus='error' on failure (caught by showError computed)
+  // If connected succeeded, auto-close watcher already consumed connectSource during onConnected()
+  connectSource.value = null;
 }
 
 async function onConnectSaved(device: { ip: string; port: number; method: 'wifi' | 'pairing' }) {
   lastError.value = '';
   connectSource.value = 'saved';
-  try {
-    await store.connectSaved(device);
-  } catch (e) {
-    lastError.value = String(e);
-    connectSource.value = null;
+  await store.connectSaved(device);
+  // store.connectWithPort() catches errors internally (toast only, no throw)
+  // Detect failure by checking connected state after await
+  if (!store.connected) {
+    lastError.value = 'Connection failed. Check the device is reachable.';
   }
+  connectSource.value = null;
 }
 
 async function onManualConnect(ip: string, port: number) {
   lastError.value = '';
   connectSource.value = 'manual';
-  try {
-    await store.connectWithPort(ip, port);
-  } catch (e) {
-    lastError.value = String(e);
-    connectSource.value = null;
+  await store.connectWithPort(ip, port);
+  // store.connectWithPort() catches errors internally (toast only, no throw)
+  // Detect failure by checking connected state after await
+  if (!store.connected) {
+    lastError.value = 'Connection failed. Check the IP and port.';
   }
+  connectSource.value = null;
 }
 
 // ── Focus trap (blueprint §4 v1.1) ──
