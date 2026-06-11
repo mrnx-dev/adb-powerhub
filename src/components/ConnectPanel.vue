@@ -6,7 +6,7 @@ import { Link, X } from '@lucide/vue';
 import ConnectAutoSection from './connect/ConnectAutoSection.vue';
 import QuickReconnectList from './connect/QuickReconnectList.vue';
 import ManualConnectSection from './connect/ManualConnectSection.vue';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 
 const store = useDeviceStore();
 const nav = useNavigationStore();
@@ -15,45 +15,144 @@ const history = useConnectionHistoryStore();
 const savedDevices = computed(() => history.getAll());
 const manualExpanded = ref(false);
 
-let wasConnecting = false;
-watch(
-  () => store.connecting,
-  (val) => {
-    wasConnecting = val || wasConnecting;
-  }
-);
+// ── State machine refs (blueprint §7.3 v1.1) ──
+const connectSource = ref<'auto' | 'saved' | 'manual' | null>(null);
+const lastError = ref('');
+let autoCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+const showError = computed(() => store.autoConnectStatus === 'error' || lastError.value !== '');
+const errorMessage = computed(() => {
+  if (store.autoConnectStatus === 'error')
+    return 'No device found. Try USB or enter IP in Manual tab.';
+  return lastError.value;
+});
+
+// ── Auto-close watcher (FR-6) ──
 watch(
   () => store.connected,
-  (val) => {
-    if (val && wasConnecting && nav.connectPanelOpen) {
-      wasConnecting = false;
-      nav.closeConnectPanel();
+  (nowConnected, wasConnected) => {
+    if (nowConnected && !wasConnected) {
+      if (connectSource.value === 'auto' || connectSource.value === 'saved') {
+        autoCloseTimer = setTimeout(() => {
+          if (nav.connectPanelOpen) nav.closeConnectPanel();
+          autoCloseTimer = null;
+        }, 800);
+      }
+      connectSource.value = null;
     }
   }
 );
 
-function handleConnect() {
-  if (store.ipAddress.trim()) {
-    store.connectWithRetry();
-  } else {
-    store.autoConnect();
+// ── Cancel timer on manual close (FR-6 AC2) ──
+watch(
+  () => nav.connectPanelOpen,
+  (open) => {
+    if (!open && autoCloseTimer) {
+      clearTimeout(autoCloseTimer);
+      autoCloseTimer = null;
+    }
+  }
+);
+
+// ── Reset state on panel close (FR-4 AC5 + cleanup) ──
+watch(
+  () => nav.connectPanelOpen,
+  (open) => {
+    if (!open) {
+      manualExpanded.value = false;
+      connectSource.value = null;
+      lastError.value = '';
+    }
+  }
+);
+
+// ── Auto-expand manual on error (FR-4 AC4) ──
+watch(
+  () => store.autoConnectStatus,
+  (status) => {
+    if (status === 'error') manualExpanded.value = true;
+  }
+);
+
+// ── Action wrappers (blueprint §5) ──
+async function onAutoConnect() {
+  lastError.value = '';
+  connectSource.value = 'auto';
+  try {
+    await store.autoConnect();
+  } catch (e) {
+    lastError.value = String(e);
+    connectSource.value = null;
   }
 }
 
-async function handleAutoConnect() {
-  await store.autoConnect();
+async function onConnectSaved(device: { ip: string; port: number; method: 'wifi' | 'pairing' }) {
+  lastError.value = '';
+  connectSource.value = 'saved';
+  try {
+    await store.connectSaved(device);
+  } catch (e) {
+    lastError.value = String(e);
+    connectSource.value = null;
+  }
 }
 
-async function handleConnectSaved(device: {
-  ip: string;
-  port: number;
-  method: 'wifi' | 'pairing';
-}) {
-  await store.connectSaved(device);
-  if (store.connected) {
+async function onManualConnect(ip: string, port: number) {
+  lastError.value = '';
+  connectSource.value = 'manual';
+  try {
+    await store.connectWithPort(ip, port);
+  } catch (e) {
+    lastError.value = String(e);
+    connectSource.value = null;
+  }
+}
+
+// ── Focus trap (blueprint §4 v1.1) ──
+const panelRef = ref<HTMLElement | null>(null);
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+let triggerElement: Element | null = null;
+
+function onPanelKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
     nav.closeConnectPanel();
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  const el = panelRef.value;
+  if (!el) return;
+  const focusable = el.querySelectorAll(FOCUSABLE);
+  if (focusable.length === 0) return;
+  const first = focusable[0] as HTMLElement;
+  const last = focusable[focusable.length - 1] as HTMLElement;
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
   }
 }
+
+watch(
+  () => nav.connectPanelOpen,
+  (open) => {
+    if (open) {
+      triggerElement = document.activeElement;
+      nextTick(() => {
+        const el = panelRef.value;
+        if (el) {
+          const first = el.querySelector<HTMLElement>(FOCUSABLE);
+          first?.focus();
+        }
+      });
+    } else {
+      if (triggerElement instanceof HTMLElement) triggerElement.focus();
+      triggerElement = null;
+    }
+  }
+);
 
 function closePanel() {
   nav.closeConnectPanel();
@@ -78,7 +177,12 @@ function handleBackdropClick() {
   <Transition name="slide-panel">
     <div
       v-if="nav.connectPanelOpen"
+      ref="panelRef"
+      role="dialog"
+      aria-label="Connect to device"
+      aria-modal="true"
       class="fixed top-[36px] right-0 h-[calc(100dvh-36px)] w-[340px] z-40 flex flex-col bg-theme-sidebar border-l border-theme-tertiary shadow-theme-modal"
+      @keydown="onPanelKeydown"
     >
       <!-- Fixed Header -->
       <div
@@ -99,6 +203,7 @@ function handleBackdropClick() {
         </div>
         <button
           class="p-1.5 rounded-lg text-theme-muted hover:text-theme-primary hover:bg-theme-hover transition-colors"
+          aria-label="Close panel"
           @click="closePanel"
         >
           <X :size="16" />
@@ -115,9 +220,9 @@ function handleBackdropClick() {
           :device-model="store.model"
           :device-id="store.deviceId"
           :transport="store.transport"
-          :error="store.autoConnectStatus === 'error'"
-          error-message="No device found. Try USB or enter IP in Manual tab."
-          @auto-connect="handleAutoConnect"
+          :error="showError"
+          :error-message="errorMessage"
+          @auto-connect="onAutoConnect"
           @disconnect="store.disconnect()"
         />
 
@@ -129,7 +234,7 @@ function handleBackdropClick() {
           :devices="savedDevices"
           :current-device-id="store.deviceId || ''"
           :connecting="store.connecting"
-          @connect="handleConnectSaved"
+          @connect="onConnectSaved"
           @forget="history.remove"
         />
 
@@ -144,7 +249,7 @@ function handleBackdropClick() {
             (ip, port) => {
               store.ipAddress = ip;
               store.port = port;
-              handleConnect();
+              onManualConnect(ip, port);
             }
           "
           @update:expanded="manualExpanded = $event"
