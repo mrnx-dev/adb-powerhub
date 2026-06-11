@@ -2,8 +2,9 @@
 import { useDeviceStore } from '../stores/device';
 import { useNavigationStore } from '../stores/navigation';
 import { useConnectionHistoryStore } from '../stores/connectionHistory';
-import { Link, Terminal, Bookmark, Check, Smartphone, X, Trash2, ChevronRight } from '@lucide/vue';
+import { Link, Terminal, Check, X, ChevronRight } from '@lucide/vue';
 import ConnectAutoSection from './connect/ConnectAutoSection.vue';
+import QuickReconnectList from './connect/QuickReconnectList.vue';
 import { ref, computed, watch } from 'vue';
 
 const store = useDeviceStore();
@@ -51,10 +52,6 @@ async function handleConnectSaved(device: {
   if (store.connected) {
     nav.closeConnectPanel();
   }
-}
-
-function forgetDevice(id: string) {
-  history.remove(id);
 }
 
 function closePanel() {
@@ -127,51 +124,13 @@ function handleBackdropClick() {
         <div class="border-t border-theme-tertiary my-3"></div>
 
         <!-- 2. Quick Reconnect Section -->
-        <div class="space-y-2.5">
-          <div v-if="savedDevices.length === 0" class="text-center py-10">
-            <Bookmark :size="28" class="mx-auto mb-2 opacity-20 text-theme-muted" />
-            <p class="text-xs text-theme-muted">No saved devices yet</p>
-            <p class="text-[10px] text-theme-muted mt-1">
-              Devices will appear here after connecting
-            </p>
-          </div>
-          <div
-            v-for="device in savedDevices"
-            :key="device.id"
-            class="flex items-start gap-3 py-3 px-3 rounded-lg border-l-4 border-accent-emerald bg-theme-hover/20 hover:bg-theme-hover/50 transition-colors"
-          >
-            <Smartphone :size="16" class="text-accent-emerald shrink-0 mt-0.5" />
-            <div class="flex-1 min-w-0">
-              <div class="text-xs font-semibold text-theme-primary truncate">
-                {{ device.label }}
-              </div>
-              <div class="text-[10px] text-theme-muted mt-0.5">
-                {{ device.ip }}:{{ device.port }}
-                <span class="mx-1">&middot;</span>
-                {{ device.method }}
-              </div>
-              <div class="text-[10px] text-theme-muted">
-                Last: {{ new Date(device.lastConnected).toLocaleDateString() }}
-              </div>
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0">
-              <button
-                class="btn-primary text-[10px] py-1 px-2.5 rounded-md font-semibold disabled:opacity-50"
-                :disabled="store.connected && store.deviceId === `${device.ip}:${device.port}`"
-                @click="handleConnectSaved(device)"
-              >
-                Connect
-              </button>
-              <button
-                class="p-1.5 rounded-md text-theme-muted hover:text-color-error hover:bg-color-error-container transition-colors"
-                title="Forget device"
-                @click="forgetDevice(device.id)"
-              >
-                <Trash2 :size="13" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <QuickReconnectList
+          :devices="savedDevices"
+          :current-device-id="store.deviceId || ''"
+          :connecting="store.connecting"
+          @connect="handleConnectSaved"
+          @forget="history.remove"
+        />
 
         <!-- Divider -->
         <div class="border-t border-theme-tertiary my-3"></div>
