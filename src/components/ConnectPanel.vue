@@ -2,19 +2,8 @@
 import { useDeviceStore } from '../stores/device';
 import { useNavigationStore } from '../stores/navigation';
 import { useConnectionHistoryStore } from '../stores/connectionHistory';
-import {
-  Link,
-  Zap,
-  Terminal,
-  Bookmark,
-  Check,
-  Smartphone,
-  XCircle,
-  Loader2,
-  X,
-  Trash2,
-  ChevronRight,
-} from '@lucide/vue';
+import { Link, Terminal, Bookmark, Check, Smartphone, X, Trash2, ChevronRight } from '@lucide/vue';
+import ConnectAutoSection from './connect/ConnectAutoSection.vue';
 import { ref, computed, watch } from 'vue';
 
 const store = useDeviceStore();
@@ -67,27 +56,6 @@ async function handleConnectSaved(device: {
 function forgetDevice(id: string) {
   history.remove(id);
 }
-
-const statusLabel = computed(() => {
-  switch (store.autoConnectStatus) {
-    case 'idle':
-      return '';
-    case 'detecting_usb':
-      return 'Detecting USB devices...';
-    case 'enabling_tcp':
-      return 'Enabling wireless mode...';
-    case 'detecting_ip':
-      return 'Detecting IP address...';
-    case 'connecting_tcp':
-      return 'Connecting via Wi-Fi...';
-    case 'connected':
-      return '';
-    case 'error':
-      return '';
-    default:
-      return '';
-  }
-});
 
 function closePanel() {
   nav.closeConnectPanel();
@@ -142,71 +110,18 @@ function handleBackdropClick() {
       <!-- Scrollable Body -->
       <div class="flex-1 overflow-y-auto px-5 pb-6">
         <!-- 1. Auto Connect Section -->
-        <div class="space-y-4 pt-2">
-          <div class="text-center py-6">
-            <div
-              class="w-12 h-12 rounded-2xl bg-accent-light border border-accent-default flex items-center justify-center mx-auto mb-3"
-            >
-              <Zap :size="24" class="text-accent-emerald" />
-            </div>
-            <p class="text-xs text-theme-secondary mb-4">
-              Plug in USB or connect to an existing device
-            </p>
-            <button
-              :disabled="store.connecting || store.autoConnectStatus === 'connected'"
-              class="w-full btn-primary py-3 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              @click="handleAutoConnect"
-            >
-              <Zap :size="16" />
-              <span>{{ store.connecting ? 'Connecting...' : 'Auto Connect' }}</span>
-            </button>
-          </div>
-
-          <!-- Connecting progress bar -->
-          <div
-            v-if="store.connecting"
-            class="flex items-center gap-2 py-2 px-3 rounded-md bg-accent-light text-[11px] text-accent-emerald"
-          >
-            <Loader2 :size="14" class="animate-spin shrink-0" />
-            <span>{{ statusLabel || 'Connecting...' }}</span>
-          </div>
-
-          <!-- Connected state -->
-          <div v-if="store.autoConnectStatus === 'connected' && store.connected" class="space-y-3">
-            <div
-              class="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-accent-light border border-accent-default"
-            >
-              <Check :size="14" class="text-accent-emerald shrink-0" />
-              <div>
-                <div class="text-xs font-semibold text-accent-emerald">
-                  {{ store.model || store.deviceId }}
-                </div>
-                <div class="text-[10px] text-theme-muted mt-0.5">
-                  {{ store.transport === 'wifi' ? 'Wi-Fi' : 'USB' }}
-                  <span class="mx-0.5">&middot;</span>
-                  {{ store.deviceId }}
-                </div>
-              </div>
-            </div>
-            <div v-if="store.transport === 'wifi'" class="text-[10px] text-theme-muted px-1">
-              You may unplug USB safely
-            </div>
-            <div v-else class="text-[10px] text-theme-muted px-1">
-              Unplugging USB will disconnect the device
-            </div>
-          </div>
-
-          <!-- Error state -->
-          <div
-            v-if="store.autoConnectStatus === 'error'"
-            class="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-color-error-container border border-color-error"
-          >
-            <XCircle :size="14" class="text-color-error shrink-0" />
-            <span class="text-[11px] text-color-error"
-              >No device found. Try USB or enter IP in Manual tab.</span
-            >
-          </div>
-        </div>
+        <ConnectAutoSection
+          :connecting="store.connecting"
+          :connected="store.connected"
+          :status="store.autoConnectStatus"
+          :device-model="store.model"
+          :device-id="store.deviceId"
+          :transport="store.transport"
+          :error="store.autoConnectStatus === 'error'"
+          error-message="No device found. Try USB or enter IP in Manual tab."
+          @auto-connect="handleAutoConnect"
+          @disconnect="store.disconnect()"
+        />
 
         <!-- Divider -->
         <div class="border-t border-theme-tertiary my-3"></div>
