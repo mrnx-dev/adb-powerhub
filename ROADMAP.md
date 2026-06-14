@@ -14,8 +14,8 @@
 
 ## Status Ringkasan
 
-- **Milestone terakhir selesai:** Connect Panel Redesign + Stage 4 Emil polish — `2026-06-11`
-- **Total fitur yang sudah jalan:** ~15 area fitur utama
+- **Milestone terakhir selesai:** File Explorer — `2026-06-14`
+- **Total fitur yang sudah jalan:** ~16 area fitur utama
 - **Fitur yang baru direncanakan:** Network diagnostics, Port Forwarding, Process Manager, Performance Charts, Backup & Restore, Scheduled Recording, Multiple Device support
 
 ## ✅ Sudah Selesai
@@ -37,6 +37,11 @@
 |                        | Actions: open, uninstall/clear, force stop, enable/disable                                                                      | 2026-06-04                                       |
 |                        | APK install via file picker + drag-and-drop desktop → app                                                                       | 2026-06-04                                       |
 |                        | Icon extraction engine (on-device ZIP DEX + aapt2 fallback, cache, progressive delivery)                                        | 2026-06-05 → 2026-06-06                          |
+| **File Explorer**      | Browse device filesystem (`/sdcard` default), breadcrumb, search/filter                                                           | 2026-06-14                                       |
+|                        | Pull/push files PC ↔ device, delete, rename, new folder                                                                         | 2026-06-14                                       |
+|                        | Batch selection (Ctrl+Click/Shift+Click/Space), batch bar, context menu                                                         | 2026-06-14                                       |
+|                        | Keyboard navigation (arrow keys, Enter, Space, Delete, Esc)                                                                     | 2026-06-14                                       |
+|                        | Rust path traversal guard, permission-based sandbox                                                                             | 2026-06-14                                       |
 | **Screenshot Gallery** | Grid view, lazy thumbnails, sort (newest/oldest/largest), filter (all/today/week)                                               | 2026-06-08                                       |
 |                        | Lightbox viewer with zoom, FLIP transition, keyboard nav, metadata, delete/open folder                                          | 2026-06-08 → 2026-06-10                          |
 |                        | Truncation banner (max 500 files), manual refresh, capture integration                                                          | 2026-06-09                                       |
@@ -46,7 +51,7 @@
 | **Settings**           | ADB/scrcpy path (auto-detect, manual, in-app download), aapt2 settings + download                                               | 2026-05-28 → 2026-06-05                          |
 |                        | Multi-theme system (18 themes), auto/light/dark mode, accent-aware tokens                                                       | 2026-05-25 → 2026-06-04                          |
 |                        | Stay on top, auto-detect, auto-reconnect, polling interval, screenshot/recording dirs, video quality                            | 2026-05-28 → 2026-06-04                          |
-| **UI/UX**              | Page transitions, collapsible sidebars, glass-morphism, toast notifications, drag-drop overlay, custom title bar                | 2026-05-25 → 2026-06-11                          |
+| **UI/UX**              | Page transitions, collapsible sidebars, glass-morphism, toast notifications, drag-drop overlay, custom title bar                | 2026-05-25 → 2026-06-14                          |
 
 ## ❌ Dihapus
 
@@ -94,6 +99,7 @@ Berdasarkan `EXECUTION_PLAN.md` dan kode saat ini:
 2026-06-09  Thumbnail cache, truncation, refresh
 2026-06-10  Lightbox Emil polish
 2026-06-11  Connect Panel Redesign + Stage 4 polish
+2026-06-14  File Explorer (browse, pull/push, delete, rename, batch, context menu)
 ```
 
 ## Cara Membaca
