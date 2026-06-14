@@ -2,13 +2,15 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
 export const useNavigationStore = defineStore('navigation', () => {
-  const currentPage = ref<'dashboard' | 'logcat' | 'apps' | 'screenshots' | 'settings'>(
+  const currentPage = ref<'dashboard' | 'logcat' | 'apps' | 'screenshots' | 'files' | 'settings'>(
     'dashboard'
   );
   const focusTerminalRequested = ref(false);
   const connectPanelOpen = ref(false);
 
-  function navigateTo(page: 'dashboard' | 'logcat' | 'apps' | 'screenshots' | 'settings') {
+  function navigateTo(
+    page: 'dashboard' | 'logcat' | 'apps' | 'screenshots' | 'files' | 'settings'
+  ) {
     currentPage.value = page;
   }
 
