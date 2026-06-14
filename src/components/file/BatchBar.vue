@@ -46,7 +46,8 @@ function onDelete() {
 
 <style scoped>
 .batch-bar {
-  @apply fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-xl border border-theme-tertiary bg-theme-card shadow-xl z-40;
+  @apply fixed left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-xl border border-theme-tertiary bg-theme-card shadow-xl z-40;
+  bottom: 1.5rem;
 }
 
 .batch-bar-enter-active,
