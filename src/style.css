@@ -1709,6 +1709,12 @@ input[type='range']::-moz-range-thumb {
   border: 1px solid var(--color-error);
 }
 
+.status-badge-warning {
+  background-color: var(--color-warning-container);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+}
+
 .status-dot {
   width: 6px;
   height: 6px;
@@ -1723,6 +1729,10 @@ input[type='range']::-moz-range-thumb {
 .status-dot-active {
   background-color: var(--color-accent-emerald);
   animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.status-dot-warning {
+  background-color: var(--color-warning);
 }
 
 .status-dot-recording {
