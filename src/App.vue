@@ -16,6 +16,7 @@ import AppsView from './views/AppsView.vue';
 import ScreenshotsView from './views/ScreenshotsView.vue';
 import FileExplorerView from './views/FileExplorerView.vue';
 import SettingsView from './views/SettingsView.vue';
+import AboutView from './views/AboutView.vue';
 import AppToast from './components/AppToast.vue';
 import ConnectPanel from './components/ConnectPanel.vue';
 
@@ -48,6 +49,8 @@ const currentViewComponent = computed(() => {
       return FileExplorerView;
     case 'settings':
       return SettingsView;
+    case 'about':
+      return AboutView;
     case 'dashboard':
     default:
       return DashboardView;

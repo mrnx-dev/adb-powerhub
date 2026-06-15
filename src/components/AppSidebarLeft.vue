@@ -11,6 +11,7 @@ import {
   Package,
   Image,
   Folder,
+  Info,
 } from '@lucide/vue';
 
 const navStore = useNavigationStore();
@@ -186,6 +187,23 @@ onUnmounted(() => {
       >
         <Settings :size="18" class="shrink-0" />
         <span v-if="expanded" class="text-sm font-medium whitespace-nowrap">Settings</span>
+      </button>
+
+      <button
+        class="btn-pressable rounded-lg border"
+        :class="[
+          navStore.currentPage === 'about'
+            ? 'action-card-active'
+            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle',
+          expanded
+            ? 'flex items-center gap-3 px-2 py-2.5'
+            : 'flex items-center justify-center py-2.5',
+        ]"
+        :title="!expanded ? 'About' : undefined"
+        @click="navStore.navigateTo('about')"
+      >
+        <Info :size="18" class="shrink-0" />
+        <span v-if="expanded" class="text-sm font-medium whitespace-nowrap">About</span>
       </button>
     </div>
   </aside>
