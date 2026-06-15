@@ -18,7 +18,7 @@ const envBadgeClass = computed(() => {
 <template>
   <div class="about-header flex items-center gap-4 mb-5">
     <div
-      class="about-icon w-16 h-16 rounded-xl bg-color-primary-container border border-theme-primary flex items-center justify-center text-color-primary text-[28px] font-extrabold shrink-0"
+      class="about-icon w-16 h-16 rounded-xl bg-color-primary-container border border-theme-primary flex items-center justify-center text-color-primary text-[28px] font-extrabold shrink-0 transition-transform duration-200 ease-out group-hover:scale-[1.02]"
       aria-hidden="true"
     >
       P

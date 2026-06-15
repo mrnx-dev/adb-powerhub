@@ -13,7 +13,7 @@ defineProps<{
 </script>
 
 <template>
-  <article class="about-card card-glass max-w-[640px] w-full p-6">
+  <article class="about-card card-glass group max-w-[640px] w-full p-6">
     <AppIdentityHeader :app-info="appInfo" />
     <DependencyList :dependencies="dependencies" />
     <ExternalLinks />

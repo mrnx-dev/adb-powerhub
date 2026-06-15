@@ -28,7 +28,7 @@ function versionLabel(dep: DependencyStatus) {
       <div
         v-for="dep in dependencies"
         :key="dep.name"
-        class="dep-row flex items-center justify-between gap-3 p-3 rounded-md bg-theme-btn border border-theme-tertiary"
+        class="dep-row hover-subtle flex items-center justify-between gap-3 p-3 rounded-md bg-theme-btn border border-theme-tertiary transition-colors duration-200 ease-out"
       >
         <div class="dep-info min-w-0">
           <div class="dep-name text-sm font-semibold text-theme-primary">{{ dep.name }}</div>
