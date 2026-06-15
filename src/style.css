@@ -1489,6 +1489,27 @@ input[type='range']::-moz-range-thumb {
    BUTTONS — Hover: solid accent bg + inverse text
    ============================================================ */
 
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-tertiary);
+  background: var(--bg-button);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-primary {
   background: var(--bg-button);
   color: var(--text-primary);

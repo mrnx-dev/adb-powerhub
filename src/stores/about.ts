@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import type { AppInfo, DependencyStatus, DebugInfo, UpdateCheckResult } from '../types/about';
 
 export const useAboutStore = defineStore('about', () => {
@@ -66,13 +65,6 @@ export const useAboutStore = defineStore('about', () => {
     }
   }
 
-  async function listenForUpdateCheck() {
-    await listen<UpdateCheckResult>('update-check-completed', (event) => {
-      updateResult.value = event.payload;
-      checkingForUpdates.value = false;
-    });
-  }
-
   return {
     appInfo,
     dependencies,
@@ -84,6 +76,5 @@ export const useAboutStore = defineStore('about', () => {
     loadDependencyStatus,
     getDebugInfo,
     checkForUpdates,
-    listenForUpdateCheck,
   };
 });
