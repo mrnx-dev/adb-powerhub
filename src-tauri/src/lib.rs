@@ -7,11 +7,13 @@ macro_rules! lock_state {
     };
 }
 
+mod about;
 mod adb;
 mod icons;
 mod scrcpy;
 mod settings;
 
+use about::*;
 use adb::*;
 use scrcpy::*;
 use settings::*;
@@ -75,6 +77,10 @@ pub fn run() {
             logcat_cancel: Arc::new(AtomicBool::new(false)),
         })
         .invoke_handler(tauri::generate_handler![
+            about_get_app_info,
+            about_get_dependency_status,
+            about_get_debug_info,
+            about_check_for_updates,
             open_folder,
             adb_connect,
             adb_disconnect,
