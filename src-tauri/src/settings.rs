@@ -66,12 +66,11 @@ pub fn settings_set_scrcpy_path(path: String, state: State<AppState>) -> Result<
     Ok(())
 }
 
-#[tauri::command]
-pub fn settings_validate_adb(path: String) -> Result<ValidationResult, String> {
+pub fn validate_adb_internal(path: &str) -> Result<ValidationResult, String> {
     if path.trim().is_empty() {
         return Err("ADB path is empty".to_string());
     }
-    let output = Command::new(&path)
+    let output = Command::new(path)
         .no_window()
         .arg("version")
         .stdout(Stdio::piped())
@@ -89,7 +88,7 @@ pub fn settings_validate_adb(path: String) -> Result<ValidationResult, String> {
             Ok(ValidationResult {
                 valid: true,
                 version,
-                path,
+                path: path.to_string(),
             })
         }
         Ok(out) => {
@@ -100,12 +99,11 @@ pub fn settings_validate_adb(path: String) -> Result<ValidationResult, String> {
     }
 }
 
-#[tauri::command]
-pub fn settings_validate_scrcpy(path: String) -> Result<ValidationResult, String> {
+pub fn validate_scrcpy_internal(path: &str) -> Result<ValidationResult, String> {
     if path.trim().is_empty() {
         return Err("scrcpy path is empty".to_string());
     }
-    let output = Command::new(&path)
+    let output = Command::new(path)
         .no_window()
         .arg("--version")
         .stdout(Stdio::piped())
@@ -125,7 +123,7 @@ pub fn settings_validate_scrcpy(path: String) -> Result<ValidationResult, String
                 Ok(ValidationResult {
                     valid: true,
                     version: version_line.to_string(),
-                    path,
+                    path: path.to_string(),
                 })
             } else {
                 Err(stderr)
@@ -133,6 +131,16 @@ pub fn settings_validate_scrcpy(path: String) -> Result<ValidationResult, String
         }
         Err(e) => Err(format!("Cannot execute scrcpy: {}", e)),
     }
+}
+
+#[tauri::command]
+pub fn settings_validate_adb(path: String) -> Result<ValidationResult, String> {
+    validate_adb_internal(&path)
+}
+
+#[tauri::command]
+pub fn settings_validate_scrcpy(path: String) -> Result<ValidationResult, String> {
+    validate_scrcpy_internal(&path)
 }
 
 #[tauri::command]
