@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { Wifi, WifiOff } from '@lucide/vue';
 import NetworkInfoTooltip from '@/components/NetworkInfoTooltip.vue';
 
@@ -26,6 +26,9 @@ const tooltipVisible = ref(false);
 const hoverTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
 const rowRef = ref<HTMLElement | null>(null);
 const isPointerDown = ref(false);
+const tooltipStyle = ref<Record<string, string>>({});
+const originX = ref('0');
+const originY = ref('0');
 
 const hasNetwork = computed(() => props.network !== null);
 const isWifi = computed(() => props.network?.network_type === 'Wi-Fi');
@@ -70,14 +73,30 @@ const displaySsid = computed(() => {
   return ssid;
 });
 
+function updateTooltipPosition() {
+  if (!rowRef.value) return;
+  const rect = rowRef.value.getBoundingClientRect();
+  const triggerCenterX = rect.left + rect.width / 2;
+  const triggerBottomY = rect.bottom;
+  tooltipStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 8}px`,
+    left: `${rect.left}px`,
+    minWidth: '16rem',
+    maxWidth: '16rem',
+  };
+  originX.value = `${triggerCenterX}px`;
+  originY.value = `${triggerBottomY}px`;
+}
+
 function showTooltip() {
-  // Ignore focus events caused by a pointer click; the click handler will toggle.
   if (isPointerDown.value) {
     isPointerDown.value = false;
     return;
   }
   if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
   hoverTimeout.value = setTimeout(() => {
+    updateTooltipPosition();
     tooltipVisible.value = true;
   }, 150);
 }
@@ -90,8 +109,16 @@ function hideTooltip() {
 
 function toggleTooltip() {
   if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
-  tooltipVisible.value = !tooltipVisible.value;
-  isPointerDown.value = false;
+  if (tooltipVisible.value) {
+    tooltipVisible.value = false;
+    isPointerDown.value = false;
+    return;
+  }
+  nextTick(() => {
+    updateTooltipPosition();
+    tooltipVisible.value = true;
+    isPointerDown.value = false;
+  });
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -104,7 +131,8 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 function handleClickOutside(e: MouseEvent) {
-  if (rowRef.value && !rowRef.value.contains(e.target as Node)) {
+  const target = e.target as Node;
+  if (rowRef.value && !rowRef.value.contains(target)) {
     tooltipVisible.value = false;
   }
 }
@@ -134,10 +162,10 @@ onUnmounted(() => {
     tabindex="0"
     role="button"
     aria-describedby="network-info-tooltip"
-    class="relative flex items-center gap-2 mt-2 px-2 py-1.5 rounded-md transition-colors duration-200 cursor-help focus:outline-none focus:ring-2 focus:ring-accent-emerald/40"
+    class="relative flex items-center gap-2 mt-2 px-2 py-1.5 rounded-md cursor-help focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-emerald/40 active:scale-[0.995]"
     :class="[
       isWifi && hasAssociation ? 'text-theme-primary' : 'text-theme-muted',
-      'hover:bg-theme-hover/30',
+      'network-row-hover',
     ]"
     @mouseenter="showTooltip"
     @mouseleave="hideTooltip"
@@ -165,7 +193,7 @@ onUnmounted(() => {
 
       <span
         v-if="signalQuality.label"
-        class="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 transition-colors duration-150"
+        class="text-[10px] px-1.5 py-0.5 rounded-full shrink-0"
         :class="signalQuality.classes"
       >
         {{ signalQuality.label }}
@@ -187,27 +215,36 @@ onUnmounted(() => {
       }}</span>
     </template>
 
-    <NetworkInfoTooltip
-      v-if="network"
-      id="network-info-tooltip"
-      :network="network"
-      :visible="tooltipVisible"
-    />
+    <Teleport v-if="network" to="body">
+      <NetworkInfoTooltip
+        id="network-info-tooltip"
+        :network="network"
+        :visible="tooltipVisible"
+        :origin-x="originX"
+        :origin-y="originY"
+        :position-style="tooltipStyle"
+      />
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
+.network-row-hover {
+  transition:
+    background-color 200ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+
 @media (hover: hover) and (pointer: fine) {
-  .hover\:bg-theme-hover\/30:hover {
+  .network-row-hover:hover {
     background-color: color-mix(in srgb, var(--theme-hover) 30%, transparent);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .transition-colors,
-  .duration-200,
-  .duration-150 {
+  .network-row-hover {
     transition-duration: 0.01ms !important;
+    transform: none !important;
   }
 }
 </style>

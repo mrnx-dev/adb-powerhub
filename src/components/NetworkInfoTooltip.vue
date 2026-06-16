@@ -15,9 +15,17 @@ interface Props {
   };
   visible: boolean;
   id?: string;
+  originX?: string;
+  originY?: string;
+  positionStyle?: Record<string, string>;
 }
 
-defineProps<Props>();
+withDefaults(defineProps<Props>(), {
+  originX: '0',
+  originY: '0',
+  id: undefined,
+  positionStyle: undefined,
+});
 
 function formatValue(value: string | number | undefined): string {
   if (value === undefined || value === null || value === '') return '—';
@@ -38,7 +46,12 @@ function formatValue(value: string | number | undefined): string {
       v-if="visible"
       :id="id"
       role="tooltip"
-      class="absolute z-50 top-full left-0 mt-2 w-64 rounded-lg border border-theme-secondary bg-theme-sidebar shadow-theme-modal p-3 text-[11px]"
+      class="w-64 rounded-lg border border-theme-secondary bg-theme-sidebar shadow-theme-modal p-3 text-[11px]"
+      :class="[positionStyle ? 'fixed z-[100]' : 'absolute z-50 top-full left-0 mt-2']"
+      :style="{
+        ...(positionStyle ?? {}),
+        transformOrigin: `${originX} ${originY}`,
+      }"
     >
       <div class="flex items-center gap-2 mb-2 pb-2 border-b border-theme-tertiary">
         <Wifi :size="13" class="text-accent-emerald" />
@@ -49,37 +62,37 @@ function formatValue(value: string | number | undefined): string {
         <span class="text-theme-secondary flex items-center gap-1.5">
           <Smartphone :size="11" /> SSID
         </span>
-        <span class="text-theme-primary text-right truncate" :title="formatValue(network.ssid)">
-          {{ formatValue(network.ssid) }}
-        </span>
+        <span class="text-theme-primary text-right truncate" :title="formatValue(network.ssid)">{{
+          formatValue(network.ssid)
+        }}</span>
 
         <span class="text-theme-secondary flex items-center gap-1.5">
           <Router :size="11" /> BSSID
         </span>
-        <span class="text-theme-primary text-right truncate" :title="formatValue(network.bssid)">
-          {{ formatValue(network.bssid) }}
-        </span>
+        <span class="text-theme-primary text-right truncate" :title="formatValue(network.bssid)">{{
+          formatValue(network.bssid)
+        }}</span>
 
         <span class="text-theme-secondary flex items-center gap-1.5">
           <Signal :size="11" /> Signal
         </span>
-        <span class="text-theme-primary text-right">
-          {{ network.signal_dbm !== undefined ? `${network.signal_dbm} dBm` : '—' }}
-        </span>
+        <span class="text-theme-primary text-right">{{
+          network.signal_dbm !== undefined ? `${network.signal_dbm} dBm` : '—'
+        }}</span>
 
         <span class="text-theme-secondary flex items-center gap-1.5">
           <Activity :size="11" /> Link Speed
         </span>
-        <span class="text-theme-primary text-right">
-          {{ network.link_speed_mbps !== undefined ? `${network.link_speed_mbps} Mbps` : '—' }}
-        </span>
+        <span class="text-theme-primary text-right">{{
+          network.link_speed_mbps !== undefined ? `${network.link_speed_mbps} Mbps` : '—'
+        }}</span>
 
         <span class="text-theme-secondary flex items-center gap-1.5">
           <Globe :size="11" /> Frequency
         </span>
-        <span class="text-theme-primary text-right">
-          {{ network.frequency_mhz !== undefined ? `${network.frequency_mhz} MHz` : '—' }}
-        </span>
+        <span class="text-theme-primary text-right">{{
+          network.frequency_mhz !== undefined ? `${network.frequency_mhz} MHz` : '—'
+        }}</span>
 
         <span class="text-theme-secondary flex items-center gap-1.5">
           <Cable :size="11" /> Device MAC
@@ -87,9 +100,8 @@ function formatValue(value: string | number | undefined): string {
         <span
           class="text-theme-primary text-right truncate"
           :title="formatValue(network.device_mac)"
+          >{{ formatValue(network.device_mac) }}</span
         >
-          {{ formatValue(network.device_mac) }}
-        </span>
 
         <span class="text-theme-secondary flex items-center gap-1.5">
           <Shield :size="11" /> HTTP Proxy
@@ -97,9 +109,8 @@ function formatValue(value: string | number | undefined): string {
         <span
           class="text-theme-primary text-right truncate"
           :title="formatValue(network.http_proxy)"
+          >{{ formatValue(network.http_proxy) }}</span
         >
-          {{ formatValue(network.http_proxy) }}
-        </span>
 
         <span class="text-theme-secondary flex items-center gap-1.5">
           <Globe :size="11" /> Type
@@ -112,9 +123,8 @@ function formatValue(value: string | number | undefined): string {
         <span
           class="text-theme-primary text-right truncate"
           :title="formatValue(network.ip_address)"
+          >{{ formatValue(network.ip_address) }}</span
         >
-          {{ formatValue(network.ip_address) }}
-        </span>
       </div>
     </div>
   </Transition>
