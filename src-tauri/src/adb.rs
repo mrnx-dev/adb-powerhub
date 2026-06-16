@@ -1032,30 +1032,45 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
     let mut candidate_ssid: Option<String> = None;
     let mut candidate_bssid: Option<String> = None;
 
+    // Best authoritative mWifiInfo block found so far. We prefer one that has a valid
+    // association (known SSID + valid BSSID) because `dumpsys wifi` contains historic
+    // disconnected mWifiInfo entries too.
+    let mut best_mwifi: Option<NetworkInfo> = None;
+
     for line in output.lines() {
         let line = line.trim();
         if line.is_empty() {
             continue;
         }
 
-        // Prefer consolidated mWifiInfo line as authoritative source.
         if line.starts_with("mWifiInfo") {
-            candidate_ssid = parse_ssid_value(line);
-            candidate_bssid = parse_bssid_value(line);
-            info.ssid = candidate_ssid.clone();
-            info.bssid = candidate_bssid.clone();
-            if let Some(n) = extract_number_after(line, "RSSI:") {
-                info.signal_dbm = Some(n as i32);
-            }
-            if let Some(n) = extract_number_after(line, "Link speed:")
-                .or_else(|| extract_number_after(line, "Tx Link speed:")) {
-                info.link_speed_mbps = Some(n as u32);
-            }
-            if let Some(n) = extract_number_after(line, "Frequency:") {
-                info.frequency_mhz = Some(n as u32);
-            }
-            if let Some(ip) = extract_ip_after(line, "IP:") {
-                info.ip_address = Some(ip);
+            let m_ssid = parse_ssid_value(line);
+            let m_bssid = parse_bssid_value(line);
+            let m_signal = extract_number_after(line, "RSSI:").map(|n| n as i32);
+            let m_link = extract_number_after(line, "Link speed:")
+                .or_else(|| extract_number_after(line, "Tx Link speed:"))
+                .map(|n| n as u32);
+            let m_freq = extract_number_after(line, "Frequency:").map(|n| n as u32);
+            let m_ip = extract_ip_after(line, "IP:");
+
+            let is_valid_assoc = m_ssid.as_ref().map_or(false, |s| !is_unknown_ssid(s))
+                && m_bssid.as_ref().map_or(false, |b| !is_zero_mac(b) && !is_privacy_placeholder_mac(b));
+
+            // Always keep the most recent valid mWifiInfo; if none valid yet, keep latest as fallback.
+            if is_valid_assoc
+                || best_mwifi.as_ref().map_or(true, |best| {
+                    best.ssid.as_ref().map_or(true, |s| is_unknown_ssid(s))
+                        && best.bssid.as_ref().map_or(true, |b| is_zero_mac(b) || is_privacy_placeholder_mac(b))
+                }) {
+                best_mwifi = Some(NetworkInfo {
+                    ssid: m_ssid.clone(),
+                    bssid: m_bssid.clone(),
+                    signal_dbm: m_signal,
+                    link_speed_mbps: m_link,
+                    frequency_mhz: m_freq,
+                    ip_address: m_ip.clone(),
+                    ..Default::default()
+                });
             }
             continue;
         }
@@ -1069,16 +1084,17 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
         if line.contains("BSSID:") || line.contains("bssid:") {
             if let Some(bssid) = parse_bssid_value(line) {
                 if !is_zero_mac(&bssid) && !is_privacy_placeholder_mac(&bssid) {
-                    candidate_bssid = Some(bssid.clone());
-                    info.bssid = Some(bssid);
+                    candidate_bssid = Some(bssid);
                 }
             }
         }
 
-        if (line.contains("rssi=") || line.contains("RSSI=")) && info.signal_dbm.is_none() {
-            if let Some(n) = extract_after_prefix(line, "rssi=")
-                .or_else(|| extract_after_prefix(line, "RSSI=")) {
-                info.signal_dbm = Some(n as i32);
+        if line.contains("rssi=") || line.contains("RSSI=") {
+            if info.signal_dbm.is_none() {
+                if let Some(n) = extract_after_prefix(line, "rssi=")
+                    .or_else(|| extract_after_prefix(line, "RSSI=")) {
+                    info.signal_dbm = Some(n as i32);
+                }
             }
         }
 
@@ -1090,8 +1106,28 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
         }
     }
 
-    // If the authoritative mWifiInfo line provided an invalid/unknown value,
-    // fall back to the last valid candidate discovered in other lines.
+    // Use the best mWifiInfo line if it has any valid data; otherwise fall back to candidates.
+    if let Some(best) = best_mwifi {
+        if info.ssid.as_ref().map_or(true, |_| true) {
+            info.ssid = best.ssid;
+        }
+        if info.bssid.as_ref().map_or(true, |_| true) {
+            info.bssid = best.bssid;
+        }
+        if info.signal_dbm.is_none() {
+            info.signal_dbm = best.signal_dbm;
+        }
+        if info.link_speed_mbps.is_none() {
+            info.link_speed_mbps = best.link_speed_mbps;
+        }
+        if info.frequency_mhz.is_none() {
+            info.frequency_mhz = best.frequency_mhz;
+        }
+        if info.ip_address.is_none() {
+            info.ip_address = best.ip_address;
+        }
+    }
+
     if info.ssid.as_ref().map_or(true, |s| is_unknown_ssid(s)) {
         info.ssid = candidate_ssid.filter(|s| !is_unknown_ssid(s));
     }
