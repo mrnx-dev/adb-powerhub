@@ -9,16 +9,12 @@ const props = defineProps<{
 const version = computed(() => props.appInfo?.version ?? '');
 const commit = computed(() => props.appInfo?.commit ?? '');
 const environment = computed(() => props.appInfo?.environment ?? 'development');
-
-const envBadgeClass = computed(() => {
-  return environment.value === 'production' ? 'status-badge-active' : 'status-badge-warning';
-});
 </script>
 
 <template>
-  <div class="about-header flex items-center gap-4 mb-5">
+  <div class="about-header flex items-center gap-4">
     <div
-      class="about-icon w-16 h-16 rounded-xl bg-color-primary-container border border-theme-primary flex items-center justify-center text-color-primary text-[28px] font-extrabold shrink-0 transition-transform duration-200 ease-out group-hover:scale-[1.02]"
+      class="about-icon w-16 h-16 rounded-xl bg-color-primary-container border border-theme-primary flex items-center justify-center text-color-primary text-[28px] font-extrabold shrink-0"
       aria-hidden="true"
     >
       P
@@ -36,16 +32,29 @@ const envBadgeClass = computed(() => {
         <span v-if="commit" class="status-badge status-badge-idle">
           {{ commit }}
         </span>
-        <span :class="['status-badge', envBadgeClass]">
-          <span
-            :class="[
-              'status-dot',
-              environment === 'production' ? 'status-dot-active' : 'status-dot-warning',
-            ]"
-          ></span>
-          {{ environment === 'production' ? 'Production' : 'Development' }}
+        <span v-if="environment === 'development'" class="status-badge status-badge-warning">
+          <span class="status-dot status-dot-warning"></span>
+          Development
         </span>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.about-icon {
+  transition: transform var(--duration-quick) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .about-header:hover .about-icon {
+    transform: scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-icon {
+    transition: none;
+  }
+}
+</style>
