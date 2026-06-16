@@ -18,15 +18,21 @@ async function handleCheckForUpdates() {
 </script>
 
 <template>
-  <section class="about-section" aria-labelledby="actions-label">
-    <h2 id="actions-label" class="section-label">Support</h2>
+  <div aria-labelledby="actions-label">
+    <h2 id="actions-label" class="font-sans text-xs font-semibold tracking-wider uppercase mb-4">
+      Support
+    </h2>
     <div class="about-actions flex flex-wrap gap-3">
-      <button type="button" class="btn btn-primary btn-pressable" @click="showDebugModal = true">
+      <button
+        type="button"
+        class="btn-pressable px-4 py-2 rounded-lg btn-primary text-xs font-semibold"
+        @click="showDebugModal = true"
+      >
         Copy Debug Info
       </button>
       <button
         type="button"
-        class="btn btn-pressable"
+        class="btn-pressable px-4 py-2 rounded-lg bg-theme-btn border border-theme-tertiary text-sm hover-accent"
         :disabled="aboutStore.checkingForUpdates"
         @click="handleCheckForUpdates"
       >
@@ -36,5 +42,5 @@ async function handleCheckForUpdates() {
     </div>
 
     <DebugInfoModal v-model:open="showDebugModal" />
-  </section>
+  </div>
 </template>

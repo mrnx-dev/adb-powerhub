@@ -19,15 +19,18 @@ function versionLabel(dep: DependencyStatus) {
 </script>
 
 <template>
-  <section class="about-section" aria-labelledby="deps-label">
-    <h2 id="deps-label" class="section-label">Dependencies</h2>
+  <div aria-labelledby="deps-label">
+    <h2 id="deps-label" class="font-sans text-xs font-semibold tracking-wider uppercase mb-4">
+      Dependencies
+    </h2>
     <div v-if="dependencies.length === 0" class="text-sm text-theme-muted">
       No dependencies configured.
     </div>
     <div v-else class="dep-list flex flex-col gap-3">
       <div
-        v-for="dep in dependencies"
+        v-for="(dep, index) in dependencies"
         :key="dep.name"
+        :style="{ '--stagger-index': index }"
         class="dep-row hover-subtle flex items-center justify-between gap-3 p-3 rounded-md bg-theme-btn border border-theme-tertiary transition-colors duration-200 ease-out"
       >
         <div class="dep-info min-w-0">
@@ -42,5 +45,29 @@ function versionLabel(dep: DependencyStatus) {
         </span>
       </div>
     </div>
-  </section>
+  </div>
 </template>
+
+<style scoped>
+.dep-row {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: dep-row-enter 180ms var(--ease-out) forwards;
+  animation-delay: calc(var(--stagger-index, 0) * 50ms);
+}
+
+@keyframes dep-row-enter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dep-row {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+</style>

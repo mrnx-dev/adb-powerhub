@@ -1510,6 +1510,11 @@ input[type='range']::-moz-range-thumb {
   cursor: not-allowed;
 }
 
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus-ring);
+}
+
 .btn-primary {
   background: var(--bg-button);
   color: var(--text-primary);
@@ -1749,7 +1754,13 @@ input[type='range']::-moz-range-thumb {
 
 .status-dot-active {
   background-color: var(--color-accent-emerald);
-  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Pulse only when user has not requested reduced motion (DESIGN §6.5) */
+@media (prefers-reduced-motion: no-preference) {
+  .status-dot-active {
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
 }
 
 .status-dot-warning {

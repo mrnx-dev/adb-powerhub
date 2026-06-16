@@ -126,7 +126,7 @@ watch(
         </div>
 
         <div class="modal-body px-5 py-4 overflow-y-auto">
-          <div v-if="loading" class="text-sm text-theme-muted">Loading debug info...</div>
+          <div v-if="loading" class="shimmer h-20 rounded-md"></div>
           <pre
             v-else
             class="debug-code bg-theme-card border border-theme-tertiary rounded-md p-3 font-mono text-[11px] leading-relaxed text-theme-secondary whitespace-pre-wrap break-words max-h-[320px] overflow-y-auto"
@@ -176,6 +176,33 @@ watch(
 .modal-fade-enter-from .modal,
 .modal-fade-leave-to .modal {
   transform: translateY(16px) scale(0.97);
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 25%,
+    rgba(255, 255, 255, 0.05) 50%,
+    var(--bg-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    background: var(--bg-card);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
