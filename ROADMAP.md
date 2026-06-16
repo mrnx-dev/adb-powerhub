@@ -1,7 +1,7 @@
 # ADB PowerHub — Roadmap & Actual Progress
 
 > Rekonstruksi dari `git log`, source code, dan `.miko/`.
-> Terakhir diperbarui: 2026-06-14.
+> Terakhir diperbarui: 2026-06-16.
 
 ## Legenda
 
@@ -14,8 +14,8 @@
 
 ## Status Ringkasan
 
-- **Milestone terakhir selesai:** File Explorer — `2026-06-14`
-- **Total fitur yang sudah jalan:** ~16 area fitur utama
+- **Milestone terakhir selesai:** About Page — `2026-06-16`
+- **Total fitur yang sudah jalan:** ~15 area fitur utama
 - **Fitur yang baru direncanakan:** Network diagnostics, Port Forwarding, Process Manager, Performance Charts, Backup & Restore, Scheduled Recording, Multiple Device support
 
 ## ✅ Sudah Selesai
@@ -37,11 +37,6 @@
 |                        | Actions: open, uninstall/clear, force stop, enable/disable                                                                      | 2026-06-04                                       |
 |                        | APK install via file picker + drag-and-drop desktop → app                                                                       | 2026-06-04                                       |
 |                        | Icon extraction engine (on-device ZIP DEX + aapt2 fallback, cache, progressive delivery)                                        | 2026-06-05 → 2026-06-06                          |
-| **File Explorer**      | Browse device filesystem (`/sdcard` default), breadcrumb, search/filter                                                           | 2026-06-14                                       |
-|                        | Pull/push files PC ↔ device, delete, rename, new folder                                                                         | 2026-06-14                                       |
-|                        | Batch selection (Ctrl+Click/Shift+Click/Space), batch bar, context menu                                                         | 2026-06-14                                       |
-|                        | Keyboard navigation (arrow keys, Enter, Space, Delete, Esc)                                                                     | 2026-06-14                                       |
-|                        | Rust path traversal guard, permission-based sandbox                                                                             | 2026-06-14                                       |
 | **Screenshot Gallery** | Grid view, lazy thumbnails, sort (newest/oldest/largest), filter (all/today/week)                                               | 2026-06-08                                       |
 |                        | Lightbox viewer with zoom, FLIP transition, keyboard nav, metadata, delete/open folder                                          | 2026-06-08 → 2026-06-10                          |
 |                        | Truncation banner (max 500 files), manual refresh, capture integration                                                          | 2026-06-09                                       |
@@ -58,6 +53,7 @@
 | Fitur              | Alasan                                                                                                                             |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
 | **Clipboard Sync** | Ditambahkan 2026-06-03, dihapus 2026-06-04 (`21d6fbe`). Tidak reliable di Android 14+ (SDK 34) karena pembatasan clipboard access. |
+| **File Explorer**  | Ditambahkan 2026-06-14, dihapus 2026-06-16 (`2f1a409`). Fitur dihilangkan untuk menyederhanakan scope aplikasi; manajemen file bisa dilakukan via ADB terminal atau file manager eksternal. |
 
 ## 🚧 Parsial / Butuh Perhatian
 
@@ -100,6 +96,7 @@ Berdasarkan `EXECUTION_PLAN.md` dan kode saat ini:
 2026-06-10  Lightbox Emil polish
 2026-06-11  Connect Panel Redesign + Stage 4 polish
 2026-06-14  File Explorer (browse, pull/push, delete, rename, batch, context menu)
+2026-06-16  File Explorer dihapus; About Page redesign
 ```
 
 ## Cara Membaca
