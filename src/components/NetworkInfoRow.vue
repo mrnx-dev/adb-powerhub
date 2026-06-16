@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Wifi, WifiOff } from '@lucide/vue';
-import NetworkInfoTooltip from './NetworkInfoTooltip.vue';
+import NetworkInfoTooltip from '@/components/NetworkInfoTooltip.vue';
 
 interface Props {
   network: {
@@ -25,6 +25,7 @@ const props = withDefaults(defineProps<Props>(), {
 const tooltipVisible = ref(false);
 const hoverTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
 const rowRef = ref<HTMLElement | null>(null);
+const isPointerDown = ref(false);
 
 const hasNetwork = computed(() => props.network !== null);
 const isWifi = computed(() => props.network?.network_type === 'Wi-Fi');
@@ -70,6 +71,11 @@ const displaySsid = computed(() => {
 });
 
 function showTooltip() {
+  // Ignore focus events caused by a pointer click; the click handler will toggle.
+  if (isPointerDown.value) {
+    isPointerDown.value = false;
+    return;
+  }
   if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
   hoverTimeout.value = setTimeout(() => {
     tooltipVisible.value = true;
@@ -79,10 +85,13 @@ function showTooltip() {
 function hideTooltip() {
   if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
   tooltipVisible.value = false;
+  isPointerDown.value = false;
 }
 
 function toggleTooltip() {
+  if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
   tooltipVisible.value = !tooltipVisible.value;
+  isPointerDown.value = false;
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -134,6 +143,7 @@ onUnmounted(() => {
     @mouseleave="hideTooltip"
     @focus="showTooltip"
     @blur="hideTooltip"
+    @pointerdown="isPointerDown = true"
     @click="toggleTooltip"
     @keydown="handleKeydown"
   >

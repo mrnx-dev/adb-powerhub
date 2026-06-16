@@ -2,7 +2,7 @@
 import { useDeviceStore } from '../stores/device';
 import { useNavigationStore } from '../stores/navigation';
 import { useDropdownRegistry } from '../composables/useDropdownRegistry';
-import NetworkInfoRow from './NetworkInfoRow.vue';
+import NetworkInfoRow from '@/components/NetworkInfoRow.vue';
 import {
   Smartphone,
   Battery,

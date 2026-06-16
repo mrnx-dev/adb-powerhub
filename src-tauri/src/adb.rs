@@ -1058,11 +1058,13 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
         }
     }
 
-    if info.ssid.is_none() {
+    // If the authoritative mWifiInfo line provided an invalid/unknown value,
+    // fall back to the last valid candidate discovered in other lines.
+    if info.ssid.as_ref().map_or(true, |s| is_unknown_ssid(s)) {
         info.ssid = candidate_ssid.filter(|s| !is_unknown_ssid(s));
     }
-    if info.bssid.is_none() {
-        info.bssid = candidate_bssid.clone();
+    if info.bssid.as_ref().map_or(true, |b| is_zero_mac(b) || is_privacy_placeholder_mac(b)) {
+        info.bssid = candidate_bssid.filter(|b| !is_zero_mac(b) && !is_privacy_placeholder_mac(b));
     }
 
     info

@@ -1161,6 +1161,11 @@ body {
   box-shadow: var(--shadow-hover);
 }
 
+/* Easing utility for Vue <Transition> classes */
+.ease-emphasized {
+  transition-timing-function: var(--ease-emphasized);
+}
+
 /* ============================================================
    MOTION UTILITIES (Dashboard Motion & UX Polish)
    ============================================================ */
