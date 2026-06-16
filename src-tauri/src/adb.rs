@@ -931,7 +931,23 @@ fn is_privacy_placeholder_mac(s: &str) -> bool {
 
 fn is_unknown_ssid(s: &str) -> bool {
     let t = s.trim();
-    t.is_empty() || t.eq_ignore_ascii_case("<unknown ssid>") || t.eq_ignore_ascii_case("<unknown>")
+    t.is_empty()
+        || t.eq_ignore_ascii_case("<unknown ssid>")
+        || t.eq_ignore_ascii_case("<unknown>")
+        || t.to_lowercase().contains("unknown")
+}
+
+fn is_placeholder_ip(s: &str) -> bool {
+    let t = s.trim();
+    t.is_empty() || t.eq_ignore_ascii_case("null") || t == "0.0.0.0"
+}
+
+fn is_placeholder_u32(n: u32) -> bool {
+    n == 0 || n == u32::MAX
+}
+
+fn is_placeholder_signal(n: i32) -> bool {
+    n < -120 || n > 0
 }
 
 fn parse_ssid_value(line: &str) -> Option<String> {
@@ -988,13 +1004,20 @@ fn extract_after_prefix(line: &str, prefix: &str) -> Option<i64> {
 }
 
 fn extract_ip_after(line: &str, prefix: &str) -> Option<String> {
-    line.split(prefix).nth(1)?
+    let raw = line
+        .split(prefix)
+        .nth(1)?
         .trim_start()
         .trim_start_matches('/')
         .split(|c: char| c == ',' || c.is_whitespace())
         .next()
         .filter(|s| !s.is_empty())
-        .map(String::from)
+        .map(String::from)?;
+    if is_placeholder_ip(&raw) {
+        None
+    } else {
+        Some(raw)
+    }
 }
 
 fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
@@ -1065,6 +1088,20 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
     }
     if info.bssid.as_ref().map_or(true, |b| is_zero_mac(b) || is_privacy_placeholder_mac(b)) {
         info.bssid = candidate_bssid.filter(|b| !is_zero_mac(b) && !is_privacy_placeholder_mac(b));
+    }
+
+    // Filter Android placeholder/sentinel values that leak through ADB output.
+    if info.signal_dbm.map_or(false, |n| is_placeholder_signal(n)) {
+        info.signal_dbm = None;
+    }
+    if info.link_speed_mbps.map_or(false, |n| is_placeholder_u32(n)) {
+        info.link_speed_mbps = None;
+    }
+    if info.frequency_mhz.map_or(false, |n| is_placeholder_u32(n)) {
+        info.frequency_mhz = None;
+    }
+    if info.ip_address.as_ref().map_or(false, |ip| is_placeholder_ip(ip)) {
+        info.ip_address = None;
     }
 
     info
@@ -1151,7 +1188,8 @@ fn parse_ip_from_ip_route(output: &str) -> Option<String> {
     let mut found_src = false;
     for part in output.split_whitespace() {
         if found_src {
-            return Some(part.to_string());
+            let ip = part.to_string();
+            return if is_placeholder_ip(&ip) { None } else { Some(ip) };
         }
         if part == "src" {
             found_src = true;
@@ -1240,7 +1278,21 @@ pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceS
     if network.ip_address.is_none() {
         let ip_route_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "ip", "route", "get", "8.8.8.8"])
             .unwrap_or_default();
-        network.ip_address = parse_ip_from_ip_route(&ip_route_output);
+        network.ip_address = parse_ip_from_ip_route(&ip_route_output).filter(|ip| !is_placeholder_ip(ip));
+    }
+
+    // Final pass: strip any sentinel values that individual parsers may have missed.
+    if network.signal_dbm.map_or(false, |n| is_placeholder_signal(n)) {
+        network.signal_dbm = None;
+    }
+    if network.link_speed_mbps.map_or(false, |n| is_placeholder_u32(n)) {
+        network.link_speed_mbps = None;
+    }
+    if network.frequency_mhz.map_or(false, |n| is_placeholder_u32(n)) {
+        network.frequency_mhz = None;
+    }
+    if network.ip_address.as_ref().map_or(false, |ip| is_placeholder_ip(ip)) {
+        network.ip_address = None;
     }
 
     Ok(DeviceStats {
