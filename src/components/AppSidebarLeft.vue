@@ -10,7 +10,6 @@ import {
   ScrollText,
   Package,
   Image,
-  Folder,
   Info,
 } from '@lucide/vue';
 
@@ -153,23 +152,6 @@ onUnmounted(() => {
       >
         <Image :size="18" class="shrink-0" />
         <span v-if="expanded" class="text-sm font-medium whitespace-nowrap">Screenshots</span>
-      </button>
-
-      <button
-        class="btn-pressable rounded-lg border"
-        :class="[
-          navStore.currentPage === 'files'
-            ? 'action-card-active'
-            : 'bg-theme-btn border-theme-tertiary text-theme-secondary hover-subtle',
-          expanded
-            ? 'flex items-center gap-3 px-2 py-2.5'
-            : 'flex items-center justify-center py-2.5',
-        ]"
-        :title="!expanded ? 'Files' : undefined"
-        @click="navStore.navigateTo('files')"
-      >
-        <Folder :size="18" class="shrink-0" />
-        <span v-if="expanded" class="text-sm font-medium whitespace-nowrap">Files</span>
       </button>
 
       <button
