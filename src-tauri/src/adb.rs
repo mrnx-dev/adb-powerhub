@@ -244,6 +244,19 @@ pub struct BatteryInfo {
     pub voltage: i32,
 }
 
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct NetworkInfo {
+    pub ssid: Option<String>,
+    pub bssid: Option<String>,
+    pub signal_dbm: Option<i32>,
+    pub link_speed_mbps: Option<u32>,
+    pub frequency_mhz: Option<u32>,
+    pub device_mac: Option<String>,
+    pub http_proxy: Option<String>,
+    pub network_type: Option<String>,
+    pub ip_address: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DeviceStats {
     pub battery: BatteryInfo,
@@ -257,6 +270,7 @@ pub struct DeviceStats {
     pub storage_used_gb: f64,
     pub screen_width: u32,
     pub screen_height: u32,
+    pub network: Option<NetworkInfo>,
 }
 
 #[tauri::command]
@@ -460,6 +474,7 @@ pub fn adb_get_device_info(state: State<AppState>) -> Result<DeviceStats, String
         storage_used_gb: 0.0,
         screen_width: 0,
         screen_height: 0,
+        network: None,
     })
 }
 
@@ -949,6 +964,7 @@ pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceS
         storage_used_gb,
         screen_width,
         screen_height,
+        network: None,
     })
 }
 
