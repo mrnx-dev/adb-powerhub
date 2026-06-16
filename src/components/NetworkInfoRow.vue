@@ -149,7 +149,7 @@ onUnmounted(() => {
   >
     <!-- Loading skeleton -->
     <template v-if="loading">
-      <div class="h-2 bg-theme-btn rounded-full animate-pulse w-full max-w-[180px]"></div>
+      <div class="h-2 rounded-full network-row-skeleton w-full max-w-[180px]"></div>
     </template>
 
     <!-- Disconnected / Wi-Fi disabled -->
