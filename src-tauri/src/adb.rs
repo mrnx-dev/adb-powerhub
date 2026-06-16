@@ -1027,6 +1027,22 @@ fn extract_ip_after(line: &str, prefix: &str) -> Option<String> {
     }
 }
 
+fn parse_supplicant_state(line: &str) -> Option<String> {
+    line.to_lowercase()
+        .split("supplicant state:")
+        .nth(1)?
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .next()
+        .map(|t| t.trim().to_string())
+}
+
+fn is_connected_supplicant_state(state: &str) -> bool {
+    matches!(
+        state.to_lowercase().as_str(),
+        "completed" | "associated" | "four_way_handshake" | "group_handshake"
+    )
+}
+
 fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
     let mut info = NetworkInfo::default();
     let mut candidate_ssid: Option<String> = None;
@@ -1046,6 +1062,7 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
         if line.starts_with("mWifiInfo") {
             let m_ssid = parse_ssid_value(line);
             let m_bssid = parse_bssid_value(line);
+            let m_state = parse_supplicant_state(line);
             let m_signal = extract_number_after(line, "RSSI:").map(|n| n as i32);
             let m_link = extract_number_after(line, "Link speed:")
                 .or_else(|| extract_number_after(line, "Tx Link speed:"))
@@ -1053,15 +1070,15 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
             let m_freq = extract_number_after(line, "Frequency:").map(|n| n as u32);
             let m_ip = extract_ip_after(line, "IP:");
 
-            let is_valid_assoc = m_ssid.as_ref().map_or(false, |s| !is_unknown_ssid(s))
+            // The last mWifiInfo line in the dump reflects the current state. Only trust it
+            // if the supplicant state indicates an active connection. Disconnected entries may
+            // still carry the old SSID/BSSID from the previous network, so we must not use them.
+            let is_connected = m_state.as_ref().map_or(false, |st| is_connected_supplicant_state(st));
+            let is_valid_assoc = is_connected
+                && m_ssid.as_ref().map_or(false, |s| !is_unknown_ssid(s))
                 && m_bssid.as_ref().map_or(false, |b| !is_zero_mac(b) && !is_privacy_placeholder_mac(b));
 
-            // Always keep the most recent valid mWifiInfo; if none valid yet, keep latest as fallback.
-            if is_valid_assoc
-                || best_mwifi.as_ref().map_or(true, |best| {
-                    best.ssid.as_ref().map_or(true, |s| is_unknown_ssid(s))
-                        && best.bssid.as_ref().map_or(true, |b| is_zero_mac(b) || is_privacy_placeholder_mac(b))
-                }) {
+            if is_valid_assoc {
                 best_mwifi = Some(NetworkInfo {
                     ssid: m_ssid.clone(),
                     bssid: m_bssid.clone(),
@@ -1071,6 +1088,9 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
                     ip_address: m_ip.clone(),
                     ..Default::default()
                 });
+            } else {
+                // Explicitly clear any stale best_mwifi when the current state is disconnected.
+                best_mwifi = None;
             }
             continue;
         }
@@ -1106,13 +1126,15 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
         }
     }
 
-    // Use the best mWifiInfo line if it has any valid data; otherwise fall back to candidates.
-    if let Some(best) = best_mwifi {
+    // Use the best mWifiInfo line if it has any valid data. If the current mWifiInfo state is
+    // disconnected, best_mwifi is None and we must not fall back to historic candidate SSIDs/BSSIDs
+    // from earlier in the dump — that would make a disconnected device look still connected.
+    if let Some(ref best) = best_mwifi {
         if info.ssid.as_ref().map_or(true, |_| true) {
-            info.ssid = best.ssid;
+            info.ssid = best.ssid.clone();
         }
         if info.bssid.as_ref().map_or(true, |_| true) {
-            info.bssid = best.bssid;
+            info.bssid = best.bssid.clone();
         }
         if info.signal_dbm.is_none() {
             info.signal_dbm = best.signal_dbm;
@@ -1124,15 +1146,28 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
             info.frequency_mhz = best.frequency_mhz;
         }
         if info.ip_address.is_none() {
-            info.ip_address = best.ip_address;
+            info.ip_address = best.ip_address.clone();
         }
     }
 
-    if info.ssid.as_ref().map_or(true, |s| is_unknown_ssid(s)) {
-        info.ssid = candidate_ssid.filter(|s| !is_unknown_ssid(s));
+    // Candidate fallback is only safe when best_mwifi indicates an active connection. Otherwise,
+    // the candidates are likely from historic events and should not override the disconnected state.
+    if best_mwifi.is_some() {
+        if info.ssid.as_ref().map_or(true, |s| is_unknown_ssid(s)) {
+            info.ssid = info.ssid.clone().or_else(|| candidate_ssid.filter(|s| !is_unknown_ssid(s)));
+        }
+        if info.bssid.as_ref().map_or(true, |b| is_zero_mac(b) || is_privacy_placeholder_mac(b)) {
+            info.bssid = info.bssid.clone().or_else(|| candidate_bssid.filter(|b| !is_zero_mac(b) && !is_privacy_placeholder_mac(b)));
+        }
     }
-    if info.bssid.as_ref().map_or(true, |b| is_zero_mac(b) || is_privacy_placeholder_mac(b)) {
-        info.bssid = candidate_bssid.filter(|b| !is_zero_mac(b) && !is_privacy_placeholder_mac(b));
+
+    // If the current supplicant state is disconnected, drop any stale signal/link/freq values that
+    // were picked up from historic RSSI poll lines. We don't want a disconnected device to show a
+    // signal strength from when it was still connected.
+    if best_mwifi.is_none() {
+        info.signal_dbm = None;
+        info.link_speed_mbps = None;
+        info.frequency_mhz = None;
     }
 
     // Filter Android placeholder/sentinel values that leak through ADB output.
