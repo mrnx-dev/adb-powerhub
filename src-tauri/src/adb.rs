@@ -934,7 +934,8 @@ fn is_unknown_ssid(s: &str) -> bool {
     t.is_empty()
         || t.eq_ignore_ascii_case("<unknown ssid>")
         || t.eq_ignore_ascii_case("<unknown>")
-        || t.to_lowercase().contains("unknown")
+        || t.eq_ignore_ascii_case("<none>")
+        || t.starts_with("<unknown")
 }
 
 fn is_placeholder_ip(s: &str) -> bool {
@@ -951,9 +952,12 @@ fn is_placeholder_signal(n: i32) -> bool {
 }
 
 fn parse_ssid_value(line: &str) -> Option<String> {
-    // Find the first "SSID:" occurrence and extract the value after it.
-    let rest = line.split("SSID:").nth(1)?;
-    let rest = rest.trim_start();
+    // Find the first "SSID:" / "ssid:" occurrence and extract the value after it.
+    let rest = line
+        .split("SSID:")
+        .nth(1)
+        .or_else(|| line.split("ssid:").nth(1))?
+        .trim_start();
     let value = if rest.starts_with('"') {
         // quoted: "MyHome5G", ...
         let mut chars = rest.chars();
@@ -974,7 +978,10 @@ fn parse_ssid_value(line: &str) -> Option<String> {
 }
 
 fn parse_bssid_value(line: &str) -> Option<String> {
-    let rest = line.split("BSSID:").nth(1)?;
+    let rest = line
+        .split("BSSID:")
+        .nth(1)
+        .or_else(|| line.split("bssid:").nth(1))?;
     let token = rest.split(|c: char| c == ',' || c.is_whitespace()).next().unwrap_or("").trim();
     if is_valid_mac(token) {
         Some(token.to_lowercase())
@@ -1053,13 +1060,13 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
             continue;
         }
 
-        if line.contains("SSID:") {
+        if line.contains("SSID:") || line.contains("ssid:") {
             if let Some(ssid) = parse_ssid_value(line) {
                 candidate_ssid = Some(ssid);
             }
         }
 
-        if line.contains("BSSID:") {
+        if line.contains("BSSID:") || line.contains("bssid:") {
             if let Some(bssid) = parse_bssid_value(line) {
                 if !is_zero_mac(&bssid) && !is_privacy_placeholder_mac(&bssid) {
                     candidate_bssid = Some(bssid.clone());
@@ -1068,14 +1075,16 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
             }
         }
 
-        if line.contains("rssi=") && info.signal_dbm.is_none() {
-            if let Some(n) = extract_after_prefix(line, "rssi=") {
+        if (line.contains("rssi=") || line.contains("RSSI=")) && info.signal_dbm.is_none() {
+            if let Some(n) = extract_after_prefix(line, "rssi=")
+                .or_else(|| extract_after_prefix(line, "RSSI=")) {
                 info.signal_dbm = Some(n as i32);
             }
         }
 
-        if line.contains("RSSI:") && info.signal_dbm.is_none() {
-            if let Some(n) = extract_number_after(line, "RSSI:") {
+        if line.contains("RSSI:") || line.contains("rssi:") {
+            if let Some(n) = extract_number_after(line, "RSSI:")
+                .or_else(|| extract_number_after(line, "rssi:")) {
                 info.signal_dbm = Some(n as i32);
             }
         }

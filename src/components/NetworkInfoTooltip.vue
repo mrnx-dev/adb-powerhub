@@ -29,7 +29,9 @@ withDefaults(defineProps<Props>(), {
 
 function formatValue(value: string | number | undefined): string {
   if (value === undefined || value === null || value === '') return '—';
-  return String(value);
+  const s = String(value).trim();
+  if (s === '' || s.toLowerCase() === 'null' || s === '0.0.0.0') return '—';
+  return s;
 }
 </script>
 

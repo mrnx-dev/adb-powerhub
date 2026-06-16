@@ -68,10 +68,16 @@ const primaryText = computed(() => {
 
 const displaySsid = computed(() => {
   const ssid = props.network?.ssid;
-  if (!ssid || ssid.trim() === '' || ssid.trim().toLowerCase() === '<unknown ssid>')
+  if (!ssid || ssid.trim() === '' || ssid.trim().toLowerCase().startsWith('<unknown'))
     return 'Hidden Network';
   return ssid;
 });
+
+function isValidString(value: string | undefined): boolean {
+  if (!value) return false;
+  const v = value.trim();
+  return v !== '' && v.toLowerCase() !== 'null' && v !== '0.0.0.0';
+}
 
 function updateTooltipPosition() {
   if (!rowRef.value) return;
@@ -210,9 +216,11 @@ onUnmounted(() => {
         network.network_type
       }}</span>
 
-      <span v-if="network?.ip_address" class="text-[10px] text-theme-secondary shrink-0">{{
-        network.ip_address
-      }}</span>
+      <span
+        v-if="network && isValidString(network.ip_address)"
+        class="text-[10px] text-theme-secondary shrink-0"
+        >{{ network.ip_address }}</span
+      >
     </template>
 
     <Teleport v-if="network" to="body">
