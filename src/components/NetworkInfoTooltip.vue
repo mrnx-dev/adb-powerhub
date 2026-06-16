@@ -14,6 +14,7 @@ interface Props {
     ip_address?: string;
   };
   visible: boolean;
+  id?: string;
 }
 
 defineProps<Props>();
@@ -35,6 +36,7 @@ function formatValue(value: string | number | undefined): string {
   >
     <div
       v-if="visible"
+      :id="id"
       role="tooltip"
       class="absolute z-50 top-full left-0 mt-2 w-64 rounded-lg border border-theme-secondary bg-theme-sidebar shadow-theme-modal p-3 text-[11px]"
     >
