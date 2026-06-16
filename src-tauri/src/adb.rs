@@ -1196,6 +1196,51 @@ pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceS
         .unwrap_or_default();
     let (screen_width, screen_height) = parse_wm_size(&wm_size_output);
 
+    // Network info (best-effort; failures degrade silently per field)
+    let dumpsys_wifi_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "dumpsys", "wifi"])
+        .unwrap_or_default();
+    let mut network = parse_dumpsys_wifi(&dumpsys_wifi_output);
+
+    let ip_addr_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "ip", "addr", "show", "wlan0"])
+        .unwrap_or_default();
+    network.device_mac = parse_mac_from_ip_addr(&ip_addr_output)
+        .or_else(|| {
+            let ifconfig_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "ifconfig", "wlan0"])
+                .unwrap_or_default();
+            parse_mac_from_ifconfig(&ifconfig_output)
+        })
+        .or_else(|| {
+            let all_ip_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "ip", "addr"])
+                .unwrap_or_default();
+            parse_first_wlan_mac(&all_ip_output)
+        })
+        .or_else(|| {
+            run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "cat", "/sys/class/net/wlan0/address"])
+                .ok()
+                .and_then(|out| {
+                    let mac = out.trim().to_lowercase();
+                    if is_valid_mac(&mac) && !is_zero_mac(&mac) && !is_privacy_placeholder_mac(&mac) {
+                        Some(mac)
+                    } else {
+                        None
+                    }
+                })
+        });
+
+    let proxy_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "settings", "get", "global", "http_proxy"])
+        .unwrap_or_default();
+    network.http_proxy = parse_http_proxy(&proxy_output);
+
+    let connectivity_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "dumpsys", "connectivity"])
+        .unwrap_or_default();
+    network.network_type = parse_network_type(&connectivity_output);
+
+    if network.ip_address.is_none() {
+        let ip_route_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "ip", "route", "get", "8.8.8.8"])
+            .unwrap_or_default();
+        network.ip_address = parse_ip_from_ip_route(&ip_route_output);
+    }
+
     Ok(DeviceStats {
         battery,
         cpu_usage: cpu,
@@ -1208,7 +1253,7 @@ pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceS
         storage_used_gb,
         screen_width,
         screen_height,
-        network: None,
+        network: Some(network),
     })
 }
 
