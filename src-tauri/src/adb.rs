@@ -914,6 +914,250 @@ fn parse_wm_size(output: &str) -> (u32, u32) {
     (0, 0)
 }
 
+// --- Network info parsing helpers -----------------------------------------
+
+fn is_valid_mac(s: &str) -> bool {
+    s.split(':').count() == 6
+        && s.split(':').all(|p| p.len() == 2 && u8::from_str_radix(p, 16).is_ok())
+}
+
+fn is_zero_mac(s: &str) -> bool {
+    s.to_lowercase() == "00:00:00:00:00:00"
+}
+
+fn is_privacy_placeholder_mac(s: &str) -> bool {
+    s.to_lowercase() == "02:00:00:00:00:00"
+}
+
+fn is_unknown_ssid(s: &str) -> bool {
+    let t = s.trim();
+    t.is_empty() || t.eq_ignore_ascii_case("<unknown ssid>") || t.eq_ignore_ascii_case("<unknown>")
+}
+
+fn parse_ssid_value(line: &str) -> Option<String> {
+    // Find the first "SSID:" occurrence and extract the value after it.
+    let rest = line.split("SSID:").nth(1)?;
+    let rest = rest.trim_start();
+    let value = if rest.starts_with('"') {
+        // quoted: "MyHome5G", ...
+        let mut chars = rest.chars();
+        chars.next(); // skip opening quote
+        let mut acc = String::new();
+        for c in chars {
+            if c == '"' {
+                break;
+            }
+            acc.push(c);
+        }
+        acc
+    } else {
+        // unquoted token until comma/whitespace
+        rest.split(|c: char| c == ',' || c.is_whitespace()).next().unwrap_or("").to_string()
+    };
+    Some(value)
+}
+
+fn parse_bssid_value(line: &str) -> Option<String> {
+    let rest = line.split("BSSID:").nth(1)?;
+    let token = rest.split(|c: char| c == ',' || c.is_whitespace()).next().unwrap_or("").trim();
+    if is_valid_mac(token) {
+        Some(token.to_lowercase())
+    } else {
+        None
+    }
+}
+
+fn extract_number_after(line: &str, prefix: &str) -> Option<i64> {
+    let rest = line.split(prefix).nth(1)?;
+    let token = rest
+        .trim_start()
+        .split(|c: char| c == ',' || c.is_whitespace() || c == 'm' || c == 'M' || c == 'd' || c == 'D' || c == 'h' || c == 'H' || c == 'z' || c == 'Z' || c == '/')
+        .next()
+        .unwrap_or("");
+    token.parse().ok()
+}
+
+fn extract_after_prefix(line: &str, prefix: &str) -> Option<i64> {
+    let rest = line.split(prefix).nth(1)?;
+    let token = rest
+        .trim_start()
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .next()
+        .unwrap_or("");
+    token.parse().ok()
+}
+
+fn extract_ip_after(line: &str, prefix: &str) -> Option<String> {
+    line.split(prefix).nth(1)?
+        .trim_start()
+        .trim_start_matches('/')
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .next()
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+}
+
+fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
+    let mut info = NetworkInfo::default();
+    let mut candidate_ssid: Option<String> = None;
+    let mut candidate_bssid: Option<String> = None;
+
+    for line in output.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        // Prefer consolidated mWifiInfo line as authoritative source.
+        if line.starts_with("mWifiInfo") {
+            candidate_ssid = parse_ssid_value(line);
+            candidate_bssid = parse_bssid_value(line);
+            info.ssid = candidate_ssid.clone();
+            info.bssid = candidate_bssid.clone();
+            if let Some(n) = extract_number_after(line, "RSSI:") {
+                info.signal_dbm = Some(n as i32);
+            }
+            if let Some(n) = extract_number_after(line, "Link speed:")
+                .or_else(|| extract_number_after(line, "Tx Link speed:")) {
+                info.link_speed_mbps = Some(n as u32);
+            }
+            if let Some(n) = extract_number_after(line, "Frequency:") {
+                info.frequency_mhz = Some(n as u32);
+            }
+            if let Some(ip) = extract_ip_after(line, "IP:") {
+                info.ip_address = Some(ip);
+            }
+            continue;
+        }
+
+        if line.contains("SSID:") {
+            if let Some(ssid) = parse_ssid_value(line) {
+                candidate_ssid = Some(ssid);
+            }
+        }
+
+        if line.contains("BSSID:") {
+            if let Some(bssid) = parse_bssid_value(line) {
+                if !is_zero_mac(&bssid) && !is_privacy_placeholder_mac(&bssid) {
+                    candidate_bssid = Some(bssid.clone());
+                    info.bssid = Some(bssid);
+                }
+            }
+        }
+
+        if line.contains("rssi=") && info.signal_dbm.is_none() {
+            if let Some(n) = extract_after_prefix(line, "rssi=") {
+                info.signal_dbm = Some(n as i32);
+            }
+        }
+
+        if line.contains("RSSI:") && info.signal_dbm.is_none() {
+            if let Some(n) = extract_number_after(line, "RSSI:") {
+                info.signal_dbm = Some(n as i32);
+            }
+        }
+    }
+
+    if info.ssid.is_none() {
+        info.ssid = candidate_ssid.filter(|s| !is_unknown_ssid(s));
+    }
+    if info.bssid.is_none() {
+        info.bssid = candidate_bssid.clone();
+    }
+
+    info
+}
+
+fn parse_mac_from_ip_addr(output: &str) -> Option<String> {
+    for line in output.lines() {
+        if line.contains("link/ether") {
+            let token = line.split_whitespace().nth(1)?;
+            let mac = token.to_lowercase();
+            if is_valid_mac(&mac) && !is_zero_mac(&mac) && !is_privacy_placeholder_mac(&mac) {
+                return Some(mac);
+            }
+        }
+    }
+    None
+}
+
+fn parse_mac_from_ifconfig(output: &str) -> Option<String> {
+    for line in output.lines() {
+        let line = line.trim();
+        if line.contains("HWaddr") {
+            let token = line.split("HWaddr").nth(1)?.trim().split_whitespace().next()?;
+            let mac = token.to_lowercase();
+            if is_valid_mac(&mac) && !is_zero_mac(&mac) && !is_privacy_placeholder_mac(&mac) {
+                return Some(mac);
+            }
+        }
+        if line.contains("ether") {
+            let token = line.split("ether").nth(1)?.trim().split_whitespace().next()?;
+            let mac = token.to_lowercase();
+            if is_valid_mac(&mac) && !is_zero_mac(&mac) && !is_privacy_placeholder_mac(&mac) {
+                return Some(mac);
+            }
+        }
+    }
+    None
+}
+
+fn parse_first_wlan_mac(output: &str) -> Option<String> {
+    let mut in_wlan = false;
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed.ends_with(':') && trimmed.contains("wlan") {
+            let name = trimmed.trim_end_matches(':').split('@').next().unwrap_or("").trim();
+            in_wlan = name.contains("wlan");
+            continue;
+        }
+        if in_wlan && line.contains("link/ether") {
+            let token = line.split_whitespace().nth(1)?;
+            let mac = token.to_lowercase();
+            if is_valid_mac(&mac) && !is_zero_mac(&mac) && !is_privacy_placeholder_mac(&mac) {
+                return Some(mac);
+            }
+        }
+    }
+    None
+}
+
+fn parse_http_proxy(output: &str) -> Option<String> {
+    let v = output.trim();
+    if v.is_empty() || v == "null" || v == "0" || v == ":0" {
+        None
+    } else {
+        Some(v.to_string())
+    }
+}
+
+fn parse_network_type(output: &str) -> Option<String> {
+    let lower = output.to_lowercase();
+    if lower.contains("transports: wifi") || lower.contains("type: wifi") || lower.contains("active network: wifi") {
+        return Some("Wi-Fi".to_string());
+    }
+    if lower.contains("transports: cellular") || lower.contains("type: mobile") {
+        return Some("Mobile".to_string());
+    }
+    if lower.contains("transports: vpn") || lower.contains("type: vpn") {
+        return Some("VPN".to_string());
+    }
+    None
+}
+
+fn parse_ip_from_ip_route(output: &str) -> Option<String> {
+    let mut found_src = false;
+    for part in output.split_whitespace() {
+        if found_src {
+            return Some(part.to_string());
+        }
+        if part == "src" {
+            found_src = true;
+        }
+    }
+    None
+}
+
 #[tauri::command]
 pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceStats, String> {
     let _guard = CommandGuard::acquire(&state).await?;
