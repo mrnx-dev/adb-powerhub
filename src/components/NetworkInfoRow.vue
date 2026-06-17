@@ -192,7 +192,7 @@ onUnmounted(() => {
     ref="rowRef"
     :tabindex="hasTooltip ? 0 : -1"
     :aria-describedby="hasTooltip ? 'network-info-tooltip' : undefined"
-    class="relative flex items-center gap-2 mt-2 px-2 py-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-emerald/40"
+    class="relative flex items-center gap-2 mt-2 py-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-emerald/40"
     :class="[
       isWifi && hasAssociation
         ? 'text-theme-primary'
@@ -243,6 +243,14 @@ onUnmounted(() => {
 
     <!-- Connected Wi-Fi info -->
     <template v-else>
+      <button
+        type="button"
+        class="network-copy-btn btn-pressable shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-theme-muted hover:text-theme-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-emerald/40"
+        aria-label="Copy network info to clipboard"
+        @click="copyNetworkInfo"
+      >
+        <Copy :size="12" />
+      </button>
       <Wifi :size="13" class="shrink-0 text-accent-emerald" />
       <span class="text-[11px] font-medium truncate max-w-[140px]">{{ displaySsid }}</span>
 
@@ -270,15 +278,6 @@ onUnmounted(() => {
         class="text-[10px] text-theme-secondary shrink-0"
         >{{ network.ip_address }}</span
       >
-
-      <button
-        type="button"
-        class="network-copy-btn btn-pressable ml-auto shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-theme-muted hover:text-theme-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-emerald/40"
-        aria-label="Copy network info to clipboard"
-        @click="copyNetworkInfo"
-      >
-        <Copy :size="12" />
-      </button>
     </template>
 
     <Teleport v-if="network && hasTooltip" to="body">
