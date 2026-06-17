@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Wifi, WifiOff, Signal, ShieldCheck } from '@lucide/vue';
 import NetworkInfoTooltip from '@/components/NetworkInfoTooltip.vue';
 
@@ -23,8 +23,10 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const tooltipVisible = ref(false);
+const pinned = ref(false);
 const hoverTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
 const rowRef = ref<HTMLElement | null>(null);
+const tooltipRef = ref<HTMLElement | null>(null);
 const isPointerDown = ref(false);
 const tooltipStyle = ref<Record<string, string>>({});
 const originX = ref('0');
@@ -115,29 +117,45 @@ function showTooltip() {
 }
 
 function hideTooltip() {
+  // A pinned tooltip stays open until explicitly dismissed (Escape / click outside /
+  // clicking the row again) so the user can move the pointer into it to reach the
+  // copy button. Preview (unpinned) tooltips hide on mouseleave/blur as before.
+  if (pinned.value) return;
   if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
   tooltipVisible.value = false;
   isPointerDown.value = false;
 }
 
+function closeTooltip() {
+  pinned.value = false;
+  if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
+  tooltipVisible.value = false;
+  isPointerDown.value = false;
+  // Return focus to the trigger so keyboard users aren't stranded after Escape.
+  rowRef.value?.focus();
+}
+
 function toggleTooltip() {
   if (!hasTooltip.value) return;
   if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
-  if (tooltipVisible.value) {
+  if (pinned.value) {
+    // Already pinned: unpin and close.
+    pinned.value = false;
     tooltipVisible.value = false;
     isPointerDown.value = false;
     return;
   }
-  nextTick(() => {
-    updateTooltipPosition();
-    tooltipVisible.value = true;
-    isPointerDown.value = false;
-  });
+  // Pin (and show) so the tooltip stays open while the pointer moves into it to
+  // reach the copy button. Replaces the old visibility-only toggle.
+  pinned.value = true;
+  updateTooltipPosition();
+  tooltipVisible.value = true;
+  isPointerDown.value = false;
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
-    hideTooltip();
+    closeTooltip();
   } else if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
     toggleTooltip();
@@ -145,14 +163,23 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 function handleClickOutside(e: MouseEvent) {
+  if (!tooltipVisible.value) return;
   const target = e.target as Node;
-  if (rowRef.value && !rowRef.value.contains(target)) {
+  const inRow = rowRef.value?.contains(target) ?? false;
+  const inTooltip = tooltipRef.value?.contains(target) ?? false;
+  // Don't close when clicking inside the tooltip (e.g. the Copy button) — it is
+  // Teleported to <body>, so it is not a descendant of the row element.
+  if (!inRow && !inTooltip) {
+    pinned.value = false;
     tooltipVisible.value = false;
   }
 }
 
 function handleScroll() {
-  if (tooltipVisible.value) tooltipVisible.value = false;
+  if (tooltipVisible.value) {
+    pinned.value = false;
+    tooltipVisible.value = false;
+  }
 }
 
 onMounted(() => {
@@ -260,14 +287,17 @@ onUnmounted(() => {
     </template>
 
     <Teleport v-if="network && hasTooltip" to="body">
-      <NetworkInfoTooltip
-        id="network-info-tooltip"
-        :network="network"
-        :visible="tooltipVisible"
-        :origin-x="originX"
-        :origin-y="originY"
-        :position-style="tooltipStyle"
-      />
+      <div ref="tooltipRef">
+        <NetworkInfoTooltip
+          id="network-info-tooltip"
+          :network="network"
+          :visible="tooltipVisible"
+          :origin-x="originX"
+          :origin-y="originY"
+          :position-style="tooltipStyle"
+          @request-close="closeTooltip"
+        />
+      </div>
     </Teleport>
   </div>
 </template>
