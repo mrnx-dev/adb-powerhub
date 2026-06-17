@@ -1,5 +1,19 @@
 <script setup lang="ts">
-import { Wifi, Signal, Router, Cable, Globe, Shield, Smartphone, Activity } from '@lucide/vue';
+import {
+  Wifi,
+  Signal,
+  Router,
+  Cable,
+  Globe,
+  Shield,
+  Smartphone,
+  Activity,
+  Copy,
+} from '@lucide/vue';
+import { useToastStore } from '@/stores/toast';
+
+const emit = defineEmits<{ (e: 'request-close'): void }>();
+const toast = useToastStore();
 
 interface Props {
   network: {
@@ -20,7 +34,7 @@ interface Props {
   positionStyle?: Record<string, string>;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   originX: '0',
   originY: '0',
   id: undefined,
@@ -32,6 +46,37 @@ function formatValue(value: string | number | undefined): string {
   const s = String(value).trim();
   if (s === '' || s.toLowerCase() === 'null' || s === '0.0.0.0') return '—';
   return s;
+}
+
+function buildCopyText(): string {
+  const n = props.network;
+  const signal = n.signal_dbm !== undefined && n.signal_dbm !== null ? `${n.signal_dbm} dBm` : '—';
+  const link =
+    n.link_speed_mbps !== undefined && n.link_speed_mbps !== null
+      ? `${n.link_speed_mbps} Mbps`
+      : '—';
+  const freq =
+    n.frequency_mhz !== undefined && n.frequency_mhz !== null ? `${n.frequency_mhz} MHz` : '—';
+  return [
+    `SSID: ${formatValue(n.ssid)}`,
+    `BSSID: ${formatValue(n.bssid)}`,
+    `Signal: ${signal}`,
+    `Link speed: ${link}`,
+    `Frequency: ${freq}`,
+    `Device MAC: ${formatValue(n.device_mac)}`,
+    `HTTP proxy: ${formatValue(n.http_proxy)}`,
+    `Network type: ${formatValue(n.network_type)}`,
+    `IP address: ${formatValue(n.ip_address)}`,
+  ].join('\n');
+}
+
+async function copyNetworkInfo() {
+  try {
+    await navigator.clipboard.writeText(buildCopyText());
+    toast.show('Network info copied to clipboard', 'success');
+  } catch {
+    toast.show('Failed to copy network info', 'error');
+  }
 }
 </script>
 
@@ -54,6 +99,7 @@ function formatValue(value: string | number | undefined): string {
         ...(positionStyle ?? {}),
         transformOrigin: `${originX} ${originY}`,
       }"
+      @keydown.escape="emit('request-close')"
     >
       <div class="flex items-center gap-2 mb-2 pb-2 border-b border-theme-tertiary">
         <Wifi :size="13" class="text-accent-emerald" />
@@ -128,11 +174,27 @@ function formatValue(value: string | number | undefined): string {
           >{{ formatValue(network.ip_address) }}</span
         >
       </div>
+
+      <div class="mt-2 pt-2 border-t border-theme-tertiary">
+        <button
+          type="button"
+          class="network-copy-btn btn-pressable w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] font-medium border border-theme-tertiary bg-theme-btn text-theme-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-emerald/40"
+          aria-label="Copy network info to clipboard"
+          @click="copyNetworkInfo"
+        >
+          <Copy :size="11" />
+          <span>Copy</span>
+        </button>
+      </div>
     </div>
   </Transition>
 </template>
 
 <style scoped>
+.network-copy-btn:hover {
+  background-color: color-mix(in srgb, var(--theme-hover) 30%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ease-emphasized {
     transition-duration: 0.01ms !important;
