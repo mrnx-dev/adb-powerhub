@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Wifi, WifiOff, Signal, ShieldCheck } from '@lucide/vue';
+import { Wifi, WifiOff, Signal, ShieldCheck, Copy } from '@lucide/vue';
+import { useToastStore } from '@/stores/toast';
 import NetworkInfoTooltip from '@/components/NetworkInfoTooltip.vue';
 
 interface Props {
@@ -22,12 +23,10 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
 });
 
+const toast = useToastStore();
 const tooltipVisible = ref(false);
-const pinned = ref(false);
 const hoverTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
 const rowRef = ref<HTMLElement | null>(null);
-const tooltipRef = ref<HTMLElement | null>(null);
-const isPointerDown = ref(false);
 const tooltipStyle = ref<Record<string, string>>({});
 const originX = ref('0');
 const originY = ref('0');
@@ -45,8 +44,8 @@ const hasAssociation = computed(() => {
   return hasSsid || hasBssid;
 });
 
-// Only the connected Wi-Fi variant carries rich detail worth a tooltip; all other
-// variants are static status rows (non-interactive, tabindex -1, default cursor).
+// Only the connected Wi-Fi variant carries rich detail worth a tooltip + copy;
+// all other variants are static status rows (non-interactive, tabindex -1).
 const hasTooltip = computed(() => isWifi.value && hasAssociation.value);
 
 interface SignalQuality {
@@ -87,6 +86,47 @@ function isValidString(value: string | undefined): boolean {
   return v !== '' && v.toLowerCase() !== 'null' && v !== '0.0.0.0';
 }
 
+function formatValue(value: string | number | undefined): string {
+  if (value === undefined || value === null || value === '') return '—';
+  const s = String(value).trim();
+  if (s === '' || s.toLowerCase() === 'null' || s === '0.0.0.0') return '—';
+  return s;
+}
+
+function buildCopyText(): string {
+  const n = props.network;
+  if (!n) return '';
+  const signal = n.signal_dbm !== undefined && n.signal_dbm !== null ? `${n.signal_dbm} dBm` : '—';
+  const link =
+    n.link_speed_mbps !== undefined && n.link_speed_mbps !== null
+      ? `${n.link_speed_mbps} Mbps`
+      : '—';
+  const freq =
+    n.frequency_mhz !== undefined && n.frequency_mhz !== null ? `${n.frequency_mhz} MHz` : '—';
+  return [
+    `SSID: ${formatValue(n.ssid)}`,
+    `BSSID: ${formatValue(n.bssid)}`,
+    `Signal: ${signal}`,
+    `Link speed: ${link}`,
+    `Frequency: ${freq}`,
+    `Device MAC: ${formatValue(n.device_mac)}`,
+    `HTTP proxy: ${formatValue(n.http_proxy)}`,
+    `Network type: ${formatValue(n.network_type)}`,
+    `IP address: ${formatValue(n.ip_address)}`,
+  ].join('\n');
+}
+
+async function copyNetworkInfo() {
+  const text = buildCopyText();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.show('Network info copied to clipboard', 'success');
+  } catch {
+    toast.show('Failed to copy network info', 'error');
+  }
+}
+
 function updateTooltipPosition() {
   if (!rowRef.value) return;
   const rect = rowRef.value.getBoundingClientRect();
@@ -105,10 +145,6 @@ function updateTooltipPosition() {
 
 function showTooltip() {
   if (!hasTooltip.value) return;
-  if (isPointerDown.value) {
-    isPointerDown.value = false;
-    return;
-  }
   if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
   hoverTimeout.value = setTimeout(() => {
     updateTooltipPosition();
@@ -117,69 +153,23 @@ function showTooltip() {
 }
 
 function hideTooltip() {
-  // A pinned tooltip stays open until explicitly dismissed (Escape / click outside /
-  // clicking the row again) so the user can move the pointer into it to reach the
-  // copy button. Preview (unpinned) tooltips hide on mouseleave/blur as before.
-  if (pinned.value) return;
   if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
   tooltipVisible.value = false;
-  isPointerDown.value = false;
-}
-
-function closeTooltip() {
-  pinned.value = false;
-  if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
-  tooltipVisible.value = false;
-  isPointerDown.value = false;
-  // Return focus to the trigger so keyboard users aren't stranded after Escape.
-  rowRef.value?.focus();
-}
-
-function toggleTooltip() {
-  if (!hasTooltip.value) return;
-  if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
-  if (pinned.value) {
-    // Already pinned: unpin and close.
-    pinned.value = false;
-    tooltipVisible.value = false;
-    isPointerDown.value = false;
-    return;
-  }
-  // Pin (and show) so the tooltip stays open while the pointer moves into it to
-  // reach the copy button. Replaces the old visibility-only toggle.
-  pinned.value = true;
-  updateTooltipPosition();
-  tooltipVisible.value = true;
-  isPointerDown.value = false;
 }
 
 function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    closeTooltip();
-  } else if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    toggleTooltip();
-  }
+  if (e.key === 'Escape') hideTooltip();
 }
 
 function handleClickOutside(e: MouseEvent) {
-  if (!tooltipVisible.value) return;
   const target = e.target as Node;
-  const inRow = rowRef.value?.contains(target) ?? false;
-  const inTooltip = tooltipRef.value?.contains(target) ?? false;
-  // Don't close when clicking inside the tooltip (e.g. the Copy button) — it is
-  // Teleported to <body>, so it is not a descendant of the row element.
-  if (!inRow && !inTooltip) {
-    pinned.value = false;
+  if (rowRef.value && !rowRef.value.contains(target)) {
     tooltipVisible.value = false;
   }
 }
 
 function handleScroll() {
-  if (tooltipVisible.value) {
-    pinned.value = false;
-    tooltipVisible.value = false;
-  }
+  if (tooltipVisible.value) tooltipVisible.value = false;
 }
 
 onMounted(() => {
@@ -201,7 +191,6 @@ onUnmounted(() => {
     v-if="loading || hasNetwork"
     ref="rowRef"
     :tabindex="hasTooltip ? 0 : -1"
-    :role="hasTooltip ? 'button' : undefined"
     :aria-describedby="hasTooltip ? 'network-info-tooltip' : undefined"
     class="relative flex items-center gap-2 mt-2 px-2 py-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-emerald/40"
     :class="[
@@ -212,14 +201,11 @@ onUnmounted(() => {
           : 'text-theme-muted',
       'network-row-hover',
       hasTooltip ? 'cursor-help' : 'cursor-default',
-      hasTooltip ? 'active:scale-[0.995]' : '',
     ]"
     @mouseenter="showTooltip"
     @mouseleave="hideTooltip"
     @focus="showTooltip"
     @blur="hideTooltip"
-    @pointerdown="isPointerDown = true"
-    @click="toggleTooltip"
     @keydown="handleKeydown"
   >
     <!-- Loading skeleton -->
@@ -284,20 +270,26 @@ onUnmounted(() => {
         class="text-[10px] text-theme-secondary shrink-0"
         >{{ network.ip_address }}</span
       >
+
+      <button
+        type="button"
+        class="network-copy-btn btn-pressable ml-auto shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-theme-muted hover:text-theme-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-emerald/40"
+        aria-label="Copy network info to clipboard"
+        @click="copyNetworkInfo"
+      >
+        <Copy :size="12" />
+      </button>
     </template>
 
     <Teleport v-if="network && hasTooltip" to="body">
-      <div ref="tooltipRef">
-        <NetworkInfoTooltip
-          id="network-info-tooltip"
-          :network="network"
-          :visible="tooltipVisible"
-          :origin-x="originX"
-          :origin-y="originY"
-          :position-style="tooltipStyle"
-          @request-close="closeTooltip"
-        />
-      </div>
+      <NetworkInfoTooltip
+        id="network-info-tooltip"
+        :network="network"
+        :visible="tooltipVisible"
+        :origin-x="originX"
+        :origin-y="originY"
+        :position-style="tooltipStyle"
+      />
     </Teleport>
   </div>
 </template>
@@ -307,6 +299,10 @@ onUnmounted(() => {
   transition:
     background-color 200ms var(--ease-out),
     transform 120ms var(--ease-out);
+}
+
+.network-copy-btn:hover {
+  background-color: color-mix(in srgb, var(--theme-hover) 30%, transparent);
 }
 
 @media (hover: hover) and (pointer: fine) {
