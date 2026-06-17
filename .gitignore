@@ -7,13 +7,12 @@ src-tauri/target/
 Thumbs.db 
 
 # Miko AI coding agent files 
-AGENTS.md 
 ORCHESTRATOR.md 
 SOUL.md 
-miko.bat 
-miko.ps1 
+miko.bat
 skills/ 
-.miko/ 
+.miko/
+scripts/
 
 # Windows CMD artifacts (e.g. `echo done > nul`)
 nul
