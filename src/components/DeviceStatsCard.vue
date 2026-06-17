@@ -2,6 +2,7 @@
 import { useDeviceStore } from '../stores/device';
 import { useNavigationStore } from '../stores/navigation';
 import { useDropdownRegistry } from '../composables/useDropdownRegistry';
+import NetworkInfoRow from '@/components/NetworkInfoRow.vue';
 import {
   Smartphone,
   Battery,
@@ -233,6 +234,8 @@ function handleDisconnect() {
               >{{ store.cpuUsage.toFixed(0) }}%</span
             >
           </div>
+
+          <NetworkInfoRow :network="store.networkInfo" :loading="store.isLoadingStats" />
         </div>
 
         <!-- Connected badge + dropdown -->

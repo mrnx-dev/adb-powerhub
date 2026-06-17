@@ -1161,6 +1161,39 @@ body {
   box-shadow: var(--shadow-hover);
 }
 
+/* Easing utility for Vue <Transition> classes */
+.ease-emphasized {
+  transition-timing-function: var(--ease-emphasized);
+}
+
+/* Network row skeleton shimmer — visible against card backgrounds */
+@keyframes network-row-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.network-row-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-btn) 0%,
+    color-mix(in srgb, var(--bg-btn) 80%, var(--text-secondary)) 50%,
+    var(--bg-btn) 100%
+  );
+  background-size: 200% 100%;
+  animation: network-row-shimmer 1.6s var(--ease-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .network-row-skeleton {
+    animation: none;
+    background: var(--bg-btn);
+  }
+}
+
 /* ============================================================
    MOTION UTILITIES (Dashboard Motion & UX Polish)
    ============================================================ */

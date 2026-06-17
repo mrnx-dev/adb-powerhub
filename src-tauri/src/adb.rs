@@ -244,6 +244,19 @@ pub struct BatteryInfo {
     pub voltage: i32,
 }
 
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct NetworkInfo {
+    pub ssid: Option<String>,
+    pub bssid: Option<String>,
+    pub signal_dbm: Option<i32>,
+    pub link_speed_mbps: Option<u32>,
+    pub frequency_mhz: Option<u32>,
+    pub device_mac: Option<String>,
+    pub http_proxy: Option<String>,
+    pub network_type: Option<String>,
+    pub ip_address: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DeviceStats {
     pub battery: BatteryInfo,
@@ -257,6 +270,7 @@ pub struct DeviceStats {
     pub storage_used_gb: f64,
     pub screen_width: u32,
     pub screen_height: u32,
+    pub network: Option<NetworkInfo>,
 }
 
 #[tauri::command]
@@ -460,6 +474,7 @@ pub fn adb_get_device_info(state: State<AppState>) -> Result<DeviceStats, String
         storage_used_gb: 0.0,
         screen_width: 0,
         screen_height: 0,
+        network: None,
     })
 }
 
@@ -899,6 +914,370 @@ fn parse_wm_size(output: &str) -> (u32, u32) {
     (0, 0)
 }
 
+// --- Network info parsing helpers -----------------------------------------
+
+fn is_valid_mac(s: &str) -> bool {
+    s.split(':').count() == 6
+        && s.split(':').all(|p| p.len() == 2 && u8::from_str_radix(p, 16).is_ok())
+}
+
+fn is_zero_mac(s: &str) -> bool {
+    s.to_lowercase() == "00:00:00:00:00:00"
+}
+
+fn is_privacy_placeholder_mac(s: &str) -> bool {
+    s.to_lowercase() == "02:00:00:00:00:00"
+}
+
+fn is_unknown_ssid(s: &str) -> bool {
+    let t = s.trim();
+    t.is_empty()
+        || t.eq_ignore_ascii_case("<unknown ssid>")
+        || t.eq_ignore_ascii_case("<unknown>")
+        || t.eq_ignore_ascii_case("<none>")
+        || t.starts_with("<unknown")
+}
+
+fn is_placeholder_ip(s: &str) -> bool {
+    let t = s.trim();
+    t.is_empty() || t.eq_ignore_ascii_case("null") || t == "0.0.0.0"
+}
+
+fn is_placeholder_u32(n: u32) -> bool {
+    n == 0 || n == u32::MAX
+}
+
+fn is_placeholder_signal(n: i32) -> bool {
+    n < -120 || n > 0
+}
+
+fn parse_ssid_value(line: &str) -> Option<String> {
+    // Find the first "SSID:" / "ssid:" occurrence and extract the value after it.
+    let rest = line
+        .split("SSID:")
+        .nth(1)
+        .or_else(|| line.split("ssid:").nth(1))?
+        .trim_start();
+    let value = if rest.starts_with('"') {
+        // quoted: "MyHome5G", ...
+        let mut chars = rest.chars();
+        chars.next(); // skip opening quote
+        let mut acc = String::new();
+        for c in chars {
+            if c == '"' {
+                break;
+            }
+            acc.push(c);
+        }
+        acc
+    } else {
+        // unquoted token until comma/whitespace
+        rest.split(|c: char| c == ',' || c.is_whitespace()).next().unwrap_or("").to_string()
+    };
+    Some(value)
+}
+
+fn parse_bssid_value(line: &str) -> Option<String> {
+    let rest = line
+        .split("BSSID:")
+        .nth(1)
+        .or_else(|| line.split("bssid:").nth(1))?;
+    let token = rest.split(|c: char| c == ',' || c.is_whitespace()).next().unwrap_or("").trim();
+    if is_valid_mac(token) {
+        Some(token.to_lowercase())
+    } else {
+        None
+    }
+}
+
+fn extract_number_after(line: &str, prefix: &str) -> Option<i64> {
+    let rest = line.split(prefix).nth(1)?;
+    let token = rest
+        .trim_start()
+        .split(|c: char| c == ',' || c.is_whitespace() || c == 'm' || c == 'M' || c == 'd' || c == 'D' || c == 'h' || c == 'H' || c == 'z' || c == 'Z' || c == '/')
+        .next()
+        .unwrap_or("");
+    token.parse().ok()
+}
+
+fn extract_after_prefix(line: &str, prefix: &str) -> Option<i64> {
+    let rest = line.split(prefix).nth(1)?;
+    let token = rest
+        .trim_start()
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .next()
+        .unwrap_or("");
+    token.parse().ok()
+}
+
+fn extract_ip_after(line: &str, prefix: &str) -> Option<String> {
+    let raw = line
+        .split(prefix)
+        .nth(1)?
+        .trim_start()
+        .trim_start_matches('/')
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .next()
+        .filter(|s| !s.is_empty())
+        .map(String::from)?;
+    if is_placeholder_ip(&raw) {
+        None
+    } else {
+        Some(raw)
+    }
+}
+
+fn parse_supplicant_state(line: &str) -> Option<String> {
+    line.to_lowercase()
+        .split("supplicant state:")
+        .nth(1)?
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .next()
+        .map(|t| t.trim().to_string())
+}
+
+fn is_connected_supplicant_state(state: &str) -> bool {
+    matches!(
+        state.to_lowercase().as_str(),
+        "completed" | "associated" | "four_way_handshake" | "group_handshake"
+    )
+}
+
+fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
+    let mut info = NetworkInfo::default();
+    let mut candidate_ssid: Option<String> = None;
+    let mut candidate_bssid: Option<String> = None;
+
+    // Best authoritative mWifiInfo block found so far. We prefer one that has a valid
+    // association (known SSID + valid BSSID) because `dumpsys wifi` contains historic
+    // disconnected mWifiInfo entries too.
+    let mut best_mwifi: Option<NetworkInfo> = None;
+
+    for line in output.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if line.starts_with("mWifiInfo") {
+            let m_ssid = parse_ssid_value(line);
+            let m_bssid = parse_bssid_value(line);
+            let m_state = parse_supplicant_state(line);
+            let m_signal = extract_number_after(line, "RSSI:").map(|n| n as i32);
+            let m_link = extract_number_after(line, "Link speed:")
+                .or_else(|| extract_number_after(line, "Tx Link speed:"))
+                .map(|n| n as u32);
+            let m_freq = extract_number_after(line, "Frequency:").map(|n| n as u32);
+            let m_ip = extract_ip_after(line, "IP:");
+
+            // The last mWifiInfo line in the dump reflects the current state. Only trust it
+            // if the supplicant state indicates an active connection. Disconnected entries may
+            // still carry the old SSID/BSSID from the previous network, so we must not use them.
+            let is_connected = m_state.as_ref().map_or(false, |st| is_connected_supplicant_state(st));
+            let is_valid_assoc = is_connected
+                && m_ssid.as_ref().map_or(false, |s| !is_unknown_ssid(s))
+                && m_bssid.as_ref().map_or(false, |b| !is_zero_mac(b) && !is_privacy_placeholder_mac(b));
+
+            if is_valid_assoc {
+                best_mwifi = Some(NetworkInfo {
+                    ssid: m_ssid.clone(),
+                    bssid: m_bssid.clone(),
+                    signal_dbm: m_signal,
+                    link_speed_mbps: m_link,
+                    frequency_mhz: m_freq,
+                    ip_address: m_ip.clone(),
+                    ..Default::default()
+                });
+            } else {
+                // Explicitly clear any stale best_mwifi when the current state is disconnected.
+                best_mwifi = None;
+            }
+            continue;
+        }
+
+        if line.contains("SSID:") || line.contains("ssid:") {
+            if let Some(ssid) = parse_ssid_value(line) {
+                candidate_ssid = Some(ssid);
+            }
+        }
+
+        if line.contains("BSSID:") || line.contains("bssid:") {
+            if let Some(bssid) = parse_bssid_value(line) {
+                if !is_zero_mac(&bssid) && !is_privacy_placeholder_mac(&bssid) {
+                    candidate_bssid = Some(bssid);
+                }
+            }
+        }
+
+        if line.contains("rssi=") || line.contains("RSSI=") {
+            if info.signal_dbm.is_none() {
+                if let Some(n) = extract_after_prefix(line, "rssi=")
+                    .or_else(|| extract_after_prefix(line, "RSSI=")) {
+                    info.signal_dbm = Some(n as i32);
+                }
+            }
+        }
+
+        if line.contains("RSSI:") || line.contains("rssi:") {
+            if let Some(n) = extract_number_after(line, "RSSI:")
+                .or_else(|| extract_number_after(line, "rssi:")) {
+                info.signal_dbm = Some(n as i32);
+            }
+        }
+    }
+
+    // Use the best mWifiInfo line if it has any valid data. If the current mWifiInfo state is
+    // disconnected, best_mwifi is None and we must not fall back to historic candidate SSIDs/BSSIDs
+    // from earlier in the dump — that would make a disconnected device look still connected.
+    if let Some(ref best) = best_mwifi {
+        if info.ssid.as_ref().map_or(true, |_| true) {
+            info.ssid = best.ssid.clone();
+        }
+        if info.bssid.as_ref().map_or(true, |_| true) {
+            info.bssid = best.bssid.clone();
+        }
+        if info.signal_dbm.is_none() {
+            info.signal_dbm = best.signal_dbm;
+        }
+        if info.link_speed_mbps.is_none() {
+            info.link_speed_mbps = best.link_speed_mbps;
+        }
+        if info.frequency_mhz.is_none() {
+            info.frequency_mhz = best.frequency_mhz;
+        }
+        if info.ip_address.is_none() {
+            info.ip_address = best.ip_address.clone();
+        }
+    }
+
+    // Candidate fallback is only safe when best_mwifi indicates an active connection. Otherwise,
+    // the candidates are likely from historic events and should not override the disconnected state.
+    if best_mwifi.is_some() {
+        if info.ssid.as_ref().map_or(true, |s| is_unknown_ssid(s)) {
+            info.ssid = info.ssid.clone().or_else(|| candidate_ssid.filter(|s| !is_unknown_ssid(s)));
+        }
+        if info.bssid.as_ref().map_or(true, |b| is_zero_mac(b) || is_privacy_placeholder_mac(b)) {
+            info.bssid = info.bssid.clone().or_else(|| candidate_bssid.filter(|b| !is_zero_mac(b) && !is_privacy_placeholder_mac(b)));
+        }
+    }
+
+    // If the current supplicant state is disconnected, drop any stale signal/link/freq values that
+    // were picked up from historic RSSI poll lines. We don't want a disconnected device to show a
+    // signal strength from when it was still connected.
+    if best_mwifi.is_none() {
+        info.signal_dbm = None;
+        info.link_speed_mbps = None;
+        info.frequency_mhz = None;
+    }
+
+    // Filter Android placeholder/sentinel values that leak through ADB output.
+    if info.signal_dbm.map_or(false, |n| is_placeholder_signal(n)) {
+        info.signal_dbm = None;
+    }
+    if info.link_speed_mbps.map_or(false, |n| is_placeholder_u32(n)) {
+        info.link_speed_mbps = None;
+    }
+    if info.frequency_mhz.map_or(false, |n| is_placeholder_u32(n)) {
+        info.frequency_mhz = None;
+    }
+    if info.ip_address.as_ref().map_or(false, |ip| is_placeholder_ip(ip)) {
+        info.ip_address = None;
+    }
+
+    info
+}
+
+fn parse_mac_from_ip_addr(output: &str) -> Option<String> {
+    for line in output.lines() {
+        if line.contains("link/ether") {
+            let token = line.split_whitespace().nth(1)?;
+            let mac = token.to_lowercase();
+            if is_valid_mac(&mac) && !is_zero_mac(&mac) && !is_privacy_placeholder_mac(&mac) {
+                return Some(mac);
+            }
+        }
+    }
+    None
+}
+
+fn parse_mac_from_ifconfig(output: &str) -> Option<String> {
+    for line in output.lines() {
+        let line = line.trim();
+        if line.contains("HWaddr") {
+            let token = line.split("HWaddr").nth(1)?.trim().split_whitespace().next()?;
+            let mac = token.to_lowercase();
+            if is_valid_mac(&mac) && !is_zero_mac(&mac) && !is_privacy_placeholder_mac(&mac) {
+                return Some(mac);
+            }
+        }
+        if line.contains("ether") {
+            let token = line.split("ether").nth(1)?.trim().split_whitespace().next()?;
+            let mac = token.to_lowercase();
+            if is_valid_mac(&mac) && !is_zero_mac(&mac) && !is_privacy_placeholder_mac(&mac) {
+                return Some(mac);
+            }
+        }
+    }
+    None
+}
+
+fn parse_first_wlan_mac(output: &str) -> Option<String> {
+    let mut in_wlan = false;
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed.ends_with(':') && trimmed.contains("wlan") {
+            let name = trimmed.trim_end_matches(':').split('@').next().unwrap_or("").trim();
+            in_wlan = name.contains("wlan");
+            continue;
+        }
+        if in_wlan && line.contains("link/ether") {
+            let token = line.split_whitespace().nth(1)?;
+            let mac = token.to_lowercase();
+            if is_valid_mac(&mac) && !is_zero_mac(&mac) && !is_privacy_placeholder_mac(&mac) {
+                return Some(mac);
+            }
+        }
+    }
+    None
+}
+
+fn parse_http_proxy(output: &str) -> Option<String> {
+    let v = output.trim();
+    if v.is_empty() || v == "null" || v == "0" || v == ":0" {
+        None
+    } else {
+        Some(v.to_string())
+    }
+}
+
+fn parse_network_type(output: &str) -> Option<String> {
+    let lower = output.to_lowercase();
+    if lower.contains("transports: wifi") || lower.contains("type: wifi") || lower.contains("active network: wifi") {
+        return Some("Wi-Fi".to_string());
+    }
+    if lower.contains("transports: cellular") || lower.contains("type: mobile") {
+        return Some("Mobile".to_string());
+    }
+    if lower.contains("transports: vpn") || lower.contains("type: vpn") {
+        return Some("VPN".to_string());
+    }
+    None
+}
+
+fn parse_ip_from_ip_route(output: &str) -> Option<String> {
+    let mut found_src = false;
+    for part in output.split_whitespace() {
+        if found_src {
+            let ip = part.to_string();
+            return if is_placeholder_ip(&ip) { None } else { Some(ip) };
+        }
+        if part == "src" {
+            found_src = true;
+        }
+    }
+    None
+}
+
 #[tauri::command]
 pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceStats, String> {
     let _guard = CommandGuard::acquire(&state).await?;
@@ -937,6 +1316,65 @@ pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceS
         .unwrap_or_default();
     let (screen_width, screen_height) = parse_wm_size(&wm_size_output);
 
+    // Network info (best-effort; failures degrade silently per field)
+    let dumpsys_wifi_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "dumpsys", "wifi"])
+        .unwrap_or_default();
+    let mut network = parse_dumpsys_wifi(&dumpsys_wifi_output);
+
+    let ip_addr_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "ip", "addr", "show", "wlan0"])
+        .unwrap_or_default();
+    network.device_mac = parse_mac_from_ip_addr(&ip_addr_output)
+        .or_else(|| {
+            let ifconfig_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "ifconfig", "wlan0"])
+                .unwrap_or_default();
+            parse_mac_from_ifconfig(&ifconfig_output)
+        })
+        .or_else(|| {
+            let all_ip_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "ip", "addr"])
+                .unwrap_or_default();
+            parse_first_wlan_mac(&all_ip_output)
+        })
+        .or_else(|| {
+            run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "cat", "/sys/class/net/wlan0/address"])
+                .ok()
+                .and_then(|out| {
+                    let mac = out.trim().to_lowercase();
+                    if is_valid_mac(&mac) && !is_zero_mac(&mac) && !is_privacy_placeholder_mac(&mac) {
+                        Some(mac)
+                    } else {
+                        None
+                    }
+                })
+        });
+
+    let proxy_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "settings", "get", "global", "http_proxy"])
+        .unwrap_or_default();
+    network.http_proxy = parse_http_proxy(&proxy_output);
+
+    let connectivity_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "dumpsys", "connectivity"])
+        .unwrap_or_default();
+    network.network_type = parse_network_type(&connectivity_output);
+
+    if network.ip_address.is_none() {
+        let ip_route_output = run_adb_cmd_with_device(&adb, serial.as_deref(), &["shell", "ip", "route", "get", "8.8.8.8"])
+            .unwrap_or_default();
+        network.ip_address = parse_ip_from_ip_route(&ip_route_output).filter(|ip| !is_placeholder_ip(ip));
+    }
+
+    // Final pass: strip any sentinel values that individual parsers may have missed.
+    if network.signal_dbm.map_or(false, |n| is_placeholder_signal(n)) {
+        network.signal_dbm = None;
+    }
+    if network.link_speed_mbps.map_or(false, |n| is_placeholder_u32(n)) {
+        network.link_speed_mbps = None;
+    }
+    if network.frequency_mhz.map_or(false, |n| is_placeholder_u32(n)) {
+        network.frequency_mhz = None;
+    }
+    if network.ip_address.as_ref().map_or(false, |ip| is_placeholder_ip(ip)) {
+        network.ip_address = None;
+    }
+
     Ok(DeviceStats {
         battery,
         cpu_usage: cpu,
@@ -949,6 +1387,7 @@ pub async fn adb_poll_device_stats(state: State<'_, AppState>) -> Result<DeviceS
         storage_used_gb,
         screen_width,
         screen_height,
+        network: Some(network),
     })
 }
 

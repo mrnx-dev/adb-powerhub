@@ -6,6 +6,18 @@ import { useSettingsStore } from './settings';
 import { useToastStore } from './toast';
 import { useConnectionHistoryStore } from './connectionHistory';
 
+interface NetworkInfoPayload {
+  ssid?: string;
+  bssid?: string;
+  signal_dbm?: number;
+  link_speed_mbps?: number;
+  frequency_mhz?: number;
+  device_mac?: string;
+  http_proxy?: string;
+  network_type?: string;
+  ip_address?: string;
+}
+
 // Screenshot Gallery debounce timer (module-level to survive store re-creation)
 let _ssRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -49,6 +61,7 @@ export const useDeviceStore = defineStore('device', () => {
   const screenWidth = ref(0);
   const screenHeight = ref(0);
   const batteryVoltage = ref(0);
+  const networkInfo = ref<NetworkInfoPayload | null>(null);
 
   const scrcpyAvailable = ref(false);
   const scrcpyPath = ref<string | null>(null);
@@ -164,6 +177,7 @@ export const useDeviceStore = defineStore('device', () => {
     screenWidth.value = 0;
     screenHeight.value = 0;
     batteryVoltage.value = 0;
+    networkInfo.value = null;
   }
 
   async function onConnected(deviceIdStr: string, method: 'manual' | 'wifi' | 'pairing') {
@@ -531,6 +545,7 @@ export const useDeviceStore = defineStore('device', () => {
         storage_used_gb: number;
         screen_width: number;
         screen_height: number;
+        network?: NetworkInfoPayload;
       }>('adb_poll_device_stats');
 
       batteryLevel.value = stats.battery.level;
@@ -549,6 +564,7 @@ export const useDeviceStore = defineStore('device', () => {
       storageUsed.value = stats.storage_used_gb;
       screenWidth.value = stats.screen_width;
       screenHeight.value = stats.screen_height;
+      networkInfo.value = stats.network ?? null;
       pollFailCount = 0;
       pollCount++;
       if (pollCount % 5 === 0) {
@@ -1253,6 +1269,7 @@ export const useDeviceStore = defineStore('device', () => {
     screenHeight,
     screenResolution,
     batteryVoltage,
+    networkInfo,
     textInput,
     showRebootMenu,
     isReconnecting,
