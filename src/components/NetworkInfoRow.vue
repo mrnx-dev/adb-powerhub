@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
-import { Wifi, WifiOff } from '@lucide/vue';
+import { Wifi, WifiOff, Signal, ShieldCheck } from '@lucide/vue';
 import NetworkInfoTooltip from '@/components/NetworkInfoTooltip.vue';
 
 interface Props {
@@ -32,6 +32,8 @@ const originY = ref('0');
 
 const hasNetwork = computed(() => props.network !== null);
 const isWifi = computed(() => props.network?.network_type === 'Wi-Fi');
+const isMobile = computed(() => props.network?.network_type === 'Mobile');
+const isVpn = computed(() => props.network?.network_type === 'VPN');
 const hasAssociation = computed(() => {
   const n = props.network;
   if (!n) return false;
@@ -40,6 +42,10 @@ const hasAssociation = computed(() => {
   const hasBssid = !!n.bssid && n.bssid.trim() !== '' && n.bssid.trim() !== '00:00:00:00:00:00';
   return hasSsid || hasBssid;
 });
+
+// Only the connected Wi-Fi variant carries rich detail worth a tooltip; all other
+// variants are static status rows (non-interactive, tabindex -1, default cursor).
+const hasTooltip = computed(() => isWifi.value && hasAssociation.value);
 
 interface SignalQuality {
   label: string;
@@ -61,9 +67,9 @@ const signalQuality = computed<SignalQuality>(() => {
 });
 
 const primaryText = computed(() => {
-  if (!isWifi.value) return 'Wi-Fi disabled · —';
-  if (!hasAssociation.value) return 'Wi-Fi on · not connected';
-  return null;
+  if (isWifi.value) return hasAssociation.value ? null : 'Wi-Fi on · not connected';
+  if (isMobile.value || isVpn.value) return null;
+  return 'No active network · —';
 });
 
 const displaySsid = computed(() => {
@@ -96,6 +102,7 @@ function updateTooltipPosition() {
 }
 
 function showTooltip() {
+  if (!hasTooltip.value) return;
   if (isPointerDown.value) {
     isPointerDown.value = false;
     return;
@@ -114,6 +121,7 @@ function hideTooltip() {
 }
 
 function toggleTooltip() {
+  if (!hasTooltip.value) return;
   if (hoverTimeout.value) clearTimeout(hoverTimeout.value);
   if (tooltipVisible.value) {
     tooltipVisible.value = false;
@@ -165,13 +173,19 @@ onUnmounted(() => {
   <div
     v-if="loading || hasNetwork"
     ref="rowRef"
-    tabindex="0"
-    role="button"
-    aria-describedby="network-info-tooltip"
-    class="relative flex items-center gap-2 mt-2 px-2 py-1.5 rounded-md cursor-help focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-emerald/40 active:scale-[0.995]"
+    :tabindex="hasTooltip ? 0 : -1"
+    :role="hasTooltip ? 'button' : undefined"
+    :aria-describedby="hasTooltip ? 'network-info-tooltip' : undefined"
+    class="relative flex items-center gap-2 mt-2 px-2 py-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-emerald/40"
     :class="[
-      isWifi && hasAssociation ? 'text-theme-primary' : 'text-theme-muted',
+      isWifi && hasAssociation
+        ? 'text-theme-primary'
+        : isMobile || isVpn
+          ? 'text-theme-secondary'
+          : 'text-theme-muted',
       'network-row-hover',
+      hasTooltip ? 'cursor-help' : 'cursor-default',
+      hasTooltip ? 'active:scale-[0.995]' : '',
     ]"
     @mouseenter="showTooltip"
     @mouseleave="hideTooltip"
@@ -186,10 +200,32 @@ onUnmounted(() => {
       <div class="h-2 rounded-full network-row-skeleton w-full max-w-[180px]"></div>
     </template>
 
-    <!-- Disconnected / Wi-Fi disabled -->
+    <!-- Status messages: "Wi-Fi on · not connected" / "No active network · —" -->
     <template v-else-if="primaryText">
       <WifiOff :size="13" class="shrink-0" />
       <span class="text-[11px]">{{ primaryText }}</span>
+    </template>
+
+    <!-- Mobile data -->
+    <template v-else-if="isMobile">
+      <Signal :size="13" class="shrink-0 text-theme-secondary" />
+      <span class="text-[11px] font-medium">Mobile data</span>
+      <span
+        v-if="network && isValidString(network.ip_address)"
+        class="text-[10px] text-theme-secondary shrink-0"
+        >{{ network.ip_address }}</span
+      >
+    </template>
+
+    <!-- VPN -->
+    <template v-else-if="isVpn">
+      <ShieldCheck :size="13" class="shrink-0 text-theme-secondary" />
+      <span class="text-[11px] font-medium">VPN</span>
+      <span
+        v-if="network && isValidString(network.ip_address)"
+        class="text-[10px] text-theme-secondary shrink-0"
+        >{{ network.ip_address }}</span
+      >
     </template>
 
     <!-- Connected Wi-Fi info -->
@@ -223,7 +259,7 @@ onUnmounted(() => {
       >
     </template>
 
-    <Teleport v-if="network" to="body">
+    <Teleport v-if="network && hasTooltip" to="body">
       <NetworkInfoTooltip
         id="network-info-tooltip"
         :network="network"
