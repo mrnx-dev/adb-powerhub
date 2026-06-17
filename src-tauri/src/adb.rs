@@ -1056,13 +1056,14 @@ fn is_connected_supplicant_state(state: &str) -> bool {
 
 fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
     let mut info = NetworkInfo::default();
-    let mut candidate_ssid: Option<String> = None;
-    let mut candidate_bssid: Option<String> = None;
 
-    // Best authoritative mWifiInfo block found so far. We prefer one that has a valid
-    // association (known SSID + valid BSSID) because `dumpsys wifi` contains historic
-    // disconnected mWifiInfo entries too.
+    // The FIRST `mWifiInfo` line in `dumpsys wifi` reflects the current connection
+    // state. The dump also contains historical `mWifiInfo` snapshots inside the
+    // connection-event log (frequently disconnected) that appear AFTER the current
+    // block. We trust only the first `mWifiInfo` and ignore the rest, so a trailing
+    // disconnected history entry cannot suppress a live connected state.
     let mut best_mwifi: Option<NetworkInfo> = None;
+    let mut seen_mwifi = false;
 
     for line in output.lines() {
         let line = line.trim();
@@ -1071,6 +1072,13 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
         }
 
         if line.starts_with("mWifiInfo") {
+            // Only the first mWifiInfo is the current connection state; later ones
+            // are historical snapshots in the connection-event log.
+            if seen_mwifi {
+                continue;
+            }
+            seen_mwifi = true;
+
             let m_ssid = parse_ssid_value(line);
             let m_bssid = parse_bssid_value(line);
             let m_state = parse_supplicant_state(line);
@@ -1081,9 +1089,9 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
             let m_freq = extract_number_after(line, "Frequency:").map(|n| n as u32);
             let m_ip = extract_ip_after(line, "IP:");
 
-            // The last mWifiInfo line in the dump reflects the current state. Only trust it
-            // if the supplicant state indicates an active connection. Disconnected entries may
-            // still carry the old SSID/BSSID from the previous network, so we must not use them.
+            // Trust the current mWifiInfo only if the supplicant state indicates an
+            // active connection. Disconnected entries may still carry the old
+            // SSID/BSSID from the previous network, so we must not use them.
             let is_connected = m_state.as_ref().map_or(false, |st| is_connected_supplicant_state(st));
             let is_valid_assoc = is_connected
                 && m_ssid.as_ref().map_or(false, |s| !is_unknown_ssid(s))
@@ -1099,28 +1107,17 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
                     ip_address: m_ip.clone(),
                     ..Default::default()
                 });
-            } else {
-                // Explicitly clear any stale best_mwifi when the current state is disconnected.
-                best_mwifi = None;
             }
+            // If the first (current) mWifiInfo is disconnected/invalid, best_mwifi
+            // stays None; later historical mWifiInfo lines are ignored (seen_mwifi).
             continue;
         }
 
-        if line.contains("SSID:") || line.contains("ssid:") {
-            if let Some(ssid) = parse_ssid_value(line) {
-                candidate_ssid = Some(ssid);
-            }
-        }
-
-        if line.contains("BSSID:") || line.contains("bssid:") {
-            if let Some(bssid) = parse_bssid_value(line) {
-                if !is_zero_mac(&bssid) && !is_privacy_placeholder_mac(&bssid) {
-                    candidate_bssid = Some(bssid);
-                }
-            }
-        }
-
-        if line.contains("rssi=") || line.contains("RSSI=") {
+        // Historic RSSI-poll `rec[]` lines (lowercase `rssi=`) appear before the
+        // first mWifiInfo. Capture the first as a fallback hint only; the first
+        // mWifiInfo is authoritative and overrides it after the loop. Ignore any
+        // such lines once the current mWifiInfo has been seen (they are history).
+        if !seen_mwifi && (line.contains("rssi=") || line.contains("RSSI=")) {
             if info.signal_dbm.is_none() {
                 if let Some(n) = extract_after_prefix(line, "rssi=")
                     .or_else(|| extract_after_prefix(line, "RSSI=")) {
@@ -1128,54 +1125,19 @@ fn parse_dumpsys_wifi(output: &str) -> NetworkInfo {
                 }
             }
         }
-
-        if line.contains("RSSI:") || line.contains("rssi:") {
-            if let Some(n) = extract_number_after(line, "RSSI:")
-                .or_else(|| extract_number_after(line, "rssi:")) {
-                info.signal_dbm = Some(n as i32);
-            }
-        }
     }
 
-    // Use the best mWifiInfo line if it has any valid data. If the current mWifiInfo state is
-    // disconnected, best_mwifi is None and we must not fall back to historic candidate SSIDs/BSSIDs
-    // from earlier in the dump — that would make a disconnected device look still connected.
-    if let Some(ref best) = best_mwifi {
-        if info.ssid.as_ref().map_or(true, |_| true) {
-            info.ssid = best.ssid.clone();
-        }
-        if info.bssid.as_ref().map_or(true, |_| true) {
-            info.bssid = best.bssid.clone();
-        }
-        if info.signal_dbm.is_none() {
-            info.signal_dbm = best.signal_dbm;
-        }
-        if info.link_speed_mbps.is_none() {
-            info.link_speed_mbps = best.link_speed_mbps;
-        }
-        if info.frequency_mhz.is_none() {
-            info.frequency_mhz = best.frequency_mhz;
-        }
-        if info.ip_address.is_none() {
-            info.ip_address = best.ip_address.clone();
-        }
-    }
-
-    // Candidate fallback is only safe when best_mwifi indicates an active connection. Otherwise,
-    // the candidates are likely from historic events and should not override the disconnected state.
-    if best_mwifi.is_some() {
-        if info.ssid.as_ref().map_or(true, |s| is_unknown_ssid(s)) {
-            info.ssid = info.ssid.clone().or_else(|| candidate_ssid.filter(|s| !is_unknown_ssid(s)));
-        }
-        if info.bssid.as_ref().map_or(true, |b| is_zero_mac(b) || is_privacy_placeholder_mac(b)) {
-            info.bssid = info.bssid.clone().or_else(|| candidate_bssid.filter(|b| !is_zero_mac(b) && !is_privacy_placeholder_mac(b)));
-        }
-    }
-
-    // If the current supplicant state is disconnected, drop any stale signal/link/freq values that
-    // were picked up from historic RSSI poll lines. We don't want a disconnected device to show a
-    // signal strength from when it was still connected.
-    if best_mwifi.is_none() {
+    // The first mWifiInfo is authoritative. When present, its fields win over the
+    // historic RSSI-poll hint. When absent (device disconnected), drop the hint so a
+    // disconnected device does not show a stale signal.
+    if let Some(best) = best_mwifi {
+        info.ssid = best.ssid;
+        info.bssid = best.bssid;
+        info.signal_dbm = best.signal_dbm;
+        info.link_speed_mbps = best.link_speed_mbps;
+        info.frequency_mhz = best.frequency_mhz;
+        info.ip_address = best.ip_address;
+    } else {
         info.signal_dbm = None;
         info.link_speed_mbps = None;
         info.frequency_mhz = None;
@@ -3053,20 +3015,18 @@ mod tests {
 
     /// Regression tests for the ADB network-info parsers in this module.
     ///
-    /// Follow-up items found while writing these tests (NOT fixed here; each should
-    /// become its own scoped task with PRD/blueprint/plan/review):
+    /// Follow-up items (see the 2026-06-17 parser-fix review):
     ///
-    /// 1. `parse_dumpsys_wifi` uses a "last mWifiInfo wins" heuristic. Real
-    ///    `dumpsys wifi` output can contain historical `mWifiInfo` lines inside
-    ///    connection-log sections that are NOT the current state. A trailing
-    ///    disconnected history entry suppresses a genuinely current connected
-    ///    state. Needs a more selective "current state" heuristic (e.g. the first
-    ///    mWifiInfo, or one keyed to the active WifiClient block).
+    /// 1. RESOLVED 2026-06-17 — "last mWifiInfo wins" replaced by "first mWifiInfo
+    ///    wins": the first mWifiInfo is the current state; historical mWifiInfo
+    ///    snapshots in the connection-event log are ignored. See
+    ///    parse_dumpsys_wifi_real_structure_connected_first_then_disconnected_history.
     ///
-    /// 2. `is_valid_assoc` requires a non-unknown SSID, so a valid connection whose
-    ///    SSID is restricted/hidden (Android 10+ without location permission, or a
-    ///    hidden SSID) is dropped entirely — contradicting PRD FR-1 "Hidden SSID →
-    ///    tampilkan sebagai 'Hidden Network'" and US-5 (Android 10+ graceful).
+    /// 2. STILL OPEN — `is_valid_assoc` requires a non-unknown SSID, so a valid
+    ///    connection whose SSID is restricted/hidden (Android 10+ without location
+    ///    permission, or a hidden SSID) is dropped entirely — contradicting PRD FR-1
+    ///    "Hidden SSID → tampilkan sebagai 'Hidden Network'" and US-5. Needs its own
+    ///    scoped task.
     // ---------------------------------------------------------------------
     // MAC / SSID / sentinel helpers
     // ---------------------------------------------------------------------
@@ -3323,14 +3283,22 @@ mod tests {
     }
 
     #[test]
-    fn parse_dumpsys_wifi_trailing_disconnected_clears_connected_data() {
-        // Documents the supplicant-state-aware "last mWifiInfo wins" contract
-        // (commit d938077): a trailing disconnected entry clears stale connected
-        // data so a freshly-disconnected device does not still show a network.
-        // NOTE: see follow-up item #1 in the module header — this contract also
-        // lets history-section disconnected mWifiInfo lines suppress a current
-        // connected state.
+    fn parse_dumpsys_wifi_trailing_disconnected_history_does_not_override_current() {
+        // First-mWifiInfo-wins contract: a trailing disconnected history entry must
+        // NOT clear a current connected state. Guards the fix for the bug where a
+        // connected device rendered 'Wi-Fi on · not connected'.
         let combined = format!("{}\n{}", REAL_CONNECTED_MWIFI, REAL_DISCONNECTED_MWIFI);
+        let info = parse_dumpsys_wifi(&combined);
+        assert_eq!(info.ssid.as_deref(), Some("MSI"));
+        assert_eq!(info.bssid.as_deref(), Some("7e:70:db:d9:e1:5d"));
+        assert_eq!(info.signal_dbm, Some(-58));
+    }
+
+    #[test]
+    fn parse_dumpsys_wifi_leading_disconnected_then_history_connected_stays_empty() {
+        // If the current (first) mWifiInfo is disconnected, a later connected
+        // history entry must NOT populate the result — it is stale history.
+        let combined = format!("{}\n{}", REAL_DISCONNECTED_MWIFI, REAL_CONNECTED_MWIFI);
         let info = parse_dumpsys_wifi(&combined);
         assert!(info.ssid.is_none());
         assert!(info.bssid.is_none());
@@ -3338,12 +3306,25 @@ mod tests {
     }
 
     #[test]
-    fn parse_dumpsys_wifi_trailing_connected_populates_after_disconnected() {
-        let combined = format!("{}\n{}", REAL_DISCONNECTED_MWIFI, REAL_CONNECTED_MWIFI);
-        let info = parse_dumpsys_wifi(&combined);
+    fn parse_dumpsys_wifi_real_structure_connected_first_then_disconnected_history() {
+        // Mirrors the real `dumpsys wifi` layout: an RSSI-poll rec[] line, then the
+        // current connected mWifiInfo block, then a trailing disconnected history
+        // block (empty mLinkProperties + disconnected mWifiInfo). The first mWifiInfo
+        // must win, and its RSSI must override the earlier rec[] rssi hint.
+        let dump = "\
+ rec[94]: time=06-16 23:50:15.176 processed=L2ConnectedState what=CMD_ONESHOT_RSSI_POLL screen=on 0 0 \"MSI\" 7e:70:db:d9:e1:5d rssi=-55 f=5805 sc=100 link=96
+mLinkProperties {InterfaceName: wlan0 LinkAddresses: [ 192.168.137.142/24 ] Routes: [ 0.0.0.0/0 -> 192.168.137.1 wlan0 ]}
+mWifiInfo SSID: \"MSI\", BSSID: 7e:70:db:d9:e1:5d, MAC: 9e:23:aa:a2:a5:09, IP: /192.168.137.142, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 11ac, RSSI: -58, Link speed: 96Mbps, Tx Link speed: 96Mbps, Frequency: 5805MHz
+ rec[29]: time=06-16 16:32:25.502 processed=L3ConnectedState what=NETWORK_DISCONNECTION_EVENT ssid: \"MSI\" bssid: 7e:70:db:d9:e1:5d reasonCode: 3
+mLinkProperties {LinkAddresses: [ ] DnsAddresses: [ ] Domains: null MTU: 0 Routes: [ ]}
+mWifiInfo SSID: <unknown ssid>, BSSID: <none>, MAC: 02:00:00:00:00:00, IP: null, Security type: -1, Supplicant state: DISCONNECTED, RSSI: -127, Link speed: -1Mbps, Frequency: -1MHz";
+        let info = parse_dumpsys_wifi(dump);
         assert_eq!(info.ssid.as_deref(), Some("MSI"));
         assert_eq!(info.bssid.as_deref(), Some("7e:70:db:d9:e1:5d"));
         assert_eq!(info.signal_dbm, Some(-58));
+        assert_eq!(info.link_speed_mbps, Some(96));
+        assert_eq!(info.frequency_mhz, Some(5805));
+        assert_eq!(info.ip_address.as_deref(), Some("192.168.137.142"));
     }
 }
 
