@@ -982,7 +982,17 @@ fn parse_bssid_value(line: &str) -> Option<String> {
         .split("BSSID:")
         .nth(1)
         .or_else(|| line.split("bssid:").nth(1))?;
-    let token = rest.split(|c: char| c == ',' || c.is_whitespace()).next().unwrap_or("").trim();
+    // Real ADB output puts a space after "BSSID:" ("BSSID: 7e:70:..."). Trim it
+    // before splitting, otherwise the leading whitespace yields an empty first
+    // token and EVERY BSSID parse fails — cascading into is_valid_assoc == false
+    // and suppressing all network fields for connected devices. Mirrors
+    // parse_ssid_value / extract_number_after / extract_ip_after, which all
+    // trim_start before splitting.
+    let token = rest
+        .trim_start()
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .next()
+        .unwrap_or("");
     if is_valid_mac(token) {
         Some(token.to_lowercase())
     } else {
@@ -1031,6 +1041,7 @@ fn parse_supplicant_state(line: &str) -> Option<String> {
     line.to_lowercase()
         .split("supplicant state:")
         .nth(1)?
+        .trim_start()
         .split(|c: char| c == ',' || c.is_whitespace())
         .next()
         .map(|t| t.trim().to_string())
@@ -3034,5 +3045,305 @@ pub async fn adb_get_thumbnail(
     tokio::task::spawn_blocking(move || generate_thumbnail(&path_buf, dir_path))
         .await
         .map_err(|e| format!("Thumbnail task failed: {}", e))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression tests for the ADB network-info parsers in this module.
+    ///
+    /// Follow-up items found while writing these tests (NOT fixed here; each should
+    /// become its own scoped task with PRD/blueprint/plan/review):
+    ///
+    /// 1. `parse_dumpsys_wifi` uses a "last mWifiInfo wins" heuristic. Real
+    ///    `dumpsys wifi` output can contain historical `mWifiInfo` lines inside
+    ///    connection-log sections that are NOT the current state. A trailing
+    ///    disconnected history entry suppresses a genuinely current connected
+    ///    state. Needs a more selective "current state" heuristic (e.g. the first
+    ///    mWifiInfo, or one keyed to the active WifiClient block).
+    ///
+    /// 2. `is_valid_assoc` requires a non-unknown SSID, so a valid connection whose
+    ///    SSID is restricted/hidden (Android 10+ without location permission, or a
+    ///    hidden SSID) is dropped entirely — contradicting PRD FR-1 "Hidden SSID →
+    ///    tampilkan sebagai 'Hidden Network'" and US-5 (Android 10+ graceful).
+    // ---------------------------------------------------------------------
+    // MAC / SSID / sentinel helpers
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn is_valid_mac_accepts_standard_and_locally_administered() {
+        assert!(is_valid_mac("00:11:22:33:44:55"));
+        assert!(is_valid_mac("7e:70:db:d9:e1:5d")); // locally administered AP BSSID
+        assert!(is_valid_mac("AA:BB:CC:DD:EE:FF")); // uppercase hex
+        assert!(is_valid_mac("aa:bb:cc:dd:ee:ff")); // lowercase hex
+    }
+
+    #[test]
+    fn is_valid_mac_rejects_malformed() {
+        assert!(!is_valid_mac("00:11:22:33:44")); // too few groups
+        assert!(!is_valid_mac("00:11:22:33:44:55:66")); // too many groups
+        assert!(!is_valid_mac("001122334455")); // no separators
+        assert!(!is_valid_mac("00:11:22:33:44:5g")); // non-hex char
+        assert!(!is_valid_mac("<none>"));
+        assert!(!is_valid_mac(""));
+    }
+
+    #[test]
+    fn is_zero_mac_detects_all_zero_case_insensitively() {
+        assert!(is_zero_mac("00:00:00:00:00:00"));
+        assert!(is_zero_mac("00:00:00:00:00:00".to_uppercase().as_str()));
+        assert!(!is_zero_mac("00:11:22:33:44:55"));
+    }
+
+    #[test]
+    fn is_privacy_placeholder_mac_detects_android6_placeholder_only() {
+        assert!(is_privacy_placeholder_mac("02:00:00:00:00:00"));
+        assert!(is_privacy_placeholder_mac("02:00:00:00:00:00".to_uppercase().as_str()));
+        assert!(!is_privacy_placeholder_mac("02:00:00:00:00:01")); // not the exact sentinel
+        assert!(!is_privacy_placeholder_mac("7e:70:db:d9:e1:5d"));
+    }
+
+    #[test]
+    fn is_unknown_ssid_recognizes_android_placeholders() {
+        assert!(is_unknown_ssid("<unknown ssid>"));
+        assert!(is_unknown_ssid("<unknown>"));
+        assert!(is_unknown_ssid("<none>"));
+        assert!(is_unknown_ssid(""));
+        assert!(is_unknown_ssid("   "));
+        assert!(is_unknown_ssid("<unknownxyz>")); // starts_with("<unknown")
+        assert!(!is_unknown_ssid("MSI"));
+        assert!(!is_unknown_ssid("MyHome5G"));
+    }
+
+    #[test]
+    fn is_placeholder_ip_recognizes_sentinels() {
+        assert!(is_placeholder_ip("0.0.0.0"));
+        assert!(is_placeholder_ip("null"));
+        assert!(is_placeholder_ip(""));
+        assert!(is_placeholder_ip("  "));
+        assert!(!is_placeholder_ip("192.168.137.142"));
+        assert!(!is_placeholder_ip("10.0.0.1"));
+    }
+
+    #[test]
+    fn is_placeholder_u32_flags_zero_and_max() {
+        assert!(is_placeholder_u32(0));
+        assert!(is_placeholder_u32(u32::MAX));
+        assert!(!is_placeholder_u32(96));
+        assert!(!is_placeholder_u32(5805));
+    }
+
+    #[test]
+    fn is_placeholder_signal_flags_out_of_range() {
+        assert!(is_placeholder_signal(-127)); // Android "unavailable" RSSI sentinel
+        assert!(is_placeholder_signal(100)); // positive is invalid for dBm
+        // 0 is the exclusive upper boundary: the function flags `n > 0`, so 0 is
+        // treated as a (theoretically extreme) valid signal, not a placeholder.
+        assert!(!is_placeholder_signal(0));
+        assert!(!is_placeholder_signal(-58));
+        assert!(!is_placeholder_signal(-42));
+        assert!(!is_placeholder_signal(-120)); // boundary: -120 is the lowest valid value
+    }
+
+    // ---------------------------------------------------------------------
+    // SSID / BSSID / number / IP extraction
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn parse_ssid_value_quoted_unquoted_and_case_insensitive() {
+        assert_eq!(parse_ssid_value(r#"SSID: "MSI", "#).as_deref(), Some("MSI"));
+        assert_eq!(parse_ssid_value(r#"SSID: "MyHome5G""#).as_deref(), Some("MyHome5G"));
+        assert_eq!(parse_ssid_value(r#"ssid: "Hidden", "#).as_deref(), Some("Hidden")); // lowercase prefix
+        assert_eq!(parse_ssid_value("SSID: MyNet,").as_deref(), Some("MyNet")); // unquoted
+        // Unquoted multi-token placeholder: the whitespace split captures only the
+        // first token ("<unknown"); is_unknown_ssid still matches via starts_with.
+        assert_eq!(parse_ssid_value("SSID: <unknown ssid>").as_deref(), Some("<unknown"));
+        assert!(parse_ssid_value("no ssid here").is_none());
+    }
+
+    #[test]
+    fn parse_bssid_value_lowercases_valid_mac_with_or_without_space() {
+        // Real ADB format has a space after "BSSID:"; both must parse. This is the
+        // regression guard for the trim_start() fix in parse_bssid_value.
+        assert_eq!(parse_bssid_value("BSSID: 7e:70:db:d9:e1:5d,").as_deref(), Some("7e:70:db:d9:e1:5d"));
+        assert_eq!(parse_bssid_value("BSSID:7e:70:db:d9:e1:5d,").as_deref(), Some("7e:70:db:d9:e1:5d"));
+        assert_eq!(parse_bssid_value("BSSID: 7E:70:DB:D9:E1:5D,").as_deref(), Some("7e:70:db:d9:e1:5d"));
+    }
+
+    #[test]
+    fn parse_bssid_value_passes_zero_mac_through_caller_filters_it() {
+        // parse_bssid_value itself returns the zero MAC; parse_dumpsys_wifi is
+        // responsible for rejecting it via is_zero_mac before use.
+        assert_eq!(parse_bssid_value("BSSID: 00:00:00:00:00:00,").as_deref(), Some("00:00:00:00:00:00"));
+    }
+
+    #[test]
+    fn parse_bssid_value_rejects_non_mac() {
+        assert!(parse_bssid_value("BSSID: <none>").is_none());
+        assert!(parse_bssid_value("no bssid here").is_none());
+    }
+
+    #[test]
+    fn parse_supplicant_state_extracts_lowercased_token() {
+        // Real format: "Supplicant state: COMPLETED, Wi-Fi standard: ...".
+        // Regression guard for the trim_start() fix (leading space after colon).
+        assert_eq!(
+            parse_supplicant_state("Supplicant state: COMPLETED, Wi-Fi standard: 11ac").as_deref(),
+            Some("completed")
+        );
+        assert_eq!(
+            parse_supplicant_state("Supplicant state: DISCONNECTED, foo").as_deref(),
+            Some("disconnected")
+        );
+        assert!(parse_supplicant_state("no supplicant state here").is_none());
+    }
+
+    #[test]
+    fn extract_number_after_parses_signed_and_unsigned() {
+        assert_eq!(extract_number_after("RSSI: -58,", "RSSI:"), Some(-58));
+        assert_eq!(extract_number_after("Link speed: 96Mbps", "Link speed:"), Some(96));
+        assert_eq!(extract_number_after("Frequency: 5805MHz", "Frequency:"), Some(5805));
+        assert!(extract_number_after("no number here", "RSSI:").is_none());
+    }
+
+    #[test]
+    fn extract_ip_after_strips_leading_slash_and_filters_placeholders() {
+        assert_eq!(extract_ip_after("IP: /192.168.137.142,", "IP:").as_deref(), Some("192.168.137.142"));
+        assert_eq!(extract_ip_after("IP: 10.0.0.1", "IP:").as_deref(), Some("10.0.0.1"));
+        assert!(extract_ip_after("IP: null", "IP:").is_none());
+        assert!(extract_ip_after("IP: 0.0.0.0", "IP:").is_none());
+        assert!(extract_ip_after("IP: ,", "IP:").is_none());
+    }
+
+    // ---------------------------------------------------------------------
+    // Other command parsers
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn parse_http_proxy_filters_empty_and_sentinels() {
+        assert!(parse_http_proxy("").is_none());
+        assert!(parse_http_proxy("   ").is_none());
+        assert!(parse_http_proxy("null").is_none());
+        assert!(parse_http_proxy("0").is_none());
+        assert!(parse_http_proxy(":0").is_none());
+        assert_eq!(parse_http_proxy("192.168.1.1:8080").as_deref(), Some("192.168.1.1:8080"));
+        assert_eq!(parse_http_proxy("proxy.example.com:3128").as_deref(), Some("proxy.example.com:3128"));
+    }
+
+    #[test]
+    fn parse_network_type_detects_wifi_mobile_vpn() {
+        assert_eq!(parse_network_type("transports: wifi").as_deref(), Some("Wi-Fi"));
+        assert_eq!(parse_network_type("type: wifi state: CONNECTED").as_deref(), Some("Wi-Fi"));
+        assert_eq!(parse_network_type("active network: wifi").as_deref(), Some("Wi-Fi"));
+        assert_eq!(parse_network_type("transports: cellular").as_deref(), Some("Mobile"));
+        assert_eq!(parse_network_type("type: mobile").as_deref(), Some("Mobile"));
+        assert_eq!(parse_network_type("transports: vpn").as_deref(), Some("VPN"));
+        assert_eq!(parse_network_type("type: vpn").as_deref(), Some("VPN"));
+        assert!(parse_network_type("nothing recognized here").is_none());
+    }
+
+    #[test]
+    fn parse_ip_from_ip_route_extracts_src_ip() {
+        assert_eq!(
+            parse_ip_from_ip_route("8.8.8.8 via 192.168.1.1 dev wlan0 table 1037 src 192.168.1.5 uid 2000").as_deref(),
+            Some("192.168.1.5")
+        );
+    }
+
+    #[test]
+    fn parse_ip_from_ip_route_filters_placeholder_src() {
+        assert!(parse_ip_from_ip_route("8.8.8.8 via 10.0.0.1 src 0.0.0.0").is_none());
+        assert!(parse_ip_from_ip_route("8.8.8.8 via 10.0.0.1 src null").is_none());
+    }
+
+    #[test]
+    fn parse_ip_from_ip_route_returns_none_without_src() {
+        assert!(parse_ip_from_ip_route("8.8.8.8 via 192.168.1.1 dev wlan0").is_none());
+        assert!(parse_ip_from_ip_route("").is_none());
+    }
+
+    #[test]
+    fn parse_mac_from_ip_addr_extracts_link_ether_lowercased() {
+        let out = "3: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\n    link/ether 00:11:22:33:44:55 brd ff:ff:ff:ff:ff:ff\n    inet 192.168.1.5/24";
+        assert_eq!(parse_mac_from_ip_addr(out).as_deref(), Some("00:11:22:33:44:55"));
+        assert_eq!(parse_mac_from_ip_addr("    link/ether AA:BB:CC:DD:EE:FF brd").as_deref(), Some("aa:bb:cc:dd:ee:ff"));
+    }
+
+    #[test]
+    fn parse_mac_from_ip_addr_rejects_zero_and_placeholder() {
+        assert!(parse_mac_from_ip_addr("    link/ether 00:00:00:00:00:00 brd").is_none());
+        assert!(parse_mac_from_ip_addr("    link/ether 02:00:00:00:00:00 brd").is_none());
+        assert!(parse_mac_from_ip_addr("no ether line here").is_none());
+    }
+
+    #[test]
+    fn parse_mac_from_ifconfig_extracts_hwaddr_and_ether() {
+        assert_eq!(parse_mac_from_ifconfig("wlan0    HWaddr 00:11:22:33:44:55").as_deref(), Some("00:11:22:33:44:55"));
+        assert_eq!(parse_mac_from_ifconfig("ether aa:bb:cc:dd:ee:ff").as_deref(), Some("aa:bb:cc:dd:ee:ff"));
+        assert!(parse_mac_from_ifconfig("HWaddr 00:00:00:00:00:00").is_none()); // zero mac rejected
+    }
+
+    // ---------------------------------------------------------------------
+    // parse_dumpsys_wifi — integration of the wifi block parser
+    // ---------------------------------------------------------------------
+
+    // The real connected mWifiInfo line from a Pixel/AOSP device (captured
+    // 2026-06-16). Acts as a regression guard for the real Android output format
+    // and for the parse_bssid_value trim_start() fix.
+    const REAL_CONNECTED_MWIFI: &str = r#"mWifiInfo SSID: "MSI", BSSID: 7e:70:db:d9:e1:5d, MAC: 9e:23:aa:a2:a5:09, IP: /192.168.137.142, Security type: 2, Supplicant state: COMPLETED, Wi-Fi standard: 11ac, RSSI: -58, Link speed: 96Mbps, Tx Link speed: 96Mbps, Max Supported Tx Link speed: 96Mbps, Rx Link speed: 86Mbps, Max Supported Rx Link speed: 96Mbps, Frequency: 5805MHz"#;
+
+    const REAL_DISCONNECTED_MWIFI: &str = r#"mWifiInfo SSID: <unknown ssid>, BSSID: <none>, MAC: 02:00:00:00:00:00, IP: null, Security type: -1, Supplicant state: DISCONNECTED, Wi-Fi standard: 11ac, RSSI: -127, Link speed: -1Mbps, Tx Link speed: -1Mbps, Max Supported Tx Link speed: -1Mbps, Rx Link speed: -1Mbps, Max Supported Rx Link speed: -1Mbps, Frequency: -1MHz"#;
+
+    #[test]
+    fn parse_dumpsys_wifi_real_connected_line_populates_all_fields() {
+        let info = parse_dumpsys_wifi(REAL_CONNECTED_MWIFI);
+        assert_eq!(info.ssid.as_deref(), Some("MSI"));
+        assert_eq!(info.bssid.as_deref(), Some("7e:70:db:d9:e1:5d"));
+        assert_eq!(info.signal_dbm, Some(-58));
+        assert_eq!(info.link_speed_mbps, Some(96));
+        assert_eq!(info.frequency_mhz, Some(5805));
+        assert_eq!(info.ip_address.as_deref(), Some("192.168.137.142"));
+        // device_mac / http_proxy / network_type come from other ADB commands,
+        // not from this parser — they stay None here.
+        assert!(info.device_mac.is_none());
+        assert!(info.http_proxy.is_none());
+        assert!(info.network_type.is_none());
+    }
+
+    #[test]
+    fn parse_dumpsys_wifi_disconnected_line_returns_empty() {
+        let info = parse_dumpsys_wifi(REAL_DISCONNECTED_MWIFI);
+        assert!(info.ssid.is_none());
+        assert!(info.bssid.is_none());
+        assert!(info.signal_dbm.is_none());
+        assert!(info.link_speed_mbps.is_none());
+        assert!(info.frequency_mhz.is_none());
+        assert!(info.ip_address.is_none());
+    }
+
+    #[test]
+    fn parse_dumpsys_wifi_trailing_disconnected_clears_connected_data() {
+        // Documents the supplicant-state-aware "last mWifiInfo wins" contract
+        // (commit d938077): a trailing disconnected entry clears stale connected
+        // data so a freshly-disconnected device does not still show a network.
+        // NOTE: see follow-up item #1 in the module header — this contract also
+        // lets history-section disconnected mWifiInfo lines suppress a current
+        // connected state.
+        let combined = format!("{}\n{}", REAL_CONNECTED_MWIFI, REAL_DISCONNECTED_MWIFI);
+        let info = parse_dumpsys_wifi(&combined);
+        assert!(info.ssid.is_none());
+        assert!(info.bssid.is_none());
+        assert!(info.signal_dbm.is_none());
+    }
+
+    #[test]
+    fn parse_dumpsys_wifi_trailing_connected_populates_after_disconnected() {
+        let combined = format!("{}\n{}", REAL_DISCONNECTED_MWIFI, REAL_CONNECTED_MWIFI);
+        let info = parse_dumpsys_wifi(&combined);
+        assert_eq!(info.ssid.as_deref(), Some("MSI"));
+        assert_eq!(info.bssid.as_deref(), Some("7e:70:db:d9:e1:5d"));
+        assert_eq!(info.signal_dbm, Some(-58));
+    }
 }
 
