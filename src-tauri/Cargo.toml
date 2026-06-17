@@ -28,7 +28,7 @@ which = "7"
 reqwest = { version = "0.12", features = ["json"] }
 zip = "2"
 walkdir = "2"
-opener = "0.7"
+opener = "0.8"
 regex = "1"
 base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
