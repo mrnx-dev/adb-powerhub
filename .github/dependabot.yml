@@ -7,6 +7,16 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    groups:
+      # Production deps together -> fewer package-lock conflicts
+      production:
+        dependency-type: "production"
+      # Dev tooling deps together (eslint, vite, vue-tsc, typescript-eslint, ...)
+      development:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "cargo"
     directory: "/src-tauri"
@@ -15,6 +25,12 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    groups:
+      # Bump all cargo deps in a single PR so Cargo.lock only drifts once
+      # -> eliminates the recurring lockfile conflicts between parallel dependabot PRs.
+      cargo-dependencies:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -23,3 +39,8 @@ updates:
     open-pull-requests-limit: 3
     labels:
       - "ci"
+    groups:
+      # All GitHub Actions bumps in one PR
+      github-actions:
+        patterns:
+          - "*"
