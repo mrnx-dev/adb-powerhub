@@ -375,6 +375,22 @@ pub fn resolve_icon_paths(aapt2_path: &str, apk_path: &Path) -> Result<Vec<IconR
         });
     }
 
+    let icons = parse_aapt2_badging_stdout(&stdout)?;
+
+    eprintln!(
+        "[icons] aapt2 resolved {} icon candidates: {:?}",
+        icons.len(),
+        icons.iter().map(|i| &i.apk_path).collect::<Vec<_>>()
+    );
+
+    Ok(icons)
+}
+
+/// Parse aapt2 `dump badging` stdout into a list of icon resources.
+/// Pure function (no I/O) - the line-parsing logic extracted from
+/// `resolve_icon_paths` so it is directly unit-testable. Returns Err if no
+/// icon resource is found.
+pub(crate) fn parse_aapt2_badging_stdout(stdout: &str) -> Result<Vec<IconResource>, String> {
     let mut icons = Vec::new();
 
     for line in stdout.lines() {
@@ -398,12 +414,6 @@ pub fn resolve_icon_paths(aapt2_path: &str, apk_path: &Path) -> Result<Vec<IconR
     if icons.is_empty() {
         return Err("No icon resource found in aapt2 output".to_string());
     }
-
-    eprintln!(
-        "[icons] aapt2 resolved {} icon candidates: {:?}",
-        icons.len(),
-        icons.iter().map(|i| &i.apk_path).collect::<Vec<_>>()
-    );
 
     Ok(icons)
 }
@@ -468,18 +478,15 @@ pub fn extract_zip_entry(apk_path: &Path, entry_name: &str) -> Result<Vec<u8>, S
 
 // ─── Adaptive Icon Handling ────────────────────────────────────
 
-fn parse_adaptive_xml(
-    apk_path: &Path,
-    xml_entry: &str,
-) -> Result<(String, String), String> {
-    let xml_bytes = extract_zip_entry(apk_path, xml_entry)?;
-    let xml_str =
-        String::from_utf8(xml_bytes).map_err(|e| format!("Adaptive icon XML is not UTF-8: {}", e))?;
-
+/// Parse adaptive-icon XML text into `(foreground_ref, background_ref)` drawable
+/// references. Pure function (no I/O) — the line-parsing logic extracted from
+/// `parse_adaptive_xml` so it is directly unit-testable. `foreground` is required
+/// (Err if absent); `background` is optional (empty string if not found).
+pub(crate) fn parse_adaptive_icon_refs(xml: &str) -> Result<(String, String), String> {
     let mut foreground = String::new();
     let mut background = String::new();
 
-    for line in xml_str.lines() {
+    for line in xml.lines() {
         let line = line.trim();
         for attr in &["android:foreground=", "android:drawable="] {
             if foreground.is_empty() && line.contains("foreground") {
@@ -505,9 +512,18 @@ fn parse_adaptive_xml(
         return Err("Could not find foreground drawable in adaptive icon XML".to_string());
     }
 
-    if background.is_empty() {
-        background = String::new();
-    }
+    Ok((foreground, background))
+}
+
+fn parse_adaptive_xml(
+    apk_path: &Path,
+    xml_entry: &str,
+) -> Result<(String, String), String> {
+    let xml_bytes = extract_zip_entry(apk_path, xml_entry)?;
+    let xml_str =
+        String::from_utf8(xml_bytes).map_err(|e| format!("Adaptive icon XML is not UTF-8: {}", e))?;
+
+    let (foreground, background) = parse_adaptive_icon_refs(&xml_str)?;
 
     let resolved_fg = resolve_drawable(apk_path, &foreground)?;
     let resolved_bg = if background.is_empty() {
@@ -521,8 +537,19 @@ fn parse_adaptive_xml(
 
 fn extract_drawable_ref(attr_value: &str) -> Option<String> {
     let val = attr_value.trim();
-    let val = val.strip_prefix('\"').unwrap_or(val);
-    let val = val.strip_suffix('\"').unwrap_or(val);
+    // Parse a quoted attribute value properly: take content between the
+    // opening quote and the NEXT quote. Handles self-closing tags
+    // (`android:drawable="@drawable/fg" />`) where the previous naive
+    // strip_prefix/strip_suffix left trailing ` />` and rfind('/') then
+    // matched the slash of `/>`, returning garbage like ">".
+    let val = if let Some(rest) = val.strip_prefix('"') {
+        match rest.find('"') {
+            Some(end) => &rest[..end],
+            None => rest, // unterminated quote - best effort
+        }
+    } else {
+        val.strip_suffix('"').unwrap_or(val)
+    };
     if let Some(slash_pos) = val.rfind('/') {
         Some(val[slash_pos + 1..].to_string())
     } else {
@@ -719,6 +746,20 @@ mod tests {
         assert_eq!(extract_drawable_ref("\"ic_launcher\""), Some("ic_launcher".to_string()));
     }
 
+    #[test]
+    fn extract_drawable_ref_handles_self_closing_tag_suffix() {
+        // Regression: previously rfind('/') matched the slash of `/>` after a
+        // quoted drawable value, returning ">" instead of the drawable name.
+        assert_eq!(
+            extract_drawable_ref("\"@drawable/fg\" />"),
+            Some("fg".to_string())
+        );
+        assert_eq!(
+            extract_drawable_ref("\"@mipmap-v31/ic\"/>"),
+            Some("ic".to_string())
+        );
+    }
+
     // ── extract_density (pure parser, sub-logic of resolve_icon_paths) ──
 
     #[test]
@@ -848,5 +889,84 @@ mod tests {
         assert!(cache.entries.contains_key("pkgA"));
         assert_eq!(cache.total_size_bytes, 100);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── parse_adaptive_icon_refs (pure; direct test, PRD §2.4 un-deferred) ──
+
+    #[test]
+    fn parse_adaptive_icon_refs_extracts_foreground_and_background() {
+        let xml = "<adaptive-icon>\n                   <background android:drawable=\"@drawable/bg\" />\n                   <foreground android:drawable=\"@drawable/fg\" />\n                   </adaptive-icon>";
+        let (fg, bg) = parse_adaptive_icon_refs(xml).unwrap();
+        assert_eq!(fg, "fg");
+        assert_eq!(bg, "bg");
+    }
+
+    #[test]
+    fn parse_adaptive_icon_refs_returns_empty_background_when_only_foreground() {
+        let xml = "<adaptive-icon>\n                   <foreground android:drawable=\"@drawable/fg\" />\n                   </adaptive-icon>";
+        let (fg, bg) = parse_adaptive_icon_refs(xml).unwrap();
+        assert_eq!(fg, "fg");
+        assert_eq!(bg, "");
+    }
+
+    #[test]
+    fn parse_adaptive_icon_refs_accepts_android_drawable_attr_for_foreground() {
+        // Some adaptive icons use android:drawable= instead of android:foreground=.
+        let xml = "<adaptive-icon>\n                   <background android:drawable=\"@drawable/bg\" />\n                   <foreground android:drawable=\"@drawable/fg_v31\" />\n                   </adaptive-icon>";
+        let (fg, bg) = parse_adaptive_icon_refs(xml).unwrap();
+        assert_eq!(fg, "fg_v31");
+        assert_eq!(bg, "bg");
+    }
+
+    #[test]
+    fn parse_adaptive_icon_refs_errors_when_no_foreground() {
+        let xml = "<adaptive-icon>\n                   <background android:drawable=\"@drawable/bg\" />\n                   </adaptive-icon>";
+        let err = parse_adaptive_icon_refs(xml).expect_err("missing foreground should error");
+        assert!(err.contains("foreground"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn parse_adaptive_icon_refs_errors_on_empty_xml() {
+        assert!(parse_adaptive_icon_refs("").is_err());
+    }
+
+    // ── parse_aapt2_badging_stdout (pure; direct test, PRD §2.4 un-deferred) ──
+
+    #[test]
+    fn parse_aapt2_badging_stdout_extracts_icon_from_application_line() {
+        let stdout = "package: name='com.example.app'\n                      application: label='Example' icon='res/mipmap-xxxhdpi/ic_launcher.png'\n";
+        let icons = parse_aapt2_badging_stdout(stdout).unwrap();
+        assert_eq!(icons.len(), 1);
+        assert_eq!(icons[0].apk_path, "res/mipmap-xxxhdpi/ic_launcher.png");
+        assert_eq!(icons[0].density, "xxxhdpi");
+    }
+
+    #[test]
+    fn parse_aapt2_badging_stdout_extracts_both_application_and_launchable_icons() {
+        let stdout = "application: label='Example' icon='res/mipmap-xxxhdpi/ic_launcher.png'\n                      launchable-activity: name='com.example.MainActivity' icon='res/drawable/ic_alt.png'\n";
+        let icons = parse_aapt2_badging_stdout(stdout).unwrap();
+        assert_eq!(icons.len(), 2);
+        assert_eq!(icons[0].density, "xxxhdpi");
+        assert_eq!(icons[1].density, "drawable");
+    }
+
+    #[test]
+    fn parse_aapt2_badging_stdout_skips_lines_without_application_prefix() {
+        let stdout = "package: name='com.example.app'\n                      uses-permission: android.permission.INTERNET\n                      application: label='Example' icon='res/mipmap-hdpi/ic.png'\n";
+        let icons = parse_aapt2_badging_stdout(stdout).unwrap();
+        assert_eq!(icons.len(), 1);
+        assert_eq!(icons[0].apk_path, "res/mipmap-hdpi/ic.png");
+    }
+
+    #[test]
+    fn parse_aapt2_badging_stdout_errors_when_no_icon_resource_found() {
+        let stdout = "package: name='com.example.app'\n                      uses-permission: android.permission.INTERNET\n";
+        let err = parse_aapt2_badging_stdout(stdout).expect_err("no icon should error");
+        assert!(err.contains("No icon resource"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn parse_aapt2_badging_stdout_errors_on_empty_stdout() {
+        assert!(parse_aapt2_badging_stdout("").is_err());
     }
 }
