@@ -676,3 +676,177 @@ pub fn extract_icon(
     let _ = std::fs::remove_file(&temp_apk);
     result
 }
+
+// ─── Tests ─────────────────────────────────────────────────────
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Resolve a fixture file under `src-tauri/tests/fixtures/` via
+    /// `CARGO_MANIFEST_DIR` so it works locally and in CI. (Blueprint §2.2)
+    fn fixture(name: &str) -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures")
+            .join(name)
+    }
+
+    // ── extract_drawable_ref (pure parser, sub-logic of parse_adaptive_xml) ──
+
+    #[test]
+    fn extract_drawable_ref_strips_resource_prefix_and_returns_last_segment() {
+        assert_eq!(
+            extract_drawable_ref("@drawable/foreground"),
+            Some("foreground".to_string())
+        );
+        assert_eq!(
+            extract_drawable_ref("@mipmap-v31/icon"),
+            Some("icon".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_drawable_ref_strips_surrounding_quotes() {
+        assert_eq!(
+            extract_drawable_ref("\"@drawable/fg\""),
+            Some("fg".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_drawable_ref_returns_value_as_is_when_no_slash() {
+        assert_eq!(extract_drawable_ref("ic_launcher"), Some("ic_launcher".to_string()));
+        // quoted no-slash
+        assert_eq!(extract_drawable_ref("\"ic_launcher\""), Some("ic_launcher".to_string()));
+    }
+
+    // ── extract_density (pure parser, sub-logic of resolve_icon_paths) ──
+
+    #[test]
+    fn extract_density_extracts_density_qualifier_from_parent_dir() {
+        assert_eq!(
+            extract_density("res/mipmap-xxxhdpi/icon.png"),
+            "xxxhdpi"
+        );
+        assert_eq!(extract_density("res/drawable-hdpi-v4/bg.png"), "hdpi-v4");
+    }
+
+    #[test]
+    fn extract_density_returns_parent_dir_when_no_qualifier() {
+        assert_eq!(extract_density("res/drawable/icon.png"), "drawable");
+    }
+
+    #[test]
+    fn extract_density_returns_unknown_when_path_has_no_parent() {
+        assert_eq!(extract_density("icon.png"), "unknown");
+    }
+
+    // ── extract_zip_entry (reads fixture ZIP; deterministic, no device) ──
+
+    #[test]
+    fn extract_zip_entry_reads_named_entry_from_fixture() {
+        let bytes = extract_zip_entry(&fixture("dummy.zip"), "hello.txt")
+            .expect("hello.txt should exist in dummy.zip");
+        assert_eq!(bytes, b"hello");
+    }
+
+    #[test]
+    fn extract_zip_entry_reads_nested_entry_from_fixture() {
+        let bytes = extract_zip_entry(&fixture("dummy.zip"), "sub/nested.txt")
+            .expect("sub/nested.txt should exist in dummy.zip");
+        assert_eq!(bytes, b"world");
+    }
+
+    #[test]
+    fn extract_zip_entry_errors_on_missing_entry() {
+        let err = extract_zip_entry(&fixture("dummy.zip"), "does-not-exist.txt")
+            .expect_err("missing entry should error");
+        assert!(err.contains("not found"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn extract_zip_entry_errors_on_malformed_zip() {
+        let err = extract_zip_entry(&fixture("malformed.bin"), "anything")
+            .expect_err("malformed archive should error");
+        assert!(err.contains("Cannot read APK as ZIP"), "unexpected error: {err}");
+    }
+
+    // ── evict_lru / cleanup_stale_cache (filesystem-backed, tempdir) ──
+
+    /// Build a temp cache dir with the given entries (each entry's png file is
+    /// created as a zero-byte placeholder; only the metadata size matters for
+    /// LRU accounting). The dir is unique per call via an atomic counter to
+    /// avoid races between parallel tests.
+    fn build_cache(entries: &[(&str, u64, u64)]) -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!(
+            "adb-powerhub-test-{}-{}",
+            std::process::id(),
+            id
+        ));
+        let _ = std::fs::create_dir_all(&dir);
+        let mut cache = IconCache::new();
+        for (pkg, size, last_access) in entries {
+            let file = format!("{}.png", pkg);
+            std::fs::write(dir.join(&file), b"placeholder").ok();
+            cache.entries.insert(
+                (*pkg).to_string(),
+                CacheEntry {
+                    version_code: 1,
+                    file,
+                    size_bytes: *size,
+                    last_access: *last_access,
+                    is_adaptive: false,
+                },
+            );
+            cache.total_size_bytes += size;
+        }
+        write_cache(&dir, &cache);
+        dir
+    }
+
+    #[test]
+    fn evict_lru_removes_oldest_entries_until_under_target() {
+        // 3 entries: A(oldest), B, C(newest). total=300. target=150 → evict A+B.
+        let dir = build_cache(&[("pkgA", 100, 100), ("pkgB", 100, 200), ("pkgC", 100, 300)]);
+        evict_lru(&dir, 150);
+        let cache = read_cache(&dir);
+        assert!(cache.entries.contains_key("pkgC"), "newest entry must remain");
+        assert!(!cache.entries.contains_key("pkgA"), "oldest entry must be evicted");
+        assert!(!cache.entries.contains_key("pkgB"), "second-oldest must be evicted");
+        assert!(cache.total_size_bytes <= 150);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn evict_lru_noops_when_already_under_target() {
+        let dir = build_cache(&[("pkgA", 50, 100)]);
+        evict_lru(&dir, 1000); // target way above total
+        let cache = read_cache(&dir);
+        assert!(cache.entries.contains_key("pkgA"), "entry must remain when under target");
+        assert_eq!(cache.total_size_bytes, 50);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cleanup_stale_cache_removes_packages_not_in_current_set() {
+        let dir = build_cache(&[("pkgA", 100, 100), ("pkgB", 100, 200), ("pkgC", 100, 300)]);
+        cleanup_stale_cache(&dir, &["pkgA".to_string(), "pkgC".to_string()]);
+        let cache = read_cache(&dir);
+        assert!(cache.entries.contains_key("pkgA"));
+        assert!(cache.entries.contains_key("pkgC"));
+        assert!(!cache.entries.contains_key("pkgB"), "stale pkgB must be removed");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cleanup_stale_cache_noops_when_no_stale_entries() {
+        let dir = build_cache(&[("pkgA", 100, 100)]);
+        cleanup_stale_cache(&dir, &["pkgA".to_string()]);
+        let cache = read_cache(&dir);
+        assert!(cache.entries.contains_key("pkgA"));
+        assert_eq!(cache.total_size_bytes, 100);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
