@@ -331,17 +331,13 @@ pub async fn settings_download_adb(
     Ok(final_path)
 }
 
-#[tauri::command]
-pub fn settings_get_adb_version(path: String) -> Result<(u32, u32, u32), String> {
-    let output = Command::new(&path)
-        .no_window()
-        .arg("version")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| format!("Cannot execute adb: {}", e))?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+/// Parse the stdout of `adb version` into a `(major, minor, patch)` tuple.
+///
+/// Recognizes two line formats emitted by ADB across platforms:
+///   - `Version 1.0.41`
+///   - `Android Debug Bridge Version 1.0.41`
+/// Returns the first matching line. Pure function (no I/O) so it is unit-testable.
+pub(crate) fn parse_adb_version_output(stdout: &str) -> Result<(u32, u32, u32), String> {
     for line in stdout.lines() {
         let trimmed = line.trim();
         if let Some(ver_str) = trimmed.strip_prefix("Version ") {
@@ -366,6 +362,20 @@ pub fn settings_get_adb_version(path: String) -> Result<(u32, u32, u32), String>
         }
     }
     Err("Could not parse ADB version".to_string())
+}
+
+#[tauri::command]
+pub fn settings_get_adb_version(path: String) -> Result<(u32, u32, u32), String> {
+    let output = Command::new(&path)
+        .no_window()
+        .arg("version")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| format!("Cannot execute adb: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    parse_adb_version_output(&stdout)
 }
 
 #[tauri::command]
