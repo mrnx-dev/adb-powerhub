@@ -62,7 +62,9 @@ cargo test --manifest-path src-tauri/Cargo.toml icons   # Run tests for one modu
   1. GitHub repo -> Settings -> Branches -> Add branch protection rule for `main`
   2. Tick "Require status checks to pass before merging"
   3. Add `test-rust` and `test-frontend` to the required list
-     This step is manual and cannot be automated from a file.
+
+  This step is manual and cannot be automated from a file.
+
 - **Flaky policy:** quarantine via `#[ignore]` (Rust) or `test.skip` (Vitest)
   with a TODO referencing a follow-up issue. No auto-retry.
 
