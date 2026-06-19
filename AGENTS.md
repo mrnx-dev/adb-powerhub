@@ -38,10 +38,33 @@ npm run lint                 # ESLint with auto-fix + Prettier
 npm run lint:check           # ESLint without fixing
 npm run format               # Prettier format all files
 npm run format:check         # Prettier check only
+npm run test                # Run frontend unit tests (vitest, one-shot)
+npm run test:watch          # Vitest watch mode for dev loop
+npm run test:coverage       # Vitest with coverage report (local only)
 npx vue-tsc --noEmit         # Type-check Vue/TypeScript frontend
 cargo check --manifest-path src-tauri/Cargo.toml   # Type-check Rust backend
 cargo test --manifest-path src-tauri/Cargo.toml    # Run Rust unit tests
+cargo test --manifest-path src-tauri/Cargo.toml icons   # Run tests for one module
 ```
+
+## Test & CI gating
+
+- **Frontend tests:** Vitest + happy-dom + @vue/test-utils. Tests colocated in
+  `src/**/__tests__/*.test.ts`. Run `npm run test` (one-shot) or
+  `npm run test:watch` during dev. Stores that call Tauri `invoke` are tested
+  by mocking `@tauri-apps/api/core` at the module boundary (`vi.mock`); stores
+  that use `@tauri-apps/plugin-store` are tested with an in-memory fake `load()`.
+- **Rust tests:** inline `#[cfg(test)] mod tests` per module + binary fixtures
+  in `src-tauri/tests/fixtures/`. Run `cargo test --manifest-path src-tauri/Cargo.toml`.
+- **CI jobs:** `ci.yml` runs `test-rust` and `test-frontend` on ubuntu-22.04
+  on every push/PR. They are currently in a **grace period** (non-required).
+  After green and stable for 1-2 weeks, enable them as required:
+  1. GitHub repo -> Settings -> Branches -> Add branch protection rule for `main`
+  2. Tick "Require status checks to pass before merging"
+  3. Add `test-rust` and `test-frontend` to the required list
+     This step is manual and cannot be automated from a file.
+- **Flaky policy:** quarantine via `#[ignore]` (Rust) or `test.skip` (Vitest)
+  with a TODO referencing a follow-up issue. No auto-retry.
 
 ---
 
