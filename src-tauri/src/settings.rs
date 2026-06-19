@@ -618,3 +618,71 @@ pub fn settings_set_aapt2_path(path: String, state: State<AppState>) -> Result<(
     *aapt2_path = if path.is_empty() { None } else { Some(path) };
     Ok(())
 }
+// ─── Tests ─────────────────────────────────────────────────────
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── parse_adb_version_output (pure; PRD FR-2, Blueprint §2.4) ──
+
+    #[test]
+    fn parse_adb_version_output_parses_android_debug_bridge_format() {
+        let stdout = "Android Debug Bridge Version 1.0.41\n\
+                      Version 1.0.41\n\
+                      Installed as /usr/bin/adb\n";
+        assert_eq!(parse_adb_version_output(stdout).unwrap(), (1, 0, 41));
+    }
+
+    #[test]
+    fn parse_adb_version_output_parses_version_prefix_format() {
+        // Some Windows/platform-tools builds print only "Version X.Y.Z".
+        assert_eq!(parse_adb_version_output("Version 35.0.2\n").unwrap(), (35, 0, 2));
+    }
+
+    #[test]
+    fn parse_adb_version_output_returns_first_matching_line() {
+        let stdout = "some preamble line\nVersion 1.0.41\nAndroid Debug Bridge Version 2.0.0\n";
+        // First match wins (Version 1.0.41), not the later 2.0.0 line.
+        assert_eq!(parse_adb_version_output(stdout).unwrap(), (1, 0, 41));
+    }
+
+    #[test]
+    fn parse_adb_version_output_parses_partial_major_minor_with_zero_patch() {
+        // Only major.minor present → patch defaults to 0.
+        assert_eq!(parse_adb_version_output("Version 2.0\n").unwrap(), (2, 0, 0));
+    }
+
+    #[test]
+    fn parse_adb_version_output_errors_on_unrecognized_output() {
+        let err = parse_adb_version_output("totally unrelated stdout\nno version here\n")
+            .expect_err("unrecognized output should error");
+        assert!(err.contains("Could not parse ADB version"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn parse_adb_version_output_errors_on_empty_stdout() {
+        assert!(parse_adb_version_output("").is_err());
+    }
+
+    // ── validate_*_internal empty-path guard (pure guard; PRD FR-2) ──
+    // Exec-path (spawning the binary) is intentionally NOT unit-tested —
+    // dropped per plan revision (cross-platform fixture friction, low value).
+
+    #[test]
+    fn validate_adb_internal_rejects_empty_path() {
+        let res = validate_adb_internal("   ");
+        assert!(res.is_err(), "empty/whitespace path should error");
+        let err = res.err().unwrap();
+        assert!(err.contains("ADB path is empty"), "unexpected error: {err}");
+        assert!(validate_adb_internal("").is_err());
+    }
+
+    #[test]
+    fn validate_scrcpy_internal_rejects_empty_path() {
+        let res = validate_scrcpy_internal("   ");
+        assert!(res.is_err(), "empty/whitespace path should error");
+        let err = res.err().unwrap();
+        assert!(err.contains("scrcpy path is empty"), "unexpected error: {err}");
+        assert!(validate_scrcpy_internal("").is_err());
+    }
+}
