@@ -30,7 +30,7 @@ zip = "8"
 walkdir = "2"
 opener = "0.8"
 regex = "1"
-base64 = "0.22"
+base64 = "0.23"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 
 [target.'cfg(unix)'.dependencies]
